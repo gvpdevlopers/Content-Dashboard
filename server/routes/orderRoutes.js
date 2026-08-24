@@ -4,6 +4,11 @@ const {
   createOrder,
   getMyOrders,
   getOrderById,
+  getAdminOrders,
+  getAdminOrderById,
+  updateOrderStatus,
+  updatePaymentStatus,
+  updateAdminNotes,
   getAdminCodOrders,
 } = require("../controllers/orderController");
 
@@ -12,7 +17,20 @@ const adminOnly = require("../middleware/admin");
 
 const router = express.Router();
 
-router.get("/", protect, getMyOrders);
+/*
+|--------------------------------------------------------------------------
+| Admin Routes
+|--------------------------------------------------------------------------
+| Keep these BEFORE /:id
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+  "/admin",
+  protect,
+  adminOnly,
+  getAdminOrders
+);
 
 router.get(
   "/admin/cod",
@@ -21,8 +39,56 @@ router.get(
   getAdminCodOrders
 );
 
-router.get("/:id", protect, getOrderById);
+router.get(
+  "/admin/:id",
+  protect,
+  adminOnly,
+  getAdminOrderById
+);
 
-router.post("/", protect, createOrder);
+router.patch(
+  "/admin/:id/status",
+  protect,
+  adminOnly,
+  updateOrderStatus
+);
+
+router.patch(
+  "/admin/:id/payment-status",
+  protect,
+  adminOnly,
+  updatePaymentStatus
+);
+
+router.patch(
+  "/admin/:id/notes",
+  protect,
+  adminOnly,
+  updateAdminNotes
+);
+
+/*
+|--------------------------------------------------------------------------
+| Client Routes
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+  "/",
+  protect,
+  getMyOrders
+);
+
+router.get(
+  "/:id",
+  protect,
+  getOrderById
+);
+
+router.post(
+  "/",
+  protect,
+  createOrder
+);
 
 module.exports = router;

@@ -155,8 +155,8 @@ const Dashboard = () => {
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-cyan-200/40">
             Welcome back
           </p>
+            <h1 className="mt-1 text-3xl font-medium tracking-tight sm:text-4xl">
 
-          <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl lg:text-5xl">
             Hello, {firstName}.
           </h1>
 

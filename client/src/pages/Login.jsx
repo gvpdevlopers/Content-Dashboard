@@ -29,12 +29,16 @@ const Login = () => {
     }
 
     try {
-      setLoading(true);
+  setLoading(true);
 
-      await login(identifier.trim(), password);
+  const data = await login(identifier.trim(), password);
 
-      navigate("/dashboard", { replace: true });
-    } catch (error) {
+  if (data.user.role === "admin") {
+    navigate("/admin", { replace: true });
+  } else {
+    navigate("/dashboard", { replace: true });
+  }
+}catch (error) {
       const message =
         error.response?.data?.message ||
         "Unable to login. Please try again.";

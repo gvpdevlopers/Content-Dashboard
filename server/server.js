@@ -8,6 +8,7 @@ const serviceRoutes = require("./routes/serviceRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const codRoutes = require("./routes/codRoutes");
+const adminUserRoutes = require("./routes/adminUserRoutes");
 
 const connectDB = require("./config/db");
 
@@ -36,16 +37,7 @@ app.use("/api/services", serviceRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/cod", codRoutes);
-
-console.log("Razorpay Key ID:", process.env.RAZORPAY_KEY_ID);
-console.log(
-  "Razorpay Secret Loaded:",
-  process.env.RAZORPAY_KEY_SECRET ? "YES" : "NO"
-);
-console.log(
-  "Razorpay Secret Length:",
-  process.env.RAZORPAY_KEY_SECRET?.length
-);
+app.use("/api/users", adminUserRoutes);
 
 const PORT = process.env.PORT || 5000;
 

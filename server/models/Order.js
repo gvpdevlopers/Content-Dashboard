@@ -106,7 +106,17 @@ codCollectedAt: {
   type: Date,
   default: null,
 },
-
+orderStatus: {
+  type: String,
+  enum: [
+    "pending",
+    "processing",
+    "in_progress",
+    "completed",
+    "cancelled",
+  ],
+  default: "pending",
+},
     notes: {
       type: String,
       default: "",
