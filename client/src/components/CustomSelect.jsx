@@ -168,7 +168,7 @@ const CustomSelect = ({
             "
           />
 
-          <div className="relative max-h-64 overflow-y-auto">
+          <div className="custom-select-scroll relative max-h-64 overflow-y-auto">
             {options.map((option) => {
               const isSelected =
                 option.value === value;
