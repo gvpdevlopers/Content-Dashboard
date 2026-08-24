@@ -1,4 +1,5 @@
 import { Navigate } from "react-router-dom";
+
 import { useAuth } from "../context/AuthContext";
 
 const AdminRoute = ({ children }) => {
@@ -6,8 +7,8 @@ const AdminRoute = ({ children }) => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#080808] text-white">
-        <div className="text-sm text-white/40">
+      <div className="flex min-h-screen items-center justify-center bg-[#f7f7f8] text-zinc-600">
+        <div className="text-sm font-medium">
           Loading...
         </div>
       </div>

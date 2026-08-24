@@ -28,7 +28,7 @@ const AdminLayout = () => {
     user?.name?.charAt(0)?.toUpperCase() || "G";
 
   return (
-    <div className="min-h-screen bg-[#080808] text-white">
+    <div className="min-h-screen bg-[#f7f7f8] text-zinc-900">
 
       {/* =====================================================
           MOBILE HEADER
@@ -38,9 +38,10 @@ const AdminLayout = () => {
         className="
           fixed left-0 right-0 top-0 z-40
           flex h-16 items-center justify-between
-          border-b border-white/10
-          bg-[#080808]/85
+          border-b border-zinc-200/80
+          bg-white/90
           px-5
+          shadow-[0_1px_10px_rgba(0,0,0,0.03)]
           backdrop-blur-xl
           lg:hidden
         "
@@ -53,13 +54,14 @@ const AdminLayout = () => {
             flex h-10 w-10
             items-center justify-center
             rounded-xl
-            border border-white/10
-            bg-white/[0.02]
-            text-white/70
-            transition-all duration-300
-            hover:border-white/20
-            hover:bg-white/[0.06]
-            hover:text-white
+            border border-zinc-200
+            bg-white
+            text-zinc-600
+            transition-all duration-200
+            hover:border-zinc-300
+            hover:bg-zinc-50
+            hover:text-zinc-900
+            hover:shadow-sm
             active:scale-95
           "
           aria-label="Open menu"
@@ -68,7 +70,7 @@ const AdminLayout = () => {
         </button>
 
         {/* Mobile Title */}
-        <div className="text-sm font-medium tracking-tight">
+        <div className="text-sm font-medium tracking-tight text-zinc-900">
           Admin Dashboard
         </div>
 
@@ -78,10 +80,10 @@ const AdminLayout = () => {
             flex h-9 w-9
             items-center justify-center
             rounded-full
-            bg-white
+            bg-zinc-900
             text-sm font-semibold
-            text-black
-            shadow-[0_5px_20px_rgba(255,255,255,0.08)]
+            text-white
+            shadow-[0_5px_20px_rgba(0,0,0,0.10)]
           "
         >
           {userInitial}
@@ -99,8 +101,9 @@ const AdminLayout = () => {
           onClick={closeSidebar}
           className="
             fixed inset-0 z-40
-            bg-black/60
-            backdrop-blur-sm
+            bg-zinc-900/20
+            backdrop-blur-[2px]
+            animate-fade-up
             lg:hidden
           "
         />
@@ -114,14 +117,14 @@ const AdminLayout = () => {
         className={`
           fixed inset-y-0 left-0 z-50
           flex w-[270px] flex-col
-          border-r border-white/10
-          bg-[#0a0a0a]
+          border-r border-zinc-200
+          bg-white
+          shadow-[10px_0_40px_rgba(0,0,0,0.04)]
           transition-transform duration-300
           lg:translate-x-0
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-
         {/* =================================================
             SIDEBAR BRAND
         ================================================== */}
@@ -130,7 +133,7 @@ const AdminLayout = () => {
           className="
             flex h-20
             items-center justify-between
-            border-b border-white/10
+            border-b border-zinc-200
             px-6
           "
         >
@@ -145,13 +148,13 @@ const AdminLayout = () => {
                 items-center justify-center
                 overflow-hidden
                 rounded-xl
-                border border-white/10
-                bg-white/[0.04]
+                border border-zinc-200
+                bg-zinc-50
                 p-1
-                shadow-[0_8px_30px_rgba(0,0,0,0.3)]
-                transition-all duration-500
-                hover:border-cyan-300/20
-                hover:shadow-[0_8px_35px_rgba(34,211,238,0.10)]
+                shadow-[0_8px_25px_rgba(0,0,0,0.06)]
+                transition-all duration-300
+                hover:border-zinc-300
+                hover:shadow-[0_10px_30px_rgba(0,0,0,0.09)]
               "
             >
               <img
@@ -163,7 +166,7 @@ const AdminLayout = () => {
                   rounded-lg
                   object-cover
                   transition-transform
-                  duration-500
+                  duration-300
                   hover:scale-105
                 "
               />
@@ -171,11 +174,11 @@ const AdminLayout = () => {
 
             {/* Brand */}
             <div>
-              <p className="text-sm font-medium tracking-tight text-white">
+              <p className="text-sm font-medium tracking-tight text-zinc-900">
                 Glow Ventures
               </p>
 
-              <p className="mt-0.5 text-[11px] text-white/35">
+              <p className="mt-0.5 text-[11px] text-zinc-400">
                 Admin Portal
               </p>
             </div>
@@ -189,10 +192,10 @@ const AdminLayout = () => {
               flex h-9 w-9
               items-center justify-center
               rounded-lg
-              text-white/40
-              transition
-              hover:bg-white/10
-              hover:text-white
+              text-zinc-400
+              transition-all duration-200
+              hover:bg-zinc-100
+              hover:text-zinc-900
               lg:hidden
             "
             aria-label="Close menu"
@@ -214,7 +217,7 @@ const AdminLayout = () => {
               font-medium
               uppercase
               tracking-[0.2em]
-              text-white/30
+              text-zinc-400
             "
           >
             Administration
@@ -258,19 +261,20 @@ const AdminLayout = () => {
             SIDEBAR FOOTER
         ================================================== */}
 
-        <div className="border-t border-white/10 p-4">
+        <div className="border-t border-zinc-200 p-4">
 
           {/* User Card */}
           <div
             className="
               mb-3
               rounded-xl
-              border border-white/10
-              bg-white/[0.025]
+              border border-zinc-200
+              bg-zinc-50
               p-3
-              transition
-              hover:border-white/[0.15]
-              hover:bg-white/[0.04]
+              transition-all duration-200
+              hover:border-zinc-300
+              hover:bg-white
+              hover:shadow-sm
             "
           >
             <div className="flex items-center gap-3">
@@ -281,9 +285,9 @@ const AdminLayout = () => {
                   shrink-0
                   items-center justify-center
                   rounded-full
-                  bg-white
+                  bg-zinc-900
                   text-sm font-semibold
-                  text-black
+                  text-white
                 "
               >
                 {userInitial}
@@ -291,18 +295,17 @@ const AdminLayout = () => {
 
               <div className="min-w-0">
 
-                <p className="truncate text-sm font-medium text-white">
+                <p className="truncate text-sm font-medium text-zinc-900">
                   {user?.name || "Glow Ventures"}
                 </p>
 
-                <p className="truncate text-xs text-white/40">
+                <p className="truncate text-xs text-zinc-500">
                   {user?.email ||
                     user?.username ||
                     "Administrator"}
                 </p>
 
               </div>
-
             </div>
           </div>
 
@@ -317,10 +320,10 @@ const AdminLayout = () => {
               rounded-xl
               px-3 py-3
               text-sm
-              text-white/50
-              transition-all duration-300
-              hover:bg-red-500/10
-              hover:text-red-300
+              text-zinc-500
+              transition-all duration-200
+              hover:bg-red-50
+              hover:text-red-600
             "
           >
             <LogOut
@@ -328,14 +331,13 @@ const AdminLayout = () => {
               strokeWidth={1.7}
               className="
                 transition-transform
-                duration-300
+                duration-200
                 group-hover:-translate-x-0.5
               "
             />
 
             <span>Logout</span>
           </button>
-
         </div>
       </aside>
 
@@ -353,20 +355,21 @@ const AdminLayout = () => {
           className="
             hidden h-20
             items-center justify-between
-            border-b border-white/10
+            border-b border-zinc-200/80
+            bg-white/70
             px-8
+            backdrop-blur-xl
             lg:flex
             xl:px-10
           "
         >
-
           {/* Page Title */}
           <div>
-            <h1 className="text-lg font-medium tracking-tight">
+            <h1 className="text-lg font-medium tracking-tight text-zinc-900">
               Admin Dashboard
             </h1>
 
-            <p className="mt-1 text-xs text-white/35">
+            <p className="mt-1 text-xs text-zinc-500">
               Manage orders, users and payments
             </p>
           </div>
@@ -374,32 +377,22 @@ const AdminLayout = () => {
           {/* User */}
           <div className="flex items-center gap-3">
 
-            {/* <div className="text-right">
-              <p className="text-sm font-medium text-white">
-                {user?.name}
-              </p>
-
-              <p className="text-xs text-white/40">
-                Administrator
-              </p>
-            </div> */}
-
             <div
               className="
                 flex h-10 w-10
                 items-center justify-center
                 rounded-full
-                bg-white
+                bg-zinc-900
                 text-sm font-semibold
-                text-black
-                shadow-[0_5px_20px_rgba(255,255,255,0.08)]
+                text-white
+                shadow-[0_5px_20px_rgba(0,0,0,0.10)]
+                transition-transform duration-200
+                hover:scale-105
               "
             >
               {userInitial}
             </div>
-
           </div>
-
         </header>
 
         {/* =================================================
@@ -408,6 +401,7 @@ const AdminLayout = () => {
 
         <main
           className="
+            page-enter
             px-5
             pb-10
             pt-24
@@ -418,7 +412,6 @@ const AdminLayout = () => {
         >
           <Outlet />
         </main>
-
       </div>
     </div>
   );
@@ -443,30 +436,56 @@ const AdminSidebarItem = ({
       className={({ isActive }) =>
         `
         group
-        flex items-center gap-3
+        flex
+        items-center
+        gap-3
         rounded-xl
-        px-3 py-3
+        px-3
+        py-3
         text-sm
-        transition-all duration-300
+        transition-all
+        duration-200
         ${
           isActive
-            ? "bg-white text-black shadow-[0_8px_25px_rgba(255,255,255,0.05)]"
-            : "text-white/50 hover:bg-white/[0.06] hover:text-white"
+            ? "bg-zinc-900 text-white shadow-[0_8px_25px_rgba(0,0,0,0.10)]"
+            : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
         }
         `
       }
     >
-      <Icon
-        size={18}
-        strokeWidth={1.7}
-        className="
-          transition-transform
-          duration-200
-          group-hover:scale-105
-        "
-      />
+      {({ isActive }) => (
+        <>
+          <Icon
+            size={18}
+            strokeWidth={1.7}
+            className={`
+              shrink-0
+              transition-transform
+              duration-200
+              ${
+                isActive
+                  ? "text-white"
+                  : "text-zinc-500 group-hover:text-zinc-900"
+              }
+              group-hover:scale-105
+            `}
+          />
 
-      <span>{label}</span>
+          <span
+            className={`
+              transition-colors
+              duration-200
+              ${
+                isActive
+                  ? "text-white"
+                  : "text-zinc-500 group-hover:text-zinc-900"
+              }
+            `}
+          >
+            {label}
+          </span>
+        </>
+      )}
     </NavLink>
   );
 };

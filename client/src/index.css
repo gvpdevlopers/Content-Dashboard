@@ -1,19 +1,41 @@
 @import "tailwindcss";
 
+/* =========================================================
+   GLOBAL RESET
+========================================================= */
+
 * {
   box-sizing: border-box;
 }
 
 html {
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
-  background: #080808;
-  color: #ffffff;
-  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  min-width: 320px;
+  min-height: 100vh;
+
+  background: #f7f7f8;
+  color: #18181b;
+
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+/* =========================================================
+   FORM ELEMENTS
+========================================================= */
 
 button,
 input,
@@ -22,22 +44,89 @@ select {
   font: inherit;
 }
 
-/* Global text selection */
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+input,
+textarea,
+select {
+  color: #18181b;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #a1a1aa;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+}
+
+/* =========================================================
+   LINKS
+========================================================= */
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* =========================================================
+   GLOBAL TEXT SELECTION
+========================================================= */
+
 ::selection {
-  background: #ffffff;
-  color: #000000;
+  background: #18181b;
+  color: #ffffff;
 }
 
 ::-moz-selection {
-  background: #ffffff;
-  color: #000000;
+  background: #18181b;
+  color: #ffffff;
 }
 
-/* Custom Select - Hide Scrollbar */
+/* =========================================================
+   GLOBAL SCROLLBAR
+========================================================= */
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: #c4c4c7 transparent;
+}
+
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c4c4c7;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1aa;
+}
+
+/* =========================================================
+   CUSTOM SELECT SCROLLBAR
+========================================================= */
 
 .custom-select-scroll {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  scrollbar-color: #d4d4d8 transparent;
 }
 
 .custom-select-scroll::-webkit-scrollbar {
@@ -49,10 +138,203 @@ select {
 }
 
 .custom-select-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: #d4d4d8;
   border-radius: 999px;
 }
 
 .custom-select-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: #a1a1aa;
+}
+
+/* =========================================================
+   SHARED LIGHT THEME VARIABLES
+========================================================= */
+
+:root {
+  --color-page: #f7f7f8;
+
+  --color-surface: #ffffff;
+  --color-surface-soft: #fafafa;
+  --color-surface-muted: #f4f4f5;
+  --color-surface-hover: #f8f8f8;
+
+  --color-border: #e5e7eb;
+  --color-border-soft: #ededee;
+  --color-border-strong: #d4d4d8;
+
+  --color-text-primary: #18181b;
+  --color-text-secondary: #3f3f46;
+  --color-text-body: #52525b;
+  --color-text-muted: #71717a;
+  --color-text-subtle: #a1a1aa;
+
+  --color-success: #15803d;
+  --color-success-bg: #f0fdf4;
+  --color-success-border: #bbf7d0;
+
+  --color-warning: #a16207;
+  --color-warning-bg: #fefce8;
+  --color-warning-border: #fde68a;
+
+  --color-danger: #dc2626;
+  --color-danger-bg: #fef2f2;
+  --color-danger-border: #fecaca;
+
+  --color-info: #2563eb;
+  --color-info-bg: #eff6ff;
+  --color-info-border: #bfdbfe;
+
+  --shadow-card:
+    0 1px 2px rgba(0, 0, 0, 0.03),
+    0 8px 30px rgba(0, 0, 0, 0.04);
+
+  --shadow-card-hover:
+    0 4px 6px rgba(0, 0, 0, 0.03),
+    0 14px 40px rgba(0, 0, 0, 0.07);
+
+  --shadow-dropdown:
+    0 10px 30px rgba(0, 0, 0, 0.10),
+    0 2px 8px rgba(0, 0, 0, 0.05);
+
+  --transition-fast: 150ms ease;
+  --transition-normal: 220ms ease;
+  --transition-slow: 320ms ease;
+}
+
+/* =========================================================
+   SHARED LIGHT SURFACES
+========================================================= */
+
+.light-surface {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+}
+
+.light-surface-soft {
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border-soft);
+}
+
+.light-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+
+  transition:
+    transform var(--transition-normal),
+    box-shadow var(--transition-normal),
+    border-color var(--transition-normal);
+}
+
+.light-card:hover {
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-card-hover);
+}
+
+/* =========================================================
+   SMOOTH INTERACTIONS
+========================================================= */
+
+button:not(:disabled),
+a {
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+button:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+input,
+textarea,
+select {
+  transition:
+    border-color var(--transition-normal),
+    background-color var(--transition-normal),
+    box-shadow var(--transition-normal);
+}
+
+/* =========================================================
+   FOCUS RING
+========================================================= */
+
+.focus-ring:focus-visible {
+  outline: 2px solid rgba(24, 24, 27, 0.18);
+  outline-offset: 2px;
+}
+
+/* =========================================================
+   PAGE ENTER ANIMATION
+========================================================= */
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-enter {
+  animation: pageEnter 320ms ease-out both;
+}
+
+/* =========================================================
+   FADE UP ANIMATION
+========================================================= */
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fadeUp 360ms ease-out both;
+}
+
+/* =========================================================
+   REDUCED MOTION
+========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 640px) {
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
 }

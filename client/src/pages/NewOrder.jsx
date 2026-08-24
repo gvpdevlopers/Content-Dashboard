@@ -1,7 +1,6 @@
 import {
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 
@@ -249,7 +248,7 @@ const NewOrder = () => {
           },
 
           theme: {
-            color: "#ffffff",
+            color: "#18181b",
           },
 
           modal: {
@@ -309,7 +308,7 @@ const NewOrder = () => {
   }
 
   return (
-    <div className="mx-auto max-w-[1100px]">
+    <div className="mx-auto max-w-[1100px] animate-fade-up">
 
       {/* =====================================================
           PAGE HEADER
@@ -324,9 +323,10 @@ const NewOrder = () => {
               flex h-9 w-9
               items-center justify-center
               rounded-xl
-              border border-white/10
-              bg-white/[0.04]
-              text-white/60
+              border border-zinc-200
+              bg-white
+              text-zinc-500
+              shadow-sm
             "
           >
             <ArrowRight
@@ -336,22 +336,46 @@ const NewOrder = () => {
           </div>
 
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-white/30">
+            <p
+              className="
+                text-[10px]
+                font-medium
+                uppercase
+                tracking-[0.2em]
+                text-zinc-400
+              "
+            >
               Orders
             </p>
 
-            <h1 className="mt-1 text-3xl font-medium tracking-tight sm:text-4xl">
+            <h1
+              className="
+                mt-1
+                text-3xl
+                font-medium
+                tracking-tight
+                text-zinc-900
+                sm:text-4xl
+              "
+            >
               Place a new order
             </h1>
           </div>
-
         </div>
 
-        <p className="mt-4 max-w-2xl text-sm leading-6 text-white/40 sm:text-[15px]">
+        <p
+          className="
+            mt-4
+            max-w-2xl
+            text-sm
+            leading-6
+            text-zinc-500
+            sm:text-[15px]
+          "
+        >
           Tell us what you need and provide the details
           for your project.
         </p>
-
       </div>
 
       {/* =====================================================
@@ -363,11 +387,14 @@ const NewOrder = () => {
           className="
             mb-6
             rounded-2xl
-            border border-red-500/20
-            bg-red-500/[0.08]
-            px-4 py-3
-            text-sm text-red-300
+            border border-red-200
+            bg-red-50
+            px-4
+            py-3
+            text-sm
+            text-red-600
             shadow-[0_10px_30px_rgba(239,68,68,0.04)]
+            animate-fade-up
           "
         >
           {error}
@@ -381,15 +408,17 @@ const NewOrder = () => {
       {loadingServices ? (
         <div
           className="
-            flex min-h-[300px]
-            items-center justify-center
+            flex
+            min-h-[300px]
+            items-center
+            justify-center
             rounded-[28px]
-            border border-white/10
-            bg-white/[0.02]
-            backdrop-blur-xl
+            border border-zinc-200
+            bg-white
+            shadow-[0_10px_35px_rgba(0,0,0,0.04)]
           "
         >
-          <div className="flex items-center gap-3 text-sm text-white/40">
+          <div className="flex items-center gap-3 text-sm text-zinc-500">
             <Loader2
               size={18}
               className="animate-spin"
@@ -401,14 +430,14 @@ const NewOrder = () => {
         <div
           className="
             rounded-[28px]
-            border border-white/10
-            bg-white/[0.02]
+            border border-zinc-200
+            bg-white
             p-10
             text-center
-            backdrop-blur-xl
+            shadow-[0_10px_35px_rgba(0,0,0,0.04)]
           "
         >
-          <p className="text-sm text-white/40">
+          <p className="text-sm text-zinc-500">
             No services are currently available.
           </p>
         </div>
@@ -424,18 +453,16 @@ const NewOrder = () => {
               relative
               overflow-hidden
               rounded-[28px]
-              border border-white/10
-              bg-[#111111]/90
+              border border-zinc-200
+              bg-white
               p-5
-              shadow-[0_20px_70px_rgba(0,0,0,0.25)]
-              backdrop-blur-2xl
+              shadow-[0_20px_70px_rgba(0,0,0,0.06)]
               sm:p-7
               lg:p-8
             "
           >
 
             {/* Background glow */}
-
             <div
               className="
                 pointer-events-none
@@ -445,7 +472,7 @@ const NewOrder = () => {
                 h-72
                 w-72
                 rounded-full
-                bg-white/[0.035]
+                bg-cyan-300/[0.035]
                 blur-3xl
               "
             />
@@ -464,7 +491,7 @@ const NewOrder = () => {
                     block
                     text-sm
                     font-medium
-                    text-white/70
+                    text-zinc-700
                   "
                 >
                   Select Service
@@ -481,33 +508,46 @@ const NewOrder = () => {
                 />
 
                 {selectedService?.description && (
-                  <p className="mt-2.5 text-xs leading-5 text-white/35">
+                  <p
+                    className="
+                      mt-2.5
+                      text-xs
+                      leading-5
+                      text-zinc-500
+                    "
+                  >
                     {selectedService.description}
                   </p>
                 )}
-
               </div>
 
               {/* =================================================
                   DYNAMIC FIELDS
               ================================================== */}
 
-              <div className="mt-8 border-t border-white/10 pt-8">
+              <div className="mt-8 border-t border-zinc-200 pt-8">
 
                 <div className="mb-6">
 
-                  <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-white/30">
+                  <p
+                    className="
+                      text-[10px]
+                      font-medium
+                      uppercase
+                      tracking-[0.2em]
+                      text-zinc-400
+                    "
+                  >
                     Project Details
                   </p>
 
-                  <h2 className="mt-2 text-lg font-medium">
+                  <h2 className="mt-2 text-lg font-medium text-zinc-900">
                     Tell us about your project
                   </h2>
-
                 </div>
 
                 {loadingService ? (
-                  <div className="flex items-center gap-3 text-sm text-white/40">
+                  <div className="flex items-center gap-3 text-sm text-zinc-500">
                     <Loader2
                       size={18}
                       className="animate-spin"
@@ -532,30 +572,29 @@ const NewOrder = () => {
                         }
                       />
                     ))}
-
                   </div>
                 )}
-
               </div>
 
               {/* =================================================
                   PRICE
               ================================================== */}
 
-              <div className="mt-8 border-t border-white/10 pt-8">
+              <div className="mt-8 border-t border-zinc-200 pt-8">
 
                 <div
                   className="
                     relative
                     overflow-hidden
                     rounded-2xl
-                    border border-white/10
-                    bg-white/[0.025]
+                    border border-zinc-200
+                    bg-zinc-50
                     p-5
                     transition-all
-                    duration-300
-                    hover:border-white/[0.16]
-                    hover:bg-white/[0.035]
+                    duration-200
+                    hover:border-zinc-300
+                    hover:bg-white
+                    hover:shadow-sm
                   "
                 >
 
@@ -568,53 +607,65 @@ const NewOrder = () => {
                       h-32
                       w-32
                       rounded-full
-                      bg-white/[0.03]
+                      bg-zinc-200/[0.45]
                       blur-3xl
                     "
                   />
 
-                  <div className="relative flex items-center justify-between gap-5">
+                  <div
+                    className="
+                      relative
+                      flex
+                      items-center
+                      justify-between
+                      gap-5
+                    "
+                  >
 
                     <div>
-                      <p className="text-sm font-medium">
+                      <p className="text-sm font-medium text-zinc-900">
                         Estimated Price
                       </p>
 
-                      <p className="mt-1 text-xs leading-5 text-white/35">
+                      <p className="mt-1 text-xs leading-5 text-zinc-500">
                         Final pricing may depend on project
                         requirements.
                       </p>
                     </div>
 
-                    <div className="shrink-0 text-xl font-medium tracking-tight">
+                    <div className="shrink-0 text-xl font-medium tracking-tight text-zinc-900">
                       ₹
                       {estimatedPrice.toLocaleString(
                         "en-IN"
                       )}
                     </div>
-
                   </div>
-
                 </div>
-
               </div>
 
               {/* =================================================
                   PAYMENT
               ================================================== */}
 
-              <div className="mt-8 border-t border-white/10 pt-8">
+              <div className="mt-8 border-t border-zinc-200 pt-8">
 
                 <div className="mb-5">
 
-                  <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-white/30">
+                  <p
+                    className="
+                      text-[10px]
+                      font-medium
+                      uppercase
+                      tracking-[0.2em]
+                      text-zinc-400
+                    "
+                  >
                     Payment
                   </p>
 
-                  <h2 className="mt-2 text-lg font-medium">
+                  <h2 className="mt-2 text-lg font-medium text-zinc-900">
                     Choose payment method
                   </h2>
-
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -642,16 +693,23 @@ const NewOrder = () => {
                     title="Pay Online"
                     description="Pay securely using Razorpay"
                   />
-
                 </div>
-
               </div>
 
               {/* =================================================
                   SUBMIT
               ================================================== */}
 
-              <div className="mt-8 flex justify-end border-t border-white/10 pt-8">
+              <div
+                className="
+                  mt-8
+                  flex
+                  justify-end
+                  border-t
+                  border-zinc-200
+                  pt-8
+                "
+              >
 
                 <button
                   type="submit"
@@ -668,17 +726,18 @@ const NewOrder = () => {
                     gap-2
                     overflow-hidden
                     rounded-xl
-                    bg-white
+                    bg-zinc-900
                     px-6
                     py-3.5
                     text-sm
                     font-medium
-                    text-black
-                    shadow-[0_10px_30px_rgba(255,255,255,0.08)]
+                    text-white
+                    shadow-[0_10px_30px_rgba(0,0,0,0.10)]
                     transition-all
-                    duration-300
+                    duration-200
                     hover:-translate-y-0.5
-                    hover:shadow-[0_15px_40px_rgba(255,255,255,0.12)]
+                    hover:bg-zinc-800
+                    hover:shadow-[0_15px_40px_rgba(0,0,0,0.14)]
                     active:translate-y-0
                     disabled:cursor-not-allowed
                     disabled:opacity-50
@@ -687,7 +746,6 @@ const NewOrder = () => {
                 >
 
                   {/* Button shine */}
-
                   <span
                     className="
                       pointer-events-none
@@ -696,7 +754,7 @@ const NewOrder = () => {
                       -translate-x-full
                       bg-gradient-to-r
                       from-transparent
-                      via-black/[0.06]
+                      via-white/[0.10]
                       to-transparent
                       transition-transform
                       duration-700
@@ -722,26 +780,19 @@ const NewOrder = () => {
                           size={17}
                           className="
                             transition-transform
-                            duration-300
+                            duration-200
                             group-hover:translate-x-1
                           "
                         />
                       </>
                     )}
-
                   </span>
-
                 </button>
-
               </div>
-
             </div>
-
           </div>
-
         </form>
       )}
-
     </div>
   );
 };
@@ -755,33 +806,30 @@ const DynamicField = ({
   value,
   onChange,
 }) => {
-
   const commonClasses = `
     w-full
     rounded-xl
-    border border-white/10
-    bg-white/[0.035]
-    px-4 py-3.5
+    border border-zinc-200
+    bg-zinc-50
+    px-4
+    py-3.5
     text-sm
-    text-white
+    text-zinc-900
     outline-none
     transition-all
-    duration-300
-    placeholder:text-white/25
-    hover:border-white/15
-    hover:bg-white/[0.05]
-    focus:border-white/30
-    focus:bg-white/[0.07]
-    focus:ring-1
-    focus:ring-white/10
+    duration-200
+    placeholder:text-zinc-400
+    hover:border-zinc-300
+    hover:bg-white
+    focus:border-zinc-400
+    focus:bg-white
+    focus:ring-2
+    focus:ring-zinc-900/5
   `;
 
   const renderField = () => {
-
     switch (field.type) {
-
       case "textarea":
-
         return (
           <textarea
             value={value}
@@ -796,7 +844,6 @@ const DynamicField = ({
         );
 
       case "select":
-
         return (
           <CustomSelect
             value={value}
@@ -812,7 +859,6 @@ const DynamicField = ({
         );
 
       case "number":
-
         return (
           <input
             type="number"
@@ -829,7 +875,6 @@ const DynamicField = ({
         );
 
       case "date":
-
         return (
           <input
             type="date"
@@ -843,7 +888,6 @@ const DynamicField = ({
         );
 
       case "url":
-
         return (
           <input
             type="url"
@@ -858,7 +902,6 @@ const DynamicField = ({
         );
 
       default:
-
         return (
           <input
             type="text"
@@ -882,21 +925,17 @@ const DynamicField = ({
           : ""
       }
     >
-
-      <label className="mb-2.5 block text-sm text-white/65">
-
+      <label className="mb-2.5 block text-sm text-zinc-600">
         {field.label}
 
         {field.required && (
-          <span className="ml-1 text-white/30">
+          <span className="ml-1 text-zinc-400">
             *
           </span>
         )}
-
       </label>
 
       {renderField()}
-
     </div>
   );
 };
@@ -912,7 +951,6 @@ const PaymentOption = ({
   title,
   description,
 }) => {
-
   return (
     <button
       type="button"
@@ -929,26 +967,26 @@ const PaymentOption = ({
         p-5
         text-left
         transition-all
-        duration-300
+        duration-200
 
         ${
           selected
             ? `
-              border-white/30
-              bg-white/[0.08]
-              shadow-[0_10px_35px_rgba(255,255,255,0.04)]
+              border-zinc-900
+              bg-zinc-50
+              shadow-[0_10px_35px_rgba(0,0,0,0.06)]
             `
             : `
-              border-white/10
-              bg-white/[0.02]
+              border-zinc-200
+              bg-white
               hover:-translate-y-0.5
-              hover:border-white/20
-              hover:bg-white/[0.045]
+              hover:border-zinc-300
+              hover:bg-zinc-50
+              hover:shadow-sm
             `
         }
       `}
     >
-
       {selected && (
         <div
           className="
@@ -959,7 +997,7 @@ const PaymentOption = ({
             h-28
             w-28
             rounded-full
-            bg-white/[0.04]
+            bg-zinc-200/[0.45]
             blur-2xl
           "
         />
@@ -974,21 +1012,21 @@ const PaymentOption = ({
           justify-center
           rounded-xl
           transition-all
-          duration-300
+          duration-200
 
           ${
             selected
               ? `
-                bg-white
-                text-black
-                shadow-[0_5px_20px_rgba(255,255,255,0.08)]
+                bg-zinc-900
+                text-white
+                shadow-[0_5px_20px_rgba(0,0,0,0.10)]
               `
               : `
-                border border-white/10
-                bg-white/[0.03]
-                text-white/50
-                group-hover:border-white/20
-                group-hover:text-white/70
+                border border-zinc-200
+                bg-zinc-50
+                text-zinc-500
+                group-hover:border-zinc-300
+                group-hover:text-zinc-700
               `
           }
         `}
@@ -997,15 +1035,13 @@ const PaymentOption = ({
       </div>
 
       <div className="relative pr-6">
-
-        <p className="text-sm font-medium">
+        <p className="text-sm font-medium text-zinc-900">
           {title}
         </p>
 
-        <p className="mt-1 text-xs leading-5 text-white/35">
+        <p className="mt-1 text-xs leading-5 text-zinc-500">
           {description}
         </p>
-
       </div>
 
       {selected && (
@@ -1018,15 +1054,14 @@ const PaymentOption = ({
             items-center
             justify-center
             rounded-full
-            bg-white
-            text-black
-            shadow-[0_3px_15px_rgba(255,255,255,0.08)]
+            bg-zinc-900
+            text-white
+            shadow-[0_3px_15px_rgba(0,0,0,0.10)]
           "
         >
           <Check size={13} />
         </div>
       )}
-
     </button>
   );
 };

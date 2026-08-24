@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+
 import { Check, ChevronDown } from "lucide-react";
 
 const CustomSelect = ({
@@ -9,7 +10,6 @@ const CustomSelect = ({
   disabled = false,
 }) => {
   const [open, setOpen] = useState(false);
-
   const selectRef = useRef(null);
 
   const selectedOption = options.find(
@@ -58,17 +58,12 @@ const CustomSelect = ({
   };
 
   return (
-    <div
-      ref={selectRef}
-      className="relative"
-    >
+    <div ref={selectRef} className="relative">
       {/* SELECT BUTTON */}
       <button
         type="button"
         disabled={disabled}
-        onClick={() =>
-          setOpen((current) => !current)
-        }
+        onClick={() => setOpen((current) => !current)}
         aria-haspopup="listbox"
         aria-expanded={open}
         className={`
@@ -85,24 +80,24 @@ const CustomSelect = ({
           text-sm
           outline-none
           transition-all
-          duration-300
-
+          duration-200
           ${
             open
               ? `
-                border-white/30
-                bg-white/[0.07]
-                ring-1
-                ring-white/10
+                border-zinc-300
+                bg-white
+                ring-2
+                ring-zinc-900/5
+                shadow-sm
               `
               : `
-                border-white/10
-                bg-white/[0.035]
-                hover:border-white/15
-                hover:bg-white/[0.05]
+                border-zinc-200
+                bg-white
+                hover:border-zinc-300
+                hover:bg-zinc-50
+                hover:shadow-sm
               `
           }
-
           disabled:cursor-not-allowed
           disabled:opacity-50
         `}
@@ -110,8 +105,8 @@ const CustomSelect = ({
         <span
           className={
             selectedOption
-              ? "text-white"
-              : "text-white/30"
+              ? "text-zinc-900"
+              : "text-zinc-400"
           }
         >
           {selectedOption?.label || placeholder}
@@ -121,13 +116,13 @@ const CustomSelect = ({
           size={18}
           className={`
             shrink-0
-            text-white/35
-            transition-transform
-            duration-300
+            text-zinc-400
+            transition-all
+            duration-200
             ${
               open
-                ? "rotate-180 text-white/70"
-                : ""
+                ? "rotate-180 text-zinc-700"
+                : "group-hover:text-zinc-600"
             }
           `}
         />
@@ -145,15 +140,15 @@ const CustomSelect = ({
             overflow-hidden
             rounded-2xl
             border
-            border-white/10
-            bg-[#141414]/95
+            border-zinc-200
+            bg-white
             p-1.5
-            shadow-[0_20px_60px_rgba(0,0,0,0.55)]
-            backdrop-blur-2xl
+            shadow-[0_20px_50px_rgba(0,0,0,0.12)]
+            animate-fade-up
           "
           role="listbox"
         >
-          {/* Top glow */}
+          {/* Top subtle highlight */}
           <div
             className="
               pointer-events-none
@@ -163,15 +158,14 @@ const CustomSelect = ({
               h-24
               w-24
               rounded-full
-              bg-white/[0.04]
+              bg-zinc-100
               blur-2xl
             "
           />
 
           <div className="custom-select-scroll relative max-h-64 overflow-y-auto">
             {options.map((option) => {
-              const isSelected =
-                option.value === value;
+              const isSelected = option.value === value;
 
               return (
                 <button
@@ -179,9 +173,7 @@ const CustomSelect = ({
                   type="button"
                   role="option"
                   aria-selected={isSelected}
-                  onClick={() =>
-                    handleSelect(option)
-                  }
+                  onClick={() => handleSelect(option)}
                   className={`
                     group
                     flex
@@ -194,25 +186,22 @@ const CustomSelect = ({
                     text-left
                     text-sm
                     transition-all
-                    duration-200
-
+                    duration-150
                     ${
                       isSelected
                         ? `
-                          bg-white/[0.10]
-                          text-white
+                          bg-zinc-100
+                          text-zinc-900
                         `
                         : `
-                          text-white/60
-                          hover:bg-white/[0.06]
-                          hover:text-white
+                          text-zinc-600
+                          hover:bg-zinc-50
+                          hover:text-zinc-900
                         `
                     }
                   `}
                 >
-                  <span>
-                    {option.label}
-                  </span>
+                  <span>{option.label}</span>
 
                   {isSelected && (
                     <span
@@ -223,8 +212,8 @@ const CustomSelect = ({
                         items-center
                         justify-center
                         rounded-full
-                        bg-white
-                        text-black
+                        bg-zinc-900
+                        text-white
                       "
                     >
                       <Check size={12} />

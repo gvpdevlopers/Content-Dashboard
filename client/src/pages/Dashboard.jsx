@@ -2,9 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
-  CheckCircle2,
-  Clock3,
   FileCheck2,
+  Clock3,
   Package,
   WalletCards,
   RefreshCw,
@@ -28,18 +27,14 @@ const Dashboard = () => {
 
       const response = await orderService.getMyOrders();
 
-      const data =
-        response?.orders ||
-        response?.data?.orders ||
-        [];
+      const data = response?.orders || response?.data?.orders || [];
 
       setOrders(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Load dashboard orders error:", error);
 
       setError(
-        error.response?.data?.message ||
-          "Unable to load dashboard data."
+        error.response?.data?.message || "Unable to load dashboard data.",
       );
     } finally {
       setLoading(false);
@@ -61,24 +56,20 @@ const Dashboard = () => {
 
     const inProgress = orders.filter((order) =>
       ["in_progress", "processing", "confirmed"].includes(
-        String(order.orderStatus || "").toLowerCase()
-      )
+        String(order.orderStatus || "").toLowerCase(),
+      ),
     ).length;
 
     const completed = orders.filter(
-      (order) =>
-        String(order.orderStatus || "").toLowerCase() ===
-        "completed"
+      (order) => String(order.orderStatus || "").toLowerCase() === "completed",
     ).length;
 
     const pendingPayment = orders.filter((order) => {
       const paymentStatus = String(
-        order.paymentStatus || "pending"
+        order.paymentStatus || "pending",
       ).toLowerCase();
 
-      const codPinStatus = String(
-        order.codPinStatus || ""
-      ).toLowerCase();
+      const codPinStatus = String(order.codPinStatus || "").toLowerCase();
 
       const isCodPaymentDone =
         codPinStatus === "verified" ||
@@ -104,27 +95,45 @@ const Dashboard = () => {
 
   const recentOrders = useMemo(() => {
     return [...orders]
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt) -
-          new Date(a.createdAt)
-      )
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       .slice(0, 5);
   }, [orders]);
 
-  const firstName =
-    user?.name?.split(" ")[0] || "there";
+  const firstName = user?.name?.split(" ")[0] || "there";
 
   return (
     <div className="relative mx-auto max-w-[1500px]">
-
       {/* =====================================================
           BACKGROUND EFFECTS
       ====================================================== */}
 
-      <div className="pointer-events-none absolute -left-32 -top-32 h-80 w-80 rounded-full bg-cyan-400/[0.035] blur-[100px]" />
+      <div
+        className="
+          pointer-events-none
+          absolute
+          -left-32
+          -top-32
+          h-80
+          w-80
+          rounded-full
+          bg-cyan-400/[0.025]
+          blur-[100px]
+        "
+      />
 
-      <div className="pointer-events-none absolute right-0 top-40 h-72 w-72 rounded-full bg-blue-500/[0.025] blur-[100px]" />
+      <div
+        className="
+          pointer-events-none
+          absolute
+          right-0
+          top-40
+          h-72
+          w-72
+          rounded-full
+          bg-blue-500/[0.02]
+          blur-[100px]
+        "
+      />
 
       {/* =====================================================
           WELCOME / HERO
@@ -132,72 +141,159 @@ const Dashboard = () => {
 
       <section
         className="
-          group relative overflow-hidden
+          group
+          relative
+          overflow-hidden
           rounded-[28px]
-          border border-white/[0.11]
-          bg-white/[0.035]
+          border border-zinc-200
+          bg-white
           p-6
-          shadow-[0_25px_80px_rgba(0,0,0,0.25)]
-          backdrop-blur-2xl
+          shadow-[0_20px_60px_rgba(0,0,0,0.06)]
+          animate-fade-up
           sm:p-8
           lg:p-10
         "
       >
-
-        {/* Top glass highlight */}
-        <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+        {/* Top highlight */}
+        <div
+          className="
+            pointer-events-none
+            absolute
+            inset-x-10
+            top-0
+            h-px
+            bg-gradient-to-r
+            from-transparent
+            via-zinc-300
+            to-transparent
+          "
+        />
 
         {/* Ambient glow */}
-        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-cyan-300/[0.035] blur-3xl transition duration-700 group-hover:bg-cyan-300/[0.06]" />
+        <div
+          className="
+            pointer-events-none
+            absolute
+            -right-24
+            -top-24
+            h-72
+            w-72
+            rounded-full
+            bg-cyan-300/[0.035]
+            blur-3xl
+            transition
+            duration-700
+            group-hover:bg-cyan-300/[0.06]
+          "
+        />
 
-        <div className="relative max-w-3xl">         
-
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-cyan-200/40">
+        <div className="relative max-w-3xl">
+          <p
+            className="
+              text-xs
+              font-medium
+              uppercase
+              tracking-[0.2em]
+              text-cyan-600/70
+            "
+          >
             Welcome back
           </p>
-            <h1 className="mt-1 text-3xl font-medium tracking-tight sm:text-4xl">
 
+          <h1
+            className="
+              mt-1
+              text-3xl
+              font-medium
+              tracking-tight
+              text-zinc-900
+              sm:text-4xl
+            "
+          >
             Hello, {firstName}.
           </h1>
 
-          <p className="mt-4 max-w-xl text-sm leading-6 text-white/45 sm:text-base">
-            Manage your projects, place new orders and
-            keep track of everything from one place.
+          <p
+            className="
+              mt-4
+              max-w-xl
+              text-sm
+              leading-6
+              text-zinc-500
+              sm:text-base
+            "
+          >
+            Manage your projects, place new orders and keep track of everything
+            from one place.
           </p>
 
           <Link
             to="/dashboard/new-order"
             className="
-              group/button relative mt-7
-              inline-flex items-center gap-2
-              overflow-hidden
-              rounded-2xl
-              border border-white
-              bg-white
-              px-5 py-3.5
-              text-sm font-medium
-              text-black
-              shadow-[0_10px_30px_rgba(255,255,255,0.05)]
-              transition-all duration-300
-              hover:-translate-y-0.5
-              hover:shadow-[0_14px_40px_rgba(34,211,238,0.12)]
-              active:translate-y-0
-            "
+    group/button
+    relative
+    mt-7
+    inline-flex
+    items-center
+    gap-2
+    overflow-hidden
+    rounded-2xl
+    border
+    border-zinc-900
+    bg-zinc-900
+    px-5
+    py-3.5
+    text-sm
+    font-medium
+    text-white
+    shadow-[0_10px_30px_rgba(0,0,0,0.08)]
+    transition-all
+    duration-200
+    hover:-translate-y-0.5
+    hover:bg-zinc-800
+    hover:text-white
+    hover:shadow-[0_14px_40px_rgba(0,0,0,0.12)]
+    active:translate-y-0
+  "
           >
+            <span
+              className="
+      absolute
+      inset-0
+      bg-gradient-to-r
+      from-zinc-800
+      via-zinc-900
+      to-zinc-800
+      opacity-0
+      transition-opacity
+      duration-300
+      group-hover/button:opacity-100
+    "
+            />
 
-            <span className="absolute inset-0 bg-gradient-to-r from-cyan-100 via-white to-blue-100 opacity-0 transition-opacity duration-300 group-hover/button:opacity-100" />
-
-            <span className="relative flex items-center gap-2">
-              Start a new order
+            <span
+              className="
+      relative
+      flex
+      items-center
+      gap-2
+      text-white
+    "
+            >
+              <span className="text-white">Start a new order</span>
 
               <ArrowUpRight
                 size={17}
-                className="transition-transform duration-300 group-hover/button:translate-x-0.5 group-hover/button:-translate-y-0.5"
+                className="
+        text-white
+        transition-transform
+        duration-200
+        group-hover/button:translate-x-0.5
+        group-hover/button:-translate-y-0.5
+      "
               />
             </span>
-
           </Link>
-
         </div>
       </section>
 
@@ -206,19 +302,48 @@ const Dashboard = () => {
       ====================================================== */}
 
       {error && (
-        <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-red-400/20 bg-red-500/[0.07] px-4 py-3.5 text-sm text-red-300">
-
+        <div
+          className="
+            mt-5
+            flex
+            items-center
+            justify-between
+            gap-4
+            rounded-2xl
+            border border-red-200
+            bg-red-50
+            px-4
+            py-3.5
+            text-sm
+            text-red-600
+            animate-fade-up
+          "
+        >
           <span>{error}</span>
 
           <button
             type="button"
             onClick={loadOrders}
-            className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-red-400/20 px-3 py-2 text-xs text-red-200 transition hover:bg-red-400/10"
+            className="
+              inline-flex
+              shrink-0
+              items-center
+              gap-2
+              rounded-xl
+              border border-red-200
+              px-3
+              py-2
+              text-xs
+              text-red-600
+              transition-all
+              duration-200
+              hover:bg-red-100
+              active:scale-[0.98]
+            "
           >
             <RefreshCw size={14} />
             Retry
           </button>
-
         </div>
       )}
 
@@ -227,7 +352,6 @@ const Dashboard = () => {
       ====================================================== */}
 
       <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-
         <StatCard
           icon={Package}
           label="Total Orders"
@@ -255,7 +379,6 @@ const Dashboard = () => {
           value={loading ? "—" : stats.pendingPayment}
           description="Orders awaiting payment"
         />
-
       </section>
 
       {/* =====================================================
@@ -263,15 +386,21 @@ const Dashboard = () => {
       ====================================================== */}
 
       <section className="mt-10">
-
         <div className="mb-5 flex items-end justify-between">
-
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-white/30">
+            <p
+              className="
+                text-xs
+                font-medium
+                uppercase
+                tracking-[0.18em]
+                text-zinc-400
+              "
+            >
               Activity
             </p>
 
-            <h2 className="mt-1 text-xl font-medium">
+            <h2 className="mt-1 text-xl font-medium text-zinc-900">
               Recent Orders
             </h2>
           </div>
@@ -279,40 +408,63 @@ const Dashboard = () => {
           <Link
             to="/dashboard/orders"
             className="
-              group flex items-center gap-1.5
-              text-sm text-white/45
+              group
+              flex
+              items-center
+              gap-1.5
+              text-sm
+              text-zinc-500
               transition-colors
-              hover:text-white
+              duration-200
+              hover:text-zinc-900
             "
           >
             View all
-
             <ArrowRight
               size={15}
-              className="transition-transform duration-300 group-hover:translate-x-0.5"
+              className="
+                transition-transform
+                duration-200
+                group-hover:translate-x-0.5
+              "
             />
           </Link>
-
         </div>
 
         {/* Loading */}
         {loading && (
-          <div className="overflow-hidden rounded-[24px] border border-white/[0.10] bg-white/[0.025] backdrop-blur-xl">
-
+          <div
+            className="
+              overflow-hidden
+              rounded-[24px]
+              border border-zinc-200
+              bg-white
+              shadow-[0_10px_35px_rgba(0,0,0,0.04)]
+            "
+          >
             {[1, 2, 3].map((item) => (
               <div
                 key={item}
-                className="flex animate-pulse items-center justify-between border-b border-white/[0.07] px-5 py-5 last:border-b-0 sm:px-6"
+                className="
+                  flex
+                  animate-pulse
+                  items-center
+                  justify-between
+                  border-b border-zinc-100
+                  px-5
+                  py-5
+                  last:border-b-0
+                  sm:px-6
+                "
               >
                 <div className="space-y-2">
-                  <div className="h-3 w-28 rounded bg-white/10" />
-                  <div className="h-3 w-40 rounded bg-white/5" />
+                  <div className="h-3 w-28 rounded bg-zinc-200" />
+                  <div className="h-3 w-40 rounded bg-zinc-100" />
                 </div>
 
-                <div className="h-7 w-20 rounded-full bg-white/5" />
+                <div className="h-7 w-20 rounded-full bg-zinc-100" />
               </div>
             ))}
-
           </div>
         )}
 
@@ -320,56 +472,95 @@ const Dashboard = () => {
         {!loading && recentOrders.length === 0 && (
           <div
             className="
-              relative overflow-hidden
+              relative
+              overflow-hidden
               rounded-[24px]
-              border border-white/[0.10]
-              bg-white/[0.025]
+              border border-zinc-200
+              bg-white
               p-10
               text-center
-              backdrop-blur-xl
+              shadow-[0_10px_35px_rgba(0,0,0,0.04)]
             "
           >
-
-            <div className="pointer-events-none absolute left-1/2 top-0 h-40 w-40 -translate-x-1/2 rounded-full bg-cyan-300/[0.035] blur-3xl" />
+            <div
+              className="
+                pointer-events-none
+                absolute
+                left-1/2
+                top-0
+                h-40
+                w-40
+                -translate-x-1/2
+                rounded-full
+                bg-cyan-300/[0.04]
+                blur-3xl
+              "
+            />
 
             <div className="relative">
-
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.035]">
+              <div
+                className="
+                  mx-auto
+                  flex h-14 w-14
+                  items-center
+                  justify-center
+                  rounded-2xl
+                  border border-zinc-200
+                  bg-zinc-50
+                "
+              >
                 <Package
                   size={21}
                   strokeWidth={1.5}
-                  className="text-white/45"
+                  className="text-zinc-400"
                 />
               </div>
 
-              <h3 className="mt-5 text-sm font-medium">
+              <h3 className="mt-5 text-sm font-medium text-zinc-900">
                 No orders yet
               </h3>
 
-              <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-white/35">
-                Your recent content orders will
-                appear here once you place your
+              <p
+                className="
+                  mx-auto
+                  mt-2
+                  max-w-sm
+                  text-sm
+                  leading-6
+                  text-zinc-500
+                "
+              >
+                Your recent content orders will appear here once you place your
                 first order.
               </p>
 
               <Link
                 to="/dashboard/new-order"
                 className="
-                  group mt-5
-                  inline-flex items-center gap-2
-                  text-sm text-white
+                  group
+                  mt-5
+                  inline-flex
+                  items-center
+                  gap-2
+                  text-sm
+                  font-medium
+                  text-zinc-900
                   transition-colors
-                  hover:text-white/65
+                  duration-200
+                  hover:text-zinc-500
                 "
               >
                 Create your first order
-
                 <ArrowUpRight
                   size={16}
-                  className="transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                  className="
+                    transition-transform
+                    duration-200
+                    group-hover:translate-x-0.5
+                    group-hover:-translate-y-0.5
+                  "
                 />
               </Link>
-
             </div>
           </div>
         )}
@@ -380,24 +571,17 @@ const Dashboard = () => {
             className="
               overflow-hidden
               rounded-[24px]
-              border border-white/[0.10]
-              bg-white/[0.025]
-              backdrop-blur-xl
+              border border-zinc-200
+              bg-white
+              shadow-[0_10px_35px_rgba(0,0,0,0.04)]
             "
           >
-
             {recentOrders.map((order) => (
-              <RecentOrder
-                key={order._id || order.id}
-                order={order}
-              />
+              <RecentOrder key={order._id || order.id} order={order} />
             ))}
-
           </div>
         )}
-
       </section>
-
     </div>
   );
 };
@@ -406,56 +590,77 @@ const Dashboard = () => {
    STAT CARD
 ========================================================= */
 
-const StatCard = ({
-  icon: Icon,
-  label,
-  value,
-  description,
-}) => {
+const StatCard = ({ icon: Icon, label, value, description }) => {
   return (
     <div
       className="
-        group relative overflow-hidden
+        group
+        relative
+        overflow-hidden
         rounded-[22px]
-        border border-white/[0.10]
-        bg-white/[0.025]
+        border border-zinc-200
+        bg-white
         p-5
-        backdrop-blur-xl
-        transition-all duration-300
+        shadow-[0_10px_35px_rgba(0,0,0,0.04)]
+        transition-all
+        duration-200
         hover:-translate-y-0.5
-        hover:border-white/[0.18]
-        hover:bg-white/[0.04]
-        hover:shadow-[0_15px_45px_rgba(0,0,0,0.22)]
+        hover:border-zinc-300
+        hover:shadow-[0_15px_45px_rgba(0,0,0,0.07)]
       "
     >
-
       {/* Hover glow */}
-      <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-cyan-300/[0.04] blur-2xl opacity-0 transition duration-500 group-hover:opacity-100" />
+      <div
+        className="
+          pointer-events-none
+          absolute
+          -right-10
+          -top-10
+          h-24
+          w-24
+          rounded-full
+          bg-cyan-300/[0.04]
+          blur-2xl
+          opacity-0
+          transition
+          duration-500
+          group-hover:opacity-100
+        "
+      />
 
       <div className="relative flex items-start justify-between">
-
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.035] transition duration-300 group-hover:border-white/20">
+        <div
+          className="
+            flex h-10 w-10
+            items-center justify-center
+            rounded-xl
+            border border-zinc-200
+            bg-zinc-50
+            transition
+            duration-200
+            group-hover:border-zinc-300
+          "
+        >
           <Icon
             size={18}
             strokeWidth={1.6}
-            className="text-white/55 transition-colors group-hover:text-white/80"
+            className="
+              text-zinc-500
+              transition-colors
+              duration-200
+              group-hover:text-zinc-800
+            "
           />
         </div>
 
-        <span className="text-2xl font-semibold tracking-tight">
+        <span className="text-2xl font-semibold tracking-tight text-zinc-900">
           {value}
         </span>
-
       </div>
 
-      <p className="relative mt-5 text-sm font-medium">
-        {label}
-      </p>
+      <p className="relative mt-5 text-sm font-medium text-zinc-900">{label}</p>
 
-      <p className="relative mt-1 text-xs text-white/35">
-        {description}
-      </p>
-
+      <p className="relative mt-1 text-xs text-zinc-500">{description}</p>
     </div>
   );
 };
@@ -466,21 +671,13 @@ const StatCard = ({
 
 const RecentOrder = ({ order }) => {
   const serviceName =
-    order.serviceSnapshot?.name ||
-    order.service?.name ||
-    "Content Service";
+    order.serviceSnapshot?.name || order.service?.name || "Content Service";
 
-  const status = String(
-    order.orderStatus || "pending"
-  ).toLowerCase();
+  const status = String(order.orderStatus || "pending").toLowerCase();
 
-  const paymentStatus = String(
-    order.paymentStatus || "pending"
-  ).toLowerCase();
+  const paymentStatus = String(order.paymentStatus || "pending").toLowerCase();
 
-  const codPinStatus = String(
-    order.codPinStatus || ""
-  ).toLowerCase();
+  const codPinStatus = String(order.codPinStatus || "").toLowerCase();
 
   /*
    * COD PIN verification is considered Payment Done
@@ -498,111 +695,157 @@ const RecentOrder = ({ order }) => {
   const statusLabel = formatStatus(status);
 
   const date = order.createdAt
-    ? new Date(order.createdAt).toLocaleDateString(
-        "en-IN",
-        {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }
-      )
+    ? new Date(order.createdAt).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
     : "—";
 
   return (
     <Link
       to={`/dashboard/orders/${order._id || order.id}`}
       className="
-        group flex flex-col gap-4
-        border-b border-white/[0.07]
-        px-5 py-5
-        transition-all duration-300
+        group
+        flex
+        flex-col
+        gap-4
+        border-b border-zinc-100
+        px-5
+        py-5
+        transition-all
+        duration-200
         last:border-b-0
-        hover:bg-white/[0.025]
+        hover:bg-zinc-50
         sm:flex-row
         sm:items-center
         sm:justify-between
         sm:px-6
       "
     >
-
       <div className="flex min-w-0 items-center gap-4">
-
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.035] transition duration-300 group-hover:border-white/20 group-hover:bg-white/[0.05]">
+        <div
+          className="
+            flex h-11 w-11
+            shrink-0
+            items-center
+            justify-center
+            rounded-xl
+            border border-zinc-200
+            bg-zinc-50
+            transition
+            duration-200
+            group-hover:border-zinc-300
+            group-hover:bg-white
+          "
+        >
           <Package
             size={18}
             strokeWidth={1.5}
-            className="text-white/50 group-hover:text-white/75"
+            className="
+              text-zinc-400
+              transition-colors
+              duration-200
+              group-hover:text-zinc-700
+            "
           />
         </div>
 
         <div className="min-w-0">
-
           <div className="flex flex-wrap items-center gap-2">
-
-            <p className="truncate text-sm font-medium text-white">
+            <p className="truncate text-sm font-medium text-zinc-900">
               {serviceName}
             </p>
 
-            <span className="text-white/20">
-              •
-            </span>
+            <span className="text-zinc-300">•</span>
 
-            <p className="text-xs text-white/35">
-              {order.orderNumber}
-            </p>
-
+            <p className="text-xs text-zinc-500">{order.orderNumber}</p>
           </div>
 
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-white/35">
-
+          <div
+            className="
+              mt-1
+              flex
+              flex-wrap
+              items-center
+              gap-2
+              text-xs
+              text-zinc-400
+            "
+          >
             <span>{date}</span>
 
-            <span className="text-white/15">
-              •
-            </span>
+            <span className="text-zinc-300">•</span>
 
-            <span>
-              ₹{Number(order.amount || 0).toLocaleString("en-IN")}
-            </span>
-
+            <span>₹{Number(order.amount || 0).toLocaleString("en-IN")}</span>
           </div>
-
         </div>
-
       </div>
 
       <div className="flex items-center justify-between gap-4 sm:justify-end">
-
         <div className="flex flex-wrap items-center gap-2">
-
-          <StatusBadge
-            label={statusLabel}
-            type={status}
-          />
+          <StatusBadge label={statusLabel} type={status} />
 
           {isCodPaymentDone ? (
-            <span className="rounded-full border border-emerald-400/15 bg-emerald-400/[0.06] px-3 py-1.5 text-[11px] font-medium text-emerald-200/70">
+            <span
+              className="
+                rounded-full
+                border border-emerald-200
+                bg-emerald-50
+                px-3
+                py-1.5
+                text-[11px]
+                font-medium
+                text-emerald-700
+              "
+            >
               Payment Done
             </span>
           ) : paymentStatus === "pending" ? (
-            <span className="rounded-full border border-amber-400/15 bg-amber-400/[0.06] px-3 py-1.5 text-[11px] font-medium text-amber-200/70">
+            <span
+              className="
+                rounded-full
+                border border-amber-200
+                bg-amber-50
+                px-3
+                py-1.5
+                text-[11px]
+                font-medium
+                text-amber-700
+              "
+            >
               Payment Pending
             </span>
           ) : paymentStatus === "paid" ? (
-            <span className="rounded-full border border-emerald-400/15 bg-emerald-400/[0.06] px-3 py-1.5 text-[11px] font-medium text-emerald-200/70">
+            <span
+              className="
+                rounded-full
+                border border-emerald-200
+                bg-emerald-50
+                px-3
+                py-1.5
+                text-[11px]
+                font-medium
+                text-emerald-700
+              "
+            >
               Payment Done
             </span>
           ) : null}
-
         </div>
 
         <ArrowRight
           size={16}
-          className="shrink-0 text-white/20 transition-all duration-300 group-hover:translate-x-1 group-hover:text-white/60"
+          className="
+            shrink-0
+            text-zinc-300
+            transition-all
+            duration-200
+            group-hover:translate-x-1
+            group-hover:text-zinc-600
+          "
         />
-
       </div>
-
     </Link>
   );
 };
@@ -613,30 +856,30 @@ const RecentOrder = ({ order }) => {
 
 const StatusBadge = ({ label, type }) => {
   const styles = {
-    pending:
-      "border-white/10 bg-white/[0.04] text-white/55",
+    pending: "border-zinc-200 bg-zinc-50 text-zinc-600",
 
-    confirmed:
-      "border-blue-400/15 bg-blue-400/[0.06] text-blue-200/70",
+    confirmed: "border-blue-200 bg-blue-50 text-blue-700",
 
-    in_progress:
-      "border-cyan-400/15 bg-cyan-400/[0.06] text-cyan-200/70",
+    in_progress: "border-cyan-200 bg-cyan-50 text-cyan-700",
 
-    processing:
-      "border-cyan-400/15 bg-cyan-400/[0.06] text-cyan-200/70",
+    processing: "border-cyan-200 bg-cyan-50 text-cyan-700",
 
-    completed:
-      "border-emerald-400/15 bg-emerald-400/[0.06] text-emerald-200/70",
+    completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
 
-    cancelled:
-      "border-red-400/15 bg-red-400/[0.06] text-red-200/70",
+    cancelled: "border-red-200 bg-red-50 text-red-700",
   };
 
   return (
     <span
-      className={`rounded-full border px-3 py-1.5 text-[11px] font-medium ${
-        styles[type] || styles.pending
-      }`}
+      className={`
+        rounded-full
+        border
+        px-3
+        py-1.5
+        text-[11px]
+        font-medium
+        ${styles[type] || styles.pending}
+      `}
     >
       {label}
     </span>
@@ -659,11 +902,7 @@ const formatStatus = (status) => {
 
   return (
     labels[status] ||
-    status
-      .replace(/_/g, " ")
-      .replace(/\b\w/g, (char) =>
-        char.toUpperCase()
-      )
+    status.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
   );
 };
 
