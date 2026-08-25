@@ -1,11 +1,6 @@
 import { useEffect, useState } from "react";
 
-import {
-  ArrowRight,
-  ClipboardList,
-  Loader2,
-  RefreshCw,
-} from "lucide-react";
+import { ArrowRight, ClipboardList, Loader2, RefreshCw } from "lucide-react";
 
 import { Link } from "react-router-dom";
 
@@ -27,10 +22,7 @@ const OrderHistory = () => {
     } catch (error) {
       console.error("Get orders error:", error);
 
-      setError(
-        error.response?.data?.message ||
-          "Unable to load your orders."
-      );
+      setError(error.response?.data?.message || "Unable to load your orders.");
     } finally {
       setLoading(false);
     }
@@ -59,10 +51,7 @@ const OrderHistory = () => {
               shadow-sm
             "
           >
-            <ClipboardList
-              size={17}
-              strokeWidth={1.7}
-            />
+            <ClipboardList size={17} strokeWidth={1.7} />
           </div>
 
           <div>
@@ -130,14 +119,9 @@ const OrderHistory = () => {
             className={`
               transition-transform
               duration-500
-              ${
-                loading
-                  ? "animate-spin"
-                  : "group-hover:rotate-180"
-              }
+              ${loading ? "animate-spin" : "group-hover:rotate-180"}
             `}
           />
-
           Refresh
         </button>
       </div>
@@ -167,9 +151,7 @@ const OrderHistory = () => {
               Something went wrong
             </p>
 
-            <p className="mt-1 text-sm text-red-600/70">
-              {error}
-            </p>
+            <p className="mt-1 text-sm text-red-600/70">{error}</p>
           </div>
 
           <button
@@ -233,10 +215,7 @@ const OrderHistory = () => {
                 bg-zinc-50
               "
             >
-              <Loader2
-                size={19}
-                className="animate-spin text-zinc-500"
-              />
+              <Loader2 size={19} className="animate-spin text-zinc-500" />
             </div>
 
             <div>
@@ -299,10 +278,7 @@ const OrderHistory = () => {
 
             <div>
               {orders.map((order) => (
-                <OrderTableRow
-                  key={order._id}
-                  order={order}
-                />
+                <OrderTableRow key={order._id} order={order} />
               ))}
             </div>
           </div>
@@ -313,10 +289,7 @@ const OrderHistory = () => {
 
           <div className="space-y-4 md:hidden">
             {orders.map((order) => (
-              <OrderMobileCard
-                key={order._id}
-                order={order}
-              />
+              <OrderMobileCard key={order._id} order={order} />
             ))}
           </div>
         </>
@@ -331,9 +304,7 @@ const OrderHistory = () => {
 
 const OrderTableRow = ({ order }) => {
   const serviceName =
-    order.serviceSnapshot?.name ||
-    order.service?.name ||
-    "Service";
+    order.serviceSnapshot?.name || order.service?.name || "Service";
 
   const isCodPaymentDone =
     order.paymentStatus === "collected" ||
@@ -372,23 +343,16 @@ const OrderTableRow = ({ order }) => {
 
       {/* Service */}
 
-      <p className="truncate text-sm text-zinc-600">
-        {serviceName}
-      </p>
+      <p className="truncate text-sm text-zinc-600">{serviceName}</p>
 
       {/* Date */}
 
-      <p className="text-sm text-zinc-500">
-        {formatDate(order.createdAt)}
-      </p>
+      <p className="text-sm text-zinc-500">{formatDate(order.createdAt)}</p>
 
       {/* Amount */}
 
       <p className="text-sm font-medium text-zinc-800">
-        ₹
-        {Number(order.amount || 0).toLocaleString(
-          "en-IN"
-        )}
+        ₹{Number(order.amount || 0).toLocaleString("en-IN")}
       </p>
 
       {/* Status */}
@@ -412,9 +376,7 @@ const OrderTableRow = ({ order }) => {
             Payment Done
           </span>
         ) : (
-          <PaymentStatusBadge
-            status={order.paymentStatus}
-          />
+          <PaymentStatusBadge status={order.paymentStatus} />
         )}
       </div>
 
@@ -460,9 +422,7 @@ const OrderTableRow = ({ order }) => {
 
 const OrderMobileCard = ({ order }) => {
   const serviceName =
-    order.serviceSnapshot?.name ||
-    order.service?.name ||
-    "Service";
+    order.serviceSnapshot?.name || order.service?.name || "Service";
 
   const isCodPaymentDone =
     order.paymentStatus === "collected" ||
@@ -502,13 +462,10 @@ const OrderMobileCard = ({ order }) => {
       />
 
       <div className="relative">
-
         {/* Top */}
 
         <div className="flex items-start justify-between gap-4">
-
           <div className="min-w-0">
-
             <p className="truncate text-sm font-medium text-zinc-900">
               {order.orderNumber}
             </p>
@@ -516,13 +473,9 @@ const OrderMobileCard = ({ order }) => {
             <p className="mt-1 text-xs text-zinc-400">
               {formatDate(order.createdAt)}
             </p>
-
           </div>
 
-          <StatusBadge
-            status={order.orderStatus}
-          />
-
+          <StatusBadge status={order.orderStatus} />
         </div>
 
         {/* Details */}
@@ -538,23 +491,16 @@ const OrderMobileCard = ({ order }) => {
             pt-5
           "
         >
-          <MobileDetail
-            label="Service"
-            value={serviceName}
-          />
+          <MobileDetail label="Service" value={serviceName} />
 
           <MobileDetail
             label="Amount"
-            value={`₹${Number(
-              order.amount || 0
-            ).toLocaleString("en-IN")}`}
+            value={`₹${Number(order.amount || 0).toLocaleString("en-IN")}`}
           />
 
           <MobileDetail
             label="Payment"
-            value={formatStatus(
-              order.paymentMethod
-            )}
+            value={formatStatus(order.paymentMethod)}
           />
 
           <MobileDetail
@@ -562,9 +508,7 @@ const OrderMobileCard = ({ order }) => {
             value={
               isCodPaymentDone
                 ? "Payment Done"
-                : formatStatus(
-                    order.paymentStatus
-                  )
+                : formatStatus(order.paymentStatus)
             }
             paymentDone={isCodPaymentDone}
           />
@@ -573,38 +517,42 @@ const OrderMobileCard = ({ order }) => {
         {/* View */}
 
         <Link
-          to={`/dashboard/orders/${order._id}`}
+          to={`/dashboard/orders/${order.id}`}
           className="
-            group/button
-            mt-5
-            flex
-            w-full
-            items-center
-            justify-center
-            gap-2
-            rounded-xl
-            border border-zinc-200
-            bg-white
-            py-3
-            text-sm
-            text-zinc-600
-            shadow-sm
-            transition
-            duration-200
-            hover:border-zinc-300
-            hover:bg-zinc-50
-            hover:text-zinc-900
-          "
+    inline-flex
+    items-center
+    justify-center
+    gap-2
+    rounded-xl
+    border
+    border-zinc-900
+    bg-zinc-900
+    px-5
+    py-3
+    text-sm
+    font-medium
+    text-white
+    shadow-sm
+    transition-[transform,background-color,box-shadow]
+    duration-300
+    ease-out
+    hover:scale-[1.01]
+    hover:bg-zinc-800
+    hover:text-white
+    hover:shadow-md
+    active:scale-[0.99]
+  "
         >
           View Order
-
           <ArrowRight
             size={16}
             className="
-              transition-transform
-              duration-200
-              group-hover/button:translate-x-1
-            "
+      text-white
+      transition-transform
+      duration-300
+      ease-out
+      group-hover:translate-x-0.5
+    "
           />
         </Link>
       </div>
@@ -616,11 +564,7 @@ const OrderMobileCard = ({ order }) => {
 /* Mobile Detail */
 /* -------------------------------- */
 
-const MobileDetail = ({
-  label,
-  value,
-  paymentDone = false,
-}) => {
+const MobileDetail = ({ label, value, paymentDone = false }) => {
   return (
     <div className="min-w-0">
       <p
@@ -640,11 +584,7 @@ const MobileDetail = ({
           mt-1
           truncate
           text-sm
-          ${
-            paymentDone
-              ? "font-medium text-emerald-600"
-              : "text-zinc-600"
-          }
+          ${paymentDone ? "font-medium text-emerald-600" : "text-zinc-600"}
         `}
       >
         {value || "—"}
@@ -658,33 +598,24 @@ const MobileDetail = ({
 /* -------------------------------- */
 
 const StatusBadge = ({ status }) => {
-  const normalizedStatus =
-    status || "unknown";
+  const normalizedStatus = status || "unknown";
 
   const statusStyles = {
-    pending:
-      "border-amber-200 bg-amber-50 text-amber-700",
+    pending: "border-amber-200 bg-amber-50 text-amber-700",
 
-    confirmed:
-      "border-blue-200 bg-blue-50 text-blue-700",
+    confirmed: "border-blue-200 bg-blue-50 text-blue-700",
 
-    processing:
-      "border-blue-200 bg-blue-50 text-blue-700",
+    processing: "border-blue-200 bg-blue-50 text-blue-700",
 
-    in_progress:
-      "border-blue-200 bg-blue-50 text-blue-700",
+    in_progress: "border-blue-200 bg-blue-50 text-blue-700",
 
-    completed:
-      "border-emerald-200 bg-emerald-50 text-emerald-700",
+    completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
 
-    delivered:
-      "border-emerald-200 bg-emerald-50 text-emerald-700",
+    delivered: "border-emerald-200 bg-emerald-50 text-emerald-700",
 
-    cancelled:
-      "border-red-200 bg-red-50 text-red-700",
+    cancelled: "border-red-200 bg-red-50 text-red-700",
 
-    rejected:
-      "border-red-200 bg-red-50 text-red-700",
+    rejected: "border-red-200 bg-red-50 text-red-700",
   };
 
   return (
@@ -714,11 +645,9 @@ const StatusBadge = ({ status }) => {
 /* -------------------------------- */
 
 const PaymentStatusBadge = ({ status }) => {
-  const normalizedStatus =
-    status || "unknown";
+  const normalizedStatus = status || "unknown";
 
-  const isPending =
-    normalizedStatus === "pending";
+  const isPending = normalizedStatus === "pending";
 
   return (
     <span
@@ -781,7 +710,6 @@ const EmptyOrders = () => {
       />
 
       <div className="relative">
-
         <div
           className="
             mx-auto
@@ -826,8 +754,7 @@ const EmptyOrders = () => {
             text-zinc-500
           "
         >
-          Once you place your first content order,
-          it will appear here.
+          Once you place your first content order, it will appear here.
         </p>
 
         <Link
@@ -854,7 +781,6 @@ const EmptyOrders = () => {
           "
         >
           Create New Order
-
           <ArrowRight
             size={16}
             className="
@@ -876,14 +802,11 @@ const EmptyOrders = () => {
 const formatDate = (date) => {
   if (!date) return "—";
 
-  return new Date(date).toLocaleDateString(
-    "en-IN",
-    {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }
-  );
+  return new Date(date).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 };
 
 const formatStatus = (status) => {
@@ -891,9 +814,7 @@ const formatStatus = (status) => {
 
   return status
     .replace(/_/g, " ")
-    .replace(/\b\w/g, (letter) =>
-      letter.toUpperCase()
-    );
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 };
 
 export default OrderHistory;

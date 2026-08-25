@@ -348,56 +348,52 @@ const AdminDashboard = () => {
 
       </section>
 
-      {/* =====================================================
-          QUICK ACTIONS
-      ====================================================== */}
+     {/* =====================================================
+    QUICK ACTIONS
+====================================================== */}
 
-      <section className="mt-8">
+<section className="mt-8">
+  <div className="mb-4">
+    <p
+      className="
+        text-[10px]
+        font-medium
+        uppercase
+        tracking-[0.2em]
+        text-zinc-400
+      "
+    >
+      Quick Access
+    </p>
 
-        <div className="mb-4">
+    <h2 className="mt-1 text-xl font-medium text-zinc-900">
+      Manage
+    </h2>
+  </div>
 
-          <p
-            className="
-              text-[10px]
-              font-medium
-              uppercase
-              tracking-[0.2em]
-              text-zinc-400
-            "
-          >
-            Quick Access
-          </p>
+  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <QuickAction
+      icon={ClipboardList}
+      title="Orders"
+      description="View and manage client orders."
+      to="/admin/orders"
+    />
 
-          <h2 className="mt-1 text-xl font-medium text-zinc-900">
-            Manage
-          </h2>
-        </div>
+    <QuickAction
+      icon={Users}
+      title="Users"
+      description="Manage registered clients."
+      to="/admin/users"
+    />
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-
-          <QuickAction
-            icon={ClipboardList}
-            title="Orders"
-            description="View and manage client orders."
-            to="/admin/orders"
-          />
-
-          <QuickAction
-            icon={Users}
-            title="Users"
-            description="Manage registered clients."
-            to="/admin/users"
-          />
-
-          <QuickAction
-            icon={KeyRound}
-            title="COD Payments"
-            description="Generate COD payment PINs."
-            to="/admin/cod"
-          />
-
-        </div>
-      </section>
+    <QuickAction
+      icon={KeyRound}
+      title="COD Payments"
+      description="Generate COD payment PINs."
+      to="/admin/cod"
+    />
+  </div>
+</section>
 
       {/* =====================================================
           RECENT ORDERS
@@ -685,13 +681,16 @@ const QuickAction = ({
         bg-white
         p-5
         shadow-[0_10px_35px_rgba(0,0,0,0.04)]
-        transition-all
+        transition-[border-color,box-shadow,background-color]
         duration-300
-        hover:-translate-y-1
+        ease-out
         hover:border-zinc-300
-        hover:shadow-[0_16px_45px_rgba(0,0,0,0.07)]
+        hover:bg-zinc-[50]
+        hover:shadow-[0_14px_40px_rgba(0,0,0,0.06)]
       "
     >
+      {/* Subtle background glow */}
+
       <div
         className="
           pointer-events-none
@@ -701,15 +700,18 @@ const QuickAction = ({
           h-28
           w-28
           rounded-full
-          bg-cyan-300/[0.035]
+          bg-cyan-300/[0.025]
           blur-3xl
-          transition
+          opacity-0
+          transition-opacity
           duration-500
-          group-hover:bg-cyan-300/[0.06]
+          ease-out
+          group-hover:opacity-100
         "
       />
 
       <div className="relative flex items-start justify-between">
+        {/* Icon */}
 
         <div
           className="
@@ -719,10 +721,11 @@ const QuickAction = ({
             border border-zinc-200
             bg-zinc-50
             text-zinc-500
-            transition-all
+            transition-[border-color,background-color,color,box-shadow]
             duration-300
+            ease-out
             group-hover:border-zinc-300
-            group-hover:bg-white
+            group-hover:bg-zinc-100
             group-hover:text-zinc-800
             group-hover:shadow-sm
           "
@@ -733,6 +736,8 @@ const QuickAction = ({
           />
         </div>
 
+        {/* Arrow */}
+
         <div
           className="
             flex h-8 w-8
@@ -742,27 +747,29 @@ const QuickAction = ({
             bg-white
             text-zinc-400
             shadow-sm
-            transition-all
+            transition-[border-color,background-color,color,box-shadow]
             duration-300
-            group-hover:border-zinc-900
+            ease-out
+            group-hover:border-zinc-800
             group-hover:bg-zinc-900
             group-hover:text-white
           "
         >
           <ArrowUpRight
             size={15}
+            strokeWidth={1.7}
             className="
               transition-transform
               duration-300
-              group-hover:translate-x-0.5
-              group-hover:-translate-y-0.5
+              ease-out
+              group-hover:translate-x-[2px]
+              group-hover:-translate-y-[2px]
             "
           />
         </div>
       </div>
 
       <div className="relative mt-5">
-
         <h3 className="text-sm font-medium text-zinc-900">
           {title}
         </h3>
@@ -770,12 +777,10 @@ const QuickAction = ({
         <p className="mt-1 text-xs leading-5 text-zinc-500">
           {description}
         </p>
-
       </div>
     </Link>
   );
 };
-
 /* =========================================================
    RECENT ORDER DESKTOP ROW
 ========================================================= */

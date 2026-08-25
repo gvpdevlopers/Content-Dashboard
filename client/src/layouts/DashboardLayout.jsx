@@ -136,49 +136,22 @@ const DashboardLayout = () => {
             px-6
           "
         >
-          <div className="flex items-center gap-3">
-            {/* Logo */}
-            <div
-              className="
-                relative
-                flex h-10 w-10
-                shrink-0
-                items-center justify-center
-                overflow-hidden
-                rounded-xl
-                border border-zinc-200
-                bg-zinc-50
-                p-1
-                shadow-[0_8px_25px_rgba(0,0,0,0.06)]
-                transition-all duration-300
-                hover:border-zinc-300
-                hover:shadow-[0_10px_30px_rgba(0,0,0,0.09)]
-              "
-            >
-              <img
-                src="/favicon.png"
-                alt="Glow Ventures"
-                className="
-                  h-full
-                  w-full
-                  rounded-lg
-                  object-cover
-                  transition-transform
-                  duration-300
-                  hover:scale-105
-                "
-              />
-            </div>
-
-            {/* Brand Name */}
-            <div>
-              <p className="text-sm font-medium tracking-tight text-zinc-900">
-                Glow Ventures
-              </p>
-
-              <p className="mt-0.5 text-[11px] text-zinc-400">Client Portal</p>
-            </div>
-          </div>
+          <div className="group flex items-center">
+  <img
+    src="/Logo.png"
+    alt="Glow Ventures"
+    className="
+      h-auto
+      w-[150px]
+      object-contain
+      transition-all
+      duration-300
+      ease-out
+      group-hover:scale-[1.03]
+      group-hover:opacity-90
+    "
+  />
+</div>
 
           {/* Mobile Close */}
           <button

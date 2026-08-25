@@ -46,11 +46,15 @@ const generateCodPin = async (req, res) => {
       .randomInt(100000, 1000000)
       .toString();
 
-    order.codPin = codPin;
-    order.codPinStatus = "active";
-    order.codPinVerifiedAt = null;
+    const generatedAt = new Date();
 
-    await order.save();
+order.codPin = codPin;
+order.codPinStatus = "active";
+order.codPinGeneratedAt = generatedAt;
+order.codPinVerifiedAt = null;
+order.codCollectedAt = null;
+
+await order.save();
 
     return res.status(200).json({
       success: true,
@@ -146,11 +150,14 @@ const verifyCodPin = async (req, res) => {
      * In the current flow, successful PIN verification
      * means the COD payment is completed.
      */
-    order.paymentStatus = "collected";
-    order.codPinStatus = "used";
-    order.codCollectedAt = new Date();
+   const verifiedAt = new Date();
 
-    await order.save();
+order.paymentStatus = "collected";
+order.codPinStatus = "used";
+order.codPinVerifiedAt = verifiedAt;
+order.codCollectedAt = verifiedAt;
+
+await order.save();
 
     return res.status(200).json({
       success: true,

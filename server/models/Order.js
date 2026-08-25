@@ -26,7 +26,6 @@ const orderSchema = new mongoose.Schema(
         type: String,
         required: true,
       },
-
       category: {
         type: String,
         required: true,
@@ -45,78 +44,91 @@ const orderSchema = new mongoose.Schema(
       min: 0,
     },
 
+    // Payment information
     paymentMethod: {
-  type: String,
-  enum: ["cod", "online"],
-  required: true,
-},
+      type: String,
+      enum: ["cod", "online"],
+      required: true,
+    },
 
-paymentStatus: {
-  type: String,
-  enum: [
-    "pending",
-    "processing",
-    "paid",
-    "failed",
-    "collected",
-  ],
-  default: "pending",
-},
+    paymentStatus: {
+      type: String,
+      enum: [
+        "pending",
+        "processing",
+        "paid",
+        "failed",
+        "collected",
+      ],
+      default: "pending",
+    },
 
-// Razorpay information
-razorpayOrderId: {
-  type: String,
-  default: null,
-},
+    // Razorpay information
+    razorpayOrderId: {
+      type: String,
+      default: null,
+    },
 
-razorpayPaymentId: {
-  type: String,
-  default: null,
-},
+    razorpayPaymentId: {
+      type: String,
+      default: null,
+    },
 
-razorpaySignature: {
-  type: String,
-  default: null,
-},
+    razorpaySignature: {
+      type: String,
+      default: null,
+    },
 
-// COD information
-codPin: {
-  type: String,
-  default: null,
-},
+    // COD information
+    codPin: {
+      type: String,
+      default: null,
+    },
 
-codPinStatus: {
-  type: String,
-  enum: [
-    "not_generated",
-    "active",
-    "verified",
-    "used",
-    "expired",
-  ],
-  default: "not_generated",
-},
+    codPinStatus: {
+      type: String,
+      enum: [
+        "not_generated",
+        "active",
+        "verified",
+        "used",
+        "expired",
+      ],
+      default: "not_generated",
+    },
 
-codPinVerifiedAt: {
-  type: Date,
-  default: null,
-},
+    // When the admin generated the COD PIN
+    codPinGeneratedAt: {
+      type: Date,
+      default: null,
+    },
 
-codCollectedAt: {
-  type: Date,
-  default: null,
-},
-orderStatus: {
-  type: String,
-  enum: [
-    "pending",
-    "processing",
-    "in_progress",
-    "completed",
-    "cancelled",
-  ],
-  default: "pending",
-},
+    // When the client successfully verified the COD PIN
+    codPinVerifiedAt: {
+      type: Date,
+      default: null,
+    },
+
+    // When COD payment was successfully collected
+    codCollectedAt: {
+      type: Date,
+      default: null,
+    },
+
+    // Order workflow status
+    orderStatus: {
+      type: String,
+      enum: [
+        "pending",
+        "processing",
+        "in_progress",
+        "completed",
+        "cancelled",
+      ],
+      default: "pending",
+    },
+
+    // Admin notes
     notes: {
       type: String,
       default: "",

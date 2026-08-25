@@ -735,7 +735,6 @@ const NewOrder = () => {
                     shadow-[0_10px_30px_rgba(0,0,0,0.10)]
                     transition-all
                     duration-200
-                    hover:-translate-y-0.5
                     hover:bg-zinc-800
                     hover:shadow-[0_15px_40px_rgba(0,0,0,0.14)]
                     active:translate-y-0
@@ -979,7 +978,6 @@ const PaymentOption = ({
             : `
               border-zinc-200
               bg-white
-              hover:-translate-y-0.5
               hover:border-zinc-300
               hover:bg-zinc-50
               hover:shadow-sm

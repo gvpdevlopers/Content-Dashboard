@@ -24,12 +24,10 @@ const AdminLayout = () => {
     setSidebarOpen(false);
   };
 
-  const userInitial =
-    user?.name?.charAt(0)?.toUpperCase() || "G";
+  const userInitial = user?.name?.charAt(0)?.toUpperCase() || "G";
 
   return (
     <div className="min-h-screen bg-[#f7f7f8] text-zinc-900">
-
       {/* =====================================================
           MOBILE HEADER
       ====================================================== */}
@@ -137,51 +135,21 @@ const AdminLayout = () => {
             px-6
           "
         >
-          <div className="flex items-center gap-3">
-
-            {/* Logo */}
-            <div
+          <div className="group flex items-center">
+            <img
+              src="/Logo.png"
+              alt="Glow Ventures"
               className="
-                relative
-                flex h-10 w-10
-                shrink-0
-                items-center justify-center
-                overflow-hidden
-                rounded-xl
-                border border-zinc-200
-                bg-zinc-50
-                p-1
-                shadow-[0_8px_25px_rgba(0,0,0,0.06)]
-                transition-all duration-300
-                hover:border-zinc-300
-                hover:shadow-[0_10px_30px_rgba(0,0,0,0.09)]
-              "
-            >
-              <img
-                src="/favicon.png"
-                alt="Glow Ventures"
-                className="
-                  h-full
-                  w-full
-                  rounded-lg
-                  object-cover
-                  transition-transform
-                  duration-300
-                  hover:scale-105
-                "
-              />
-            </div>
-
-            {/* Brand */}
-            <div>
-              <p className="text-sm font-medium tracking-tight text-zinc-900">
-                Glow Ventures
-              </p>
-
-              <p className="mt-0.5 text-[11px] text-zinc-400">
-                Admin Portal
-              </p>
-            </div>
+      h-auto
+      w-[160px]
+      object-contain
+      transition-all
+      duration-300
+      ease-out
+      group-hover:scale-[1.03]
+      group-hover:opacity-90
+    "
+            />
           </div>
 
           {/* Mobile Close */}
@@ -209,7 +177,6 @@ const AdminLayout = () => {
         ================================================== */}
 
         <nav className="flex-1 px-4 py-6">
-
           <p
             className="
               mb-3 px-3
@@ -224,7 +191,6 @@ const AdminLayout = () => {
           </p>
 
           <div className="space-y-1">
-
             <AdminSidebarItem
               icon={LayoutDashboard}
               label="Dashboard"
@@ -253,7 +219,6 @@ const AdminLayout = () => {
               to="/admin/cod"
               onClick={closeSidebar}
             />
-
           </div>
         </nav>
 
@@ -262,7 +227,6 @@ const AdminLayout = () => {
         ================================================== */}
 
         <div className="border-t border-zinc-200 p-4">
-
           {/* User Card */}
           <div
             className="
@@ -278,7 +242,6 @@ const AdminLayout = () => {
             "
           >
             <div className="flex items-center gap-3">
-
               <div
                 className="
                   flex h-9 w-9
@@ -294,17 +257,13 @@ const AdminLayout = () => {
               </div>
 
               <div className="min-w-0">
-
                 <p className="truncate text-sm font-medium text-zinc-900">
                   {user?.name || "Glow Ventures"}
                 </p>
 
                 <p className="truncate text-xs text-zinc-500">
-                  {user?.email ||
-                    user?.username ||
-                    "Administrator"}
+                  {user?.email || user?.username || "Administrator"}
                 </p>
-
               </div>
             </div>
           </div>
@@ -346,7 +305,6 @@ const AdminLayout = () => {
       ====================================================== */}
 
       <div className="min-h-screen lg:pl-[270px]">
-
         {/* =================================================
             DESKTOP HEADER
         ================================================== */}
@@ -376,7 +334,6 @@ const AdminLayout = () => {
 
           {/* User */}
           <div className="flex items-center gap-3">
-
             <div
               className="
                 flex h-10 w-10
@@ -421,13 +378,7 @@ const AdminLayout = () => {
    ADMIN SIDEBAR ITEM
 ========================================================= */
 
-const AdminSidebarItem = ({
-  icon: Icon,
-  label,
-  to,
-  end,
-  onClick,
-}) => {
+const AdminSidebarItem = ({ icon: Icon, label, to, end, onClick }) => {
   return (
     <NavLink
       to={to}

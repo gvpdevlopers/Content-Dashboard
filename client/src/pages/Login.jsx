@@ -608,7 +608,7 @@ const Login = () => {
   "
             >
               <img
-                src="/GVP_logo.png"
+                src="/Logo.png"
                 alt="Glow Ventures"
                 className="
       h-full

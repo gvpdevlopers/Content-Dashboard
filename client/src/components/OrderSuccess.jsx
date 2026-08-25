@@ -164,34 +164,49 @@ const OrderSuccess = ({ order }) => {
             sm:justify-center
           "
         >
-          <Link
-            to={`/dashboard/orders/${order.id}`}
-            className="
-              inline-flex
-              items-center
-              justify-center
-              gap-2
-              rounded-xl
-              bg-zinc-900
-              px-5
-              py-3
-              text-sm
-              font-medium
-              text-white
-              shadow-sm
-              transition-all
-              duration-200
-              hover:bg-zinc-800
-              hover:shadow-md
-              active:scale-[0.98]
-            "
-          >
-            View Order
-            <ArrowRight
-              size={16}
-              className="transition-transform duration-200 group-hover:translate-x-0.5"
-            />
-          </Link>
+         <Link
+  to={`/dashboard/orders/${order.id}`}
+  className="
+    group
+    inline-flex
+    items-center
+    justify-center
+    gap-2
+    rounded-xl
+    border
+    border-zinc-900
+    bg-zinc-900
+    px-5
+    py-3
+    text-sm
+    font-medium
+    !text-white
+    shadow-sm
+    transition-[transform,background-color,box-shadow]
+    duration-300
+    ease-out
+    hover:bg-zinc-800
+    hover:!text-white
+    hover:shadow-md
+    hover:scale-[1.01]
+    active:scale-[0.99]
+  "
+>
+  <span className="!text-white">
+    View Order
+  </span>
+
+  <ArrowRight
+    size={16}
+    className="
+      !text-white
+      transition-transform
+      duration-300
+      ease-out
+      group-hover:translate-x-0.5
+    "
+  />
+</Link>
 
           <Link
             to="/dashboard/orders"

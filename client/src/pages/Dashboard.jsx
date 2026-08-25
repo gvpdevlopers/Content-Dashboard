@@ -247,13 +247,14 @@ const Dashboard = () => {
     font-medium
     text-white
     shadow-[0_10px_30px_rgba(0,0,0,0.08)]
-    transition-all
-    duration-200
-    hover:-translate-y-0.5
+    transition-[transform,background-color,box-shadow]
+    duration-300
+    ease-out
+    hover:
     hover:bg-zinc-800
     hover:text-white
-    hover:shadow-[0_14px_40px_rgba(0,0,0,0.12)]
-    active:translate-y-0
+    hover:shadow-[0_12px_34px_rgba(0,0,0,0.10)]
+    active:scale-[0.99]
   "
           >
             <span
@@ -267,6 +268,7 @@ const Dashboard = () => {
       opacity-0
       transition-opacity
       duration-300
+      ease-out
       group-hover/button:opacity-100
     "
             />
@@ -287,7 +289,8 @@ const Dashboard = () => {
                 className="
         text-white
         transition-transform
-        duration-200
+        duration-300
+        ease-out
         group-hover/button:translate-x-0.5
         group-hover/button:-translate-y-0.5
       "
