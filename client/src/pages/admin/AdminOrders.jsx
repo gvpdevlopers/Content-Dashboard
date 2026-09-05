@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   ArrowRight,
@@ -6,6 +6,7 @@ import {
   Loader2,
   RefreshCw,
   Search,
+  X,
 } from "lucide-react";
 
 import { Link } from "react-router-dom";
@@ -21,6 +22,11 @@ const AdminOrders = () => {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all");
+
+  /* =====================================================
+     LOAD ORDERS
+  ====================================================== */
 
   const loadOrders = async (isRefresh = false) => {
     try {
@@ -32,20 +38,29 @@ const AdminOrders = () => {
 
       setError("");
 
-      const data =
-        await adminOrderService.getAdminOrders();
+      const data = await adminOrderService.getAdminOrders();
 
-      setOrders(data.orders || []);
+      const receivedOrders = Array.isArray(data?.orders) ? data.orders : [];
+
+      /*
+       * Newest orders first.
+       *
+       * This keeps the admin list useful even if the API
+       * does not explicitly sort the response.
+       */
+      const sortedOrders = [...receivedOrders].sort((a, b) => {
+        const dateA = new Date(a?.createdAt || 0).getTime();
+
+        const dateB = new Date(b?.createdAt || 0).getTime();
+
+        return dateB - dateA;
+      });
+
+      setOrders(sortedOrders);
     } catch (error) {
-      console.error(
-        "Get admin orders error:",
-        error
-      );
+      console.error("Get admin orders error:", error);
 
-      setError(
-        error.response?.data?.message ||
-          "Unable to load orders."
-      );
+      setError(error.response?.data?.message || "Unable to load orders.");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -60,48 +75,68 @@ const AdminOrders = () => {
      FILTER ORDERS
   ====================================================== */
 
-  const filteredOrders = orders.filter(
-    (order) => {
-      const searchValue =
-        search.trim().toLowerCase();
+  const filteredOrders = useMemo(() => {
+    const searchValue = search.trim().toLowerCase();
+
+    return orders.filter((order) => {
+      const orderNumber = String(order?.orderNumber || "").toLowerCase();
+
+      const clientName = String(
+        order?.client?.name ||
+          order?.client?.username ||
+          order?.client?.fullName ||
+          "",
+      ).toLowerCase();
+
+      const clientEmail = String(order?.client?.email || "").toLowerCase();
+
+      const serviceName = String(
+        order?.serviceSnapshot?.name || order?.service?.name || "",
+      ).toLowerCase();
+
+      const serviceSlug = String(
+        order?.serviceSnapshot?.slug || order?.service?.slug || "",
+      ).toLowerCase();
+
+      const paymentMethod = String(order?.paymentMethod || "").toLowerCase();
+
+      const paymentStatus = String(order?.paymentStatus || "").toLowerCase();
 
       const matchesSearch =
         !searchValue ||
-        order.orderNumber
-          ?.toLowerCase()
-          .includes(searchValue) ||
-        order.client?.name
-          ?.toLowerCase()
-          .includes(searchValue) ||
-        order.client?.email
-          ?.toLowerCase()
-          .includes(searchValue) ||
-        order.serviceSnapshot?.name
-          ?.toLowerCase()
-          .includes(searchValue) ||
-        order.service?.name
-          ?.toLowerCase()
-          .includes(searchValue);
+        orderNumber.includes(searchValue) ||
+        clientName.includes(searchValue) ||
+        clientEmail.includes(searchValue) ||
+        serviceName.includes(searchValue) ||
+        serviceSlug.includes(searchValue) ||
+        paymentMethod.includes(searchValue) ||
+        paymentStatus.includes(searchValue);
 
       const matchesStatus =
-        statusFilter === "all" ||
-        order.orderStatus ===
-          statusFilter;
+        statusFilter === "all" || order?.orderStatus === statusFilter;
 
-      return (
-        matchesSearch &&
-        matchesStatus
-      );
-    }
-  );
+      const matchesPayment =
+        paymentFilter === "all" || order?.paymentStatus === paymentFilter;
+
+      return matchesSearch && matchesStatus && matchesPayment;
+    });
+  }, [orders, search, statusFilter, paymentFilter]);
+
+  /* =====================================================
+     FILTER STATE
+  ====================================================== */
 
   const hasFilters =
-    Boolean(search.trim()) ||
-    statusFilter !== "all";
+    Boolean(search.trim()) || statusFilter !== "all" || paymentFilter !== "all";
+
+  const clearFilters = () => {
+    setSearch("");
+    setStatusFilter("all");
+    setPaymentFilter("all");
+  };
 
   return (
     <div className="mx-auto max-w-[1500px] animate-fade-up">
-
       {/* =====================================================
           PAGE HEADER
       ====================================================== */}
@@ -172,9 +207,7 @@ const AdminOrders = () => {
         />
 
         <div className="relative">
-
           <div className="flex items-center gap-3">
-
             <div
               className="
                 flex h-10 w-10
@@ -191,10 +224,7 @@ const AdminOrders = () => {
                 group-hover:text-zinc-800
               "
             >
-              <ClipboardList
-                size={18}
-                strokeWidth={1.6}
-              />
+              <ClipboardList size={18} strokeWidth={1.6} />
             </div>
 
             <p
@@ -208,7 +238,6 @@ const AdminOrders = () => {
             >
               Orders
             </p>
-
           </div>
 
           <div
@@ -222,9 +251,7 @@ const AdminOrders = () => {
               sm:justify-between
             "
           >
-
             <div>
-
               <h1
                 className="
                   mt-1
@@ -248,20 +275,14 @@ const AdminOrders = () => {
                   sm:text-base
                 "
               >
-                Manage client orders, payments and
-                project status from one place.
+                Review and manage client orders, payments and project status.
               </p>
-
             </div>
 
             <button
               type="button"
-              onClick={() =>
-                loadOrders(true)
-              }
-              disabled={
-                loading || refreshing
-              }
+              onClick={() => loadOrders(true)}
+              disabled={loading || refreshing}
               className="
                 group/refresh
                 inline-flex
@@ -301,11 +322,8 @@ const AdminOrders = () => {
                 `}
               />
 
-              {refreshing
-                ? "Refreshing..."
-                : "Refresh"}
+              {refreshing ? "Refreshing..." : "Refresh"}
             </button>
-
           </div>
         </div>
       </section>
@@ -330,15 +348,11 @@ const AdminOrders = () => {
             sm:justify-between
           "
         >
-          <p className="text-sm text-red-600">
-            {error}
-          </p>
+          <p className="text-sm text-red-600">{error}</p>
 
           <button
             type="button"
-            onClick={() =>
-              loadOrders()
-            }
+            onClick={() => loadOrders()}
             className="
               self-start
               text-sm
@@ -379,11 +393,9 @@ const AdminOrders = () => {
             lg:items-center
           "
         >
-
           {/* Search */}
 
           <div className="relative flex-1">
-
             <Search
               size={17}
               className="
@@ -400,11 +412,7 @@ const AdminOrders = () => {
             <input
               type="text"
               value={search}
-              onChange={(event) =>
-                setSearch(
-                  event.target.value
-                )
-              }
+              onChange={(event) => setSearch(event.target.value)}
               placeholder="Search orders, clients or services..."
               className="
                 h-[50px]
@@ -428,23 +436,20 @@ const AdminOrders = () => {
                 focus:ring-zinc-900/5
               "
             />
-
           </div>
 
-          {/* Status */}
+          {/* Order Status */}
 
           <div
             className="
               w-full
-              lg:w-[220px]
+              lg:w-[210px]
               lg:shrink-0
             "
           >
             <CustomSelect
               value={statusFilter}
-              onChange={
-                setStatusFilter
-              }
+              onChange={setStatusFilter}
               options={[
                 {
                   value: "all",
@@ -467,13 +472,93 @@ const AdminOrders = () => {
                   label: "Completed",
                 },
                 {
+                  value: "delivered",
+                  label: "Delivered",
+                },
+                {
                   value: "cancelled",
                   label: "Cancelled",
+                },
+                {
+                  value: "rejected",
+                  label: "Rejected",
                 },
               ]}
             />
           </div>
 
+          {/* Payment Status */}
+
+          <div
+            className="
+              w-full
+              lg:w-[210px]
+              lg:shrink-0
+            "
+          >
+            <CustomSelect
+              value={paymentFilter}
+              onChange={setPaymentFilter}
+              options={[
+                {
+                  value: "all",
+                  label: "All Payments",
+                },
+                {
+                  value: "pending",
+                  label: "Payment Pending",
+                },
+                {
+                  value: "paid",
+                  label: "Paid",
+                },
+                {
+                  value: "collected",
+                  label: "Collected",
+                },
+                {
+                  value: "failed",
+                  label: "Failed",
+                },
+                {
+                  value: "refunded",
+                  label: "Refunded",
+                },
+              ]}
+            />
+          </div>
+
+          {/* Clear */}
+
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="
+                inline-flex
+                h-[50px]
+                shrink-0
+                items-center
+                justify-center
+                gap-2
+                rounded-xl
+                border border-zinc-200
+                bg-white
+                px-4
+                text-sm
+                text-zinc-500
+                shadow-sm
+                transition-all
+                duration-200
+                hover:border-zinc-300
+                hover:bg-zinc-50
+                hover:text-zinc-900
+              "
+            >
+              <X size={15} />
+              Clear
+            </button>
+          )}
         </div>
       </section>
 
@@ -491,17 +576,13 @@ const AdminOrders = () => {
           "
         >
           <p className="text-sm text-zinc-400">
-
             Showing{" "}
-
             <span className="font-medium text-zinc-700">
               {filteredOrders.length}
             </span>{" "}
-
-            {filteredOrders.length === 1
-              ? "order"
-              : "orders"}
-
+            of{" "}
+            <span className="font-medium text-zinc-700">{orders.length}</span>{" "}
+            {orders.length === 1 ? "order" : "orders"}
           </p>
         </div>
       )}
@@ -549,20 +630,17 @@ const AdminOrders = () => {
               text-center
             "
           >
-
             <div
               className="
                 flex h-12 w-12
-                items-center justify-center
+                items-center
+                justify-center
                 rounded-2xl
                 border border-zinc-200
                 bg-zinc-50
               "
             >
-              <Loader2
-                size={19}
-                className="animate-spin text-zinc-400"
-              />
+              <Loader2 size={19} className="animate-spin text-zinc-400" />
             </div>
 
             <div>
@@ -574,13 +652,10 @@ const AdminOrders = () => {
                 Fetching the latest order data...
               </p>
             </div>
-
           </div>
         </div>
       ) : filteredOrders.length === 0 ? (
-        <EmptyOrders
-          hasFilters={hasFilters}
-        />
+        <EmptyOrders hasFilters={hasFilters} onClear={clearFilters} />
       ) : (
         <>
           {/* =================================================
@@ -598,6 +673,8 @@ const AdminOrders = () => {
               md:block
             "
           >
+            {/* Table Header */}
+
             <div
               className="
                 grid
@@ -624,14 +701,9 @@ const AdminOrders = () => {
             </div>
 
             <div>
-              {filteredOrders.map(
-                (order) => (
-                  <AdminOrderRow
-                    key={order._id}
-                    order={order}
-                  />
-                )
-              )}
+              {filteredOrders.map((order) => (
+                <AdminOrderRow key={order._id} order={order} />
+              ))}
             </div>
           </div>
 
@@ -640,16 +712,9 @@ const AdminOrders = () => {
           ================================================== */}
 
           <div className="space-y-3 md:hidden">
-
-            {filteredOrders.map(
-              (order) => (
-                <AdminOrderMobileCard
-                  key={order._id}
-                  order={order}
-                />
-              )
-            )}
-
+            {filteredOrders.map((order) => (
+              <AdminOrderMobileCard key={order._id} order={order} />
+            ))}
           </div>
         </>
       )}
@@ -661,18 +726,19 @@ const AdminOrders = () => {
    DESKTOP ORDER ROW
 ========================================================= */
 
-const AdminOrderRow = ({
-  order,
-}) => {
+const AdminOrderRow = ({ order }) => {
   const serviceName =
-    order.serviceSnapshot?.name ||
-    order.service?.name ||
-    "Service";
+    order?.serviceSnapshot?.name || order?.service?.name || "Service";
 
   const clientName =
-    order.client?.name ||
-    order.client?.username ||
+    order?.client?.name ||
+    order?.client?.username ||
+    order?.client?.fullName ||
+    order?.client?.email ||
     "Unknown Client";
+
+  const amount =
+    order?.amount ?? order?.totalAmount ?? order?.pricing?.total ?? 0;
 
   return (
     <Link
@@ -695,75 +761,51 @@ const AdminOrderRow = ({
       {/* Order */}
 
       <div className="min-w-0">
-
         <p className="truncate text-sm font-medium text-zinc-900">
-          {order.orderNumber}
+          {order?.orderNumber || "—"}
         </p>
 
         <p className="mt-1 text-xs text-zinc-400">
-          {formatDate(order.createdAt)}
+          {formatDate(order?.createdAt)}
         </p>
-
       </div>
 
       {/* Client */}
 
       <div className="min-w-0">
-
-        <p className="truncate text-sm text-zinc-700">
-          {clientName}
-        </p>
+        <p className="truncate text-sm text-zinc-700">{clientName}</p>
 
         <p className="mt-1 truncate text-xs text-zinc-400">
-          {order.client?.email || "—"}
+          {order?.client?.email || "—"}
         </p>
-
       </div>
 
       {/* Service */}
 
-      <p className="truncate pr-4 text-sm text-zinc-600">
-        {serviceName}
-      </p>
+      <p className="truncate pr-4 text-sm text-zinc-600">{serviceName}</p>
 
       {/* Amount */}
 
       <p className="text-sm font-medium text-zinc-900">
-        ₹
-        {Number(
-          order.amount || 0
-        ).toLocaleString(
-          "en-IN"
-        )}
+        ₹{Number(amount).toLocaleString("en-IN")}
       </p>
 
       {/* Payment */}
 
-      <div>
-        <PaymentBadge
-          method={
-            order.paymentMethod
-          }
-          status={
-            order.paymentStatus
-          }
-        />
-      </div>
+      <PaymentBadge
+        method={order?.paymentMethod}
+        status={order?.paymentStatus}
+      />
 
       {/* Status */}
 
       <div>
-        <StatusBadge
-          status={
-            order.orderStatus
-          }
-        />
+        <StatusBadge status={order?.orderStatus} />
       </div>
 
       {/* Arrow */}
 
       <div className="flex justify-end">
-
         <span
           className="
             flex h-9 w-9
@@ -790,7 +832,6 @@ const AdminOrderRow = ({
             "
           />
         </span>
-
       </div>
     </Link>
   );
@@ -800,18 +841,19 @@ const AdminOrderRow = ({
    MOBILE ORDER CARD
 ========================================================= */
 
-const AdminOrderMobileCard = ({
-  order,
-}) => {
+const AdminOrderMobileCard = ({ order }) => {
   const serviceName =
-    order.serviceSnapshot?.name ||
-    order.service?.name ||
-    "Service";
+    order?.serviceSnapshot?.name || order?.service?.name || "Service";
 
   const clientName =
-    order.client?.name ||
-    order.client?.username ||
+    order?.client?.name ||
+    order?.client?.username ||
+    order?.client?.fullName ||
+    order?.client?.email ||
     "Unknown Client";
+
+  const amount =
+    order?.amount ?? order?.totalAmount ?? order?.pricing?.total ?? 0;
 
   return (
     <Link
@@ -831,6 +873,8 @@ const AdminOrderMobileCard = ({
         hover:shadow-[0_12px_40px_rgba(0,0,0,0.06)]
       "
     >
+      {/* Header */}
+
       <div
         className="
           flex
@@ -839,26 +883,20 @@ const AdminOrderMobileCard = ({
           gap-4
         "
       >
-
         <div className="min-w-0">
-
           <p className="truncate text-sm font-medium text-zinc-900">
-            {order.orderNumber}
+            {order?.orderNumber || "—"}
           </p>
 
           <p className="mt-1 text-xs text-zinc-400">
-            {formatDate(order.createdAt)}
+            {formatDate(order?.createdAt)}
           </p>
-
         </div>
 
-        <StatusBadge
-          status={
-            order.orderStatus
-          }
-        />
-
+        <StatusBadge status={order?.orderStatus} />
       </div>
+
+      {/* Information */}
 
       <div
         className="
@@ -869,11 +907,9 @@ const AdminOrderMobileCard = ({
           pt-4
         "
       >
-
         {/* Client */}
 
         <div>
-
           <p
             className="
               text-[10px]
@@ -886,22 +922,18 @@ const AdminOrderMobileCard = ({
             Client
           </p>
 
-          <p className="mt-1 text-sm text-zinc-700">
-            {clientName}
-          </p>
+          <p className="mt-1 text-sm text-zinc-700">{clientName}</p>
 
-          {order.client?.email && (
+          {order?.client?.email && (
             <p className="mt-1 truncate text-xs text-zinc-400">
               {order.client.email}
             </p>
           )}
-
         </div>
 
         {/* Service */}
 
         <div>
-
           <p
             className="
               text-[10px]
@@ -914,18 +946,13 @@ const AdminOrderMobileCard = ({
             Service
           </p>
 
-          <p className="mt-1 text-sm text-zinc-700">
-            {serviceName}
-          </p>
-
+          <p className="mt-1 text-sm text-zinc-700">{serviceName}</p>
         </div>
 
         {/* Amount + Payment */}
 
         <div className="grid grid-cols-2 gap-4">
-
           <div>
-
             <p
               className="
                 text-[10px]
@@ -939,18 +966,11 @@ const AdminOrderMobileCard = ({
             </p>
 
             <p className="mt-1 text-sm font-medium text-zinc-900">
-              ₹
-              {Number(
-                order.amount || 0
-              ).toLocaleString(
-                "en-IN"
-              )}
+              ₹{Number(amount).toLocaleString("en-IN")}
             </p>
-
           </div>
 
           <div>
-
             <p
               className="
                 text-[10px]
@@ -964,22 +984,13 @@ const AdminOrderMobileCard = ({
             </p>
 
             <div className="mt-1">
-
               <PaymentBadge
-                method={
-                  order.paymentMethod
-                }
-                status={
-                  order.paymentStatus
-                }
+                method={order?.paymentMethod}
+                status={order?.paymentStatus}
               />
-
             </div>
-
           </div>
-
         </div>
-
       </div>
 
       {/* View Details */}
@@ -995,7 +1006,6 @@ const AdminOrderMobileCard = ({
           pt-4
         "
       >
-
         <span
           className="
             text-xs
@@ -1010,7 +1020,8 @@ const AdminOrderMobileCard = ({
         <span
           className="
             flex h-9 w-9
-            items-center justify-center
+            items-center
+            justify-center
             rounded-lg
             border border-zinc-200
             bg-white
@@ -1032,7 +1043,6 @@ const AdminOrderMobileCard = ({
             "
           />
         </span>
-
       </div>
     </Link>
   );
@@ -1042,47 +1052,48 @@ const AdminOrderMobileCard = ({
    STATUS BADGE
 ========================================================= */
 
-const StatusBadge = ({
-  status,
-}) => {
+const StatusBadge = ({ status }) => {
   const config = {
     pending: {
       label: "Pending",
-      className:
-        "border-amber-200 bg-amber-50 text-amber-700",
+      className: "border-amber-200 bg-amber-50 text-amber-700",
     },
 
     processing: {
       label: "Processing",
-      className:
-        "border-blue-200 bg-blue-50 text-blue-700",
+      className: "border-blue-200 bg-blue-50 text-blue-700",
     },
 
     in_progress: {
       label: "In Progress",
-      className:
-        "border-purple-200 bg-purple-50 text-purple-700",
+      className: "border-purple-200 bg-purple-50 text-purple-700",
     },
 
     completed: {
       label: "Completed",
-      className:
-        "border-emerald-200 bg-emerald-50 text-emerald-700",
+      className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    },
+
+    delivered: {
+      label: "Delivered",
+      className: "border-emerald-200 bg-emerald-50 text-emerald-700",
     },
 
     cancelled: {
       label: "Cancelled",
-      className:
-        "border-red-200 bg-red-50 text-red-700",
+      className: "border-red-200 bg-red-50 text-red-700",
+    },
+
+    rejected: {
+      label: "Rejected",
+      className: "border-red-200 bg-red-50 text-red-700",
     },
   };
 
-  const current =
-    config[status] || {
-      label: formatStatus(status),
-      className:
-        "border-zinc-200 bg-zinc-50 text-zinc-500",
-    };
+  const current = config[status] || {
+    label: formatStatus(status),
+    className: "border-zinc-200 bg-zinc-50 text-zinc-500",
+  };
 
   return (
     <span
@@ -1107,45 +1118,61 @@ const StatusBadge = ({
    PAYMENT BADGE
 ========================================================= */
 
-const PaymentBadge = ({
-  method,
-  status,
-}) => {
+const PaymentBadge = ({ method, status }) => {
   const methodLabel =
     method === "cod"
       ? "COD"
       : method === "online"
         ? "Online"
-        : formatStatus(method);
+        : method
+          ? formatStatus(method)
+          : "—";
 
-  const statusLabel =
-    formatStatus(status);
+  const statusConfig = {
+    paid: {
+      label: "Paid",
+      className: "text-emerald-600",
+    },
 
-  const isSuccessful =
-    status === "paid" ||
-    status === "collected";
+    collected: {
+      label: "Collected",
+      className: "text-emerald-600",
+    },
+
+    pending: {
+      label: "Pending",
+      className: "text-amber-600",
+    },
+
+    failed: {
+      label: "Failed",
+      className: "text-red-600",
+    },
+
+    refunded: {
+      label: "Refunded",
+      className: "text-blue-600",
+    },
+  };
+
+  const current = statusConfig[status] || {
+    label: formatStatus(status),
+    className: "text-zinc-400",
+  };
 
   return (
     <div>
-
-      <p className="text-xs text-zinc-600">
-        {methodLabel}
-      </p>
+      <p className="text-xs text-zinc-600">{methodLabel}</p>
 
       <p
         className={`
           mt-0.5
           text-[10px]
-          ${
-            isSuccessful
-              ? "text-emerald-600"
-              : "text-zinc-400"
-          }
+          ${current.className}
         `}
       >
-        {statusLabel}
+        {current.label}
       </p>
-
     </div>
   );
 };
@@ -1154,9 +1181,7 @@ const PaymentBadge = ({
    EMPTY STATE
 ========================================================= */
 
-const EmptyOrders = ({
-  hasFilters,
-}) => {
+const EmptyOrders = ({ hasFilters, onClear }) => {
   return (
     <div
       className="
@@ -1190,22 +1215,19 @@ const EmptyOrders = ({
       />
 
       <div className="relative">
-
         <div
           className="
             mx-auto
             flex h-14 w-14
-            items-center justify-center
+            items-center
+            justify-center
             rounded-2xl
             border border-zinc-200
             bg-zinc-50
             text-zinc-400
           "
         >
-          <ClipboardList
-            size={22}
-            strokeWidth={1.6}
-          />
+          <ClipboardList size={22} strokeWidth={1.6} />
         </div>
 
         <h2
@@ -1216,9 +1238,7 @@ const EmptyOrders = ({
             text-zinc-900
           "
         >
-          {hasFilters
-            ? "No matching orders"
-            : "No orders yet"}
+          {hasFilters ? "No matching orders" : "No orders yet"}
         </h2>
 
         <p
@@ -1231,10 +1251,40 @@ const EmptyOrders = ({
           "
         >
           {hasFilters
-            ? "Try changing your search or status filter."
+            ? "Try changing your search or filters."
             : "Orders placed by clients will appear here."}
         </p>
 
+        {hasFilters && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="
+              mt-5
+              inline-flex
+              items-center
+              gap-2
+              rounded-xl
+              border border-zinc-200
+              bg-white
+              px-4
+              py-2.5
+              text-sm
+              font-medium
+              text-zinc-600
+              shadow-sm
+              transition-all
+              duration-200
+              hover:border-zinc-900
+              hover:bg-zinc-900
+              hover:text-white
+              hover:shadow-md
+            "
+          >
+            <X size={15} />
+            Clear filters
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1244,42 +1294,32 @@ const EmptyOrders = ({
    HELPERS
 ========================================================= */
 
-const formatDate = (
-  date
-) => {
+const formatDate = (date) => {
   if (!date) {
     return "—";
   }
 
-  return new Date(
-    date
-  ).toLocaleDateString(
-    "en-IN",
-    {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }
-  );
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "—";
+  }
+
+  return parsedDate.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 };
 
-const formatStatus = (
-  status
-) => {
+const formatStatus = (status) => {
   if (!status) {
     return "Unknown";
   }
 
   return String(status)
-    .replace(
-      /_/g,
-      " "
-    )
-    .replace(
-      /\b\w/g,
-      (letter) =>
-        letter.toUpperCase()
-    );
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 };
 
 export default AdminOrders;

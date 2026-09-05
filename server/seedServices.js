@@ -5,32 +5,49 @@ const Service = require("./models/Service");
 dotenv.config();
 
 const services = [
+  /*
+  |--------------------------------------------------------------------------
+  | 1. Social Media Profile Management
+  |--------------------------------------------------------------------------
+  */
+
   {
-    name: "Video Editing",
-    slug: "video-editing",
-    category: "Video",
+    name: "Social Media Profile Management",
+    slug: "social-media-profile-management",
+    category: "Social Media",
     description:
-      "Professional editing for reels, social media videos and other content.",
-    pricingType: "starting_from",
-    basePrice: 1000,
+      "Complete social media management including profile management, content posting, scheduling, uploading and comment management for one month.",
+
+    pricingType: "per_unit",
+
+    basePrice: 10000,
+
+    unit: "profile",
+
+    minQuantity: 1,
+
     fields: [
       {
-        name: "projectType",
-        label: "Project Type",
+        name: "platform",
+        label: "Social Media Platform",
         type: "select",
         required: true,
         options: [
           {
-            label: "Instagram Reel",
-            value: "instagram_reel",
+            label: "Instagram",
+            value: "instagram",
           },
           {
-            label: "YouTube Video",
-            value: "youtube_video",
+            label: "Facebook",
+            value: "facebook",
           },
           {
-            label: "Short Video",
-            value: "short_video",
+            label: "LinkedIn",
+            value: "linkedin",
+          },
+          {
+            label: "YouTube",
+            value: "youtube",
           },
           {
             label: "Other",
@@ -39,115 +56,173 @@ const services = [
         ],
         order: 1,
       },
+
       {
-        name: "videoDuration",
-        label: "Approximate Video Duration",
-        type: "select",
+        name: "profileLink",
+        label: "Social Media Profile Link",
+        type: "url",
         required: true,
-        options: [
-          {
-            label: "Up to 30 seconds",
-            value: "up_to_30_seconds",
-          },
-          {
-            label: "30–60 seconds",
-            value: "30_to_60_seconds",
-          },
-          {
-            label: "1–3 minutes",
-            value: "1_to_3_minutes",
-          },
-          {
-            label: "3–5 minutes",
-            value: "3_to_5_minutes",
-          },
-          {
-            label: "More than 5 minutes",
-            value: "more_than_5_minutes",
-          },
-        ],
+        placeholder: "https://instagram.com/yourprofile",
         order: 2,
       },
+
       {
-        name: "quantity",
-        label: "Number of Videos",
-        type: "number",
-        required: true,
-        min: 1,
-        max: 100,
+        name: "accountAccess",
+        label: "Account / Access Information",
+        type: "textarea",
+        required: false,
+        placeholder:
+          "Provide relevant account access information or mention if access will be shared separately.",
         order: 3,
       },
+
       {
-        name: "editingStyle",
-        label: "Editing Style",
+        name: "requirements",
+        label: "Additional Requirements",
+        type: "textarea",
+        required: false,
+        placeholder:
+          "Tell us about your brand, posting requirements, content preferences or anything else we should know.",
+        order: 4,
+      },
+    ],
+
+    displayOrder: 1,
+
+    isActive: true,
+  },
+
+  /*
+  |--------------------------------------------------------------------------
+  | 2. Professionally Created Social Media Grid Posts
+  |--------------------------------------------------------------------------
+  */
+
+  {
+    name: "Social Media Grid Posts",
+    slug: "social-media-grid-posts",
+    category: "Social Media",
+    description:
+      "Professionally created social media grid posts. Each line contains 3 coordinated images.",
+
+    pricingType: "per_unit",
+
+    basePrice: 6000,
+
+    unit: "line",
+
+    minQuantity: 1,
+
+    fields: [
+      {
+        name: "platform",
+        label: "Social Media Platform",
         type: "select",
         required: true,
         options: [
           {
-            label: "Basic",
-            value: "basic",
+            label: "Instagram",
+            value: "instagram",
           },
           {
-            label: "Standard",
-            value: "standard",
+            label: "Facebook",
+            value: "facebook",
           },
           {
-            label: "Premium",
-            value: "premium",
+            label: "LinkedIn",
+            value: "linkedin",
+          },
+          {
+            label: "Other",
+            value: "other",
           },
         ],
-        order: 4,
+        order: 1,
       },
+
+      {
+        name: "profileLink",
+        label: "Social Media Profile Link",
+        type: "url",
+        required: false,
+        placeholder: "https://instagram.com/yourprofile",
+        order: 2,
+      },
+
+      {
+        name: "brandInformation",
+        label: "Brand / Content Information",
+        type: "textarea",
+        required: true,
+        placeholder:
+          "Provide the content, brand information, products, offers or topics that should be covered.",
+        order: 3,
+      },
+
       {
         name: "referenceLink",
         label: "Reference / Inspiration Link",
         type: "url",
         required: false,
         placeholder: "https://...",
-        order: 5,
+        order: 4,
       },
+
       {
         name: "requirements",
-        label: "Project Requirements",
+        label: "Additional Requirements",
         type: "textarea",
-        required: true,
+        required: false,
         placeholder:
-          "Tell us about the video, style, content and requirements...",
-        order: 6,
+          "Share any design preferences, colors, style references or other requirements.",
+        order: 5,
       },
     ],
+
+    displayOrder: 2,
+
+    isActive: true,
   },
 
+  /*
+  |--------------------------------------------------------------------------
+  | 3. Festival Stories - Animated Graphics
+  |--------------------------------------------------------------------------
+  */
+
   {
-    name: "Graphic Design",
-    slug: "graphic-design",
-    category: "Design",
+    name: "Festival Stories - Animated Graphics",
+    slug: "festival-stories-animated-graphics",
+    category: "Social Media",
     description:
-      "Professional graphics for social media, marketing and digital content.",
-    pricingType: "starting_from",
-    basePrice: 500,
+      "Animated festival story graphics covering festivals throughout one month.",
+
+    pricingType: "per_unit",
+
+    basePrice: 5000,
+
+    unit: "profile",
+
+    minQuantity: 1,
+
     fields: [
       {
-        name: "designType",
-        label: "Design Type",
+        name: "platform",
+        label: "Social Media Platform",
         type: "select",
         required: true,
         options: [
           {
-            label: "Social Media Post",
-            value: "social_media_post",
+            label: "Instagram",
+            value: "instagram",
           },
           {
-            label: "Instagram Story",
-            value: "instagram_story",
+            label: "Facebook",
+            value: "facebook",
           },
           {
-            label: "Thumbnail",
-            value: "thumbnail",
-          },
-          {
-            label: "Banner",
-            value: "banner",
+            label: "Instagram + Facebook",
+            value: "instagram_facebook",
           },
           {
             label: "Other",
@@ -156,133 +231,651 @@ const services = [
         ],
         order: 1,
       },
+
       {
-        name: "quantity",
-        label: "Number of Designs",
-        type: "number",
-        required: true,
-        min: 1,
-        max: 100,
+        name: "profileLink",
+        label: "Social Media Profile Link",
+        type: "url",
+        required: false,
+        placeholder: "https://instagram.com/yourprofile",
         order: 2,
       },
+
       {
-        name: "dimensions",
-        label: "Required Dimensions",
+        name: "month",
+        label: "Month",
+        type: "select",
+        required: true,
+        options: [
+          { label: "January", value: "january" },
+          { label: "February", value: "february" },
+          { label: "March", value: "march" },
+          { label: "April", value: "april" },
+          { label: "May", value: "may" },
+          { label: "June", value: "june" },
+          { label: "July", value: "july" },
+          { label: "August", value: "august" },
+          { label: "September", value: "september" },
+          { label: "October", value: "october" },
+          { label: "November", value: "november" },
+          { label: "December", value: "december" },
+        ],
+        order: 3,
+      },
+
+      {
+        name: "requirements",
+        label: "Additional Requirements",
+        type: "textarea",
+        required: false,
+        placeholder:
+          "Mention any specific festivals, themes, offers or design requirements.",
+        order: 4,
+      },
+    ],
+
+    displayOrder: 3,
+
+    isActive: true,
+  },
+
+  /*
+  |--------------------------------------------------------------------------
+  | 4. Google Business Profile SEO + Reviews
+  |--------------------------------------------------------------------------
+  */
+
+  {
+    name: "Google Business Profile SEO & Reviews",
+    slug: "google-business-profile-seo-reviews",
+    category: "SEO",
+    description:
+      "Google Business Profile optimization and support for generating 5-star reviews for one month.",
+
+    pricingType: "per_unit",
+
+    basePrice: 5000,
+
+    unit: "profile",
+
+    minQuantity: 1,
+
+    fields: [
+      {
+        name: "googleBusinessLink",
+        label: "Google Business Profile Link",
+        type: "url",
+        required: true,
+        placeholder: "https://g.page/your-business",
+        order: 1,
+      },
+
+      {
+        name: "businessName",
+        label: "Business Name",
         type: "text",
-        required: false,
-        placeholder: "Example: 1080 × 1080 px",
+        required: true,
+        placeholder: "Enter your business name",
+        order: 2,
+      },
+
+      {
+        name: "businessLocation",
+        label: "Business Location",
+        type: "text",
+        required: true,
+        placeholder: "City / Area",
         order: 3,
       },
-      {
-        name: "referenceLink",
-        label: "Reference / Inspiration Link",
-        type: "url",
-        required: false,
-        placeholder: "https://...",
-        order: 4,
-      },
+
       {
         name: "requirements",
-        label: "Design Requirements",
+        label: "Additional Requirements",
         type: "textarea",
-        required: true,
+        required: false,
         placeholder:
-          "Describe the design, content, style and requirements...",
-        order: 5,
+          "Tell us about your business, target customers, services or any specific requirements.",
+        order: 4,
       },
     ],
+
+    displayOrder: 4,
+
+    isActive: true,
   },
 
+  /*
+  |--------------------------------------------------------------------------
+  | 5. Visual Content - Reels
+  |--------------------------------------------------------------------------
+  |
+  | Selection structure:
+  |
+  | Shoot - Required - Select ONE
+  |   - iPhone
+  |   - Camera
+  |
+  | Drone - Optional - Select/Deselect
+  |   - Drone
+  |
+  | Host - Optional - Select ONE
+  |   - Exclusive
+  |   - Local
+  |   - Founder Faced
+  |
+  */
+
   {
-    name: "Video Shoot",
-    slug: "video-shoot",
-    category: "Production",
+    name: "Visual Content - Reels",
+    slug: "visual-content-reels",
+    category: "Visual Content",
+
     description:
-      "Professional video shooting and production services.",
+      "Professional reel production with flexible shoot, drone and host options.",
+
     pricingType: "custom",
+
     basePrice: 0,
-    fields: [
+
+    unit: "reel",
+
+    minQuantity: 1,
+
+    pricingOptions: [
+      /*
+      |--------------------------------------------------------------------------
+      | Shoot Group
+      |--------------------------------------------------------------------------
+      | Required - Select ONE
+      |--------------------------------------------------------------------------
+      */
+
       {
-        name: "shootType",
-        label: "Shoot Type",
-        type: "select",
-        required: true,
-        options: [
-          {
-            label: "Product Shoot",
-            value: "product_shoot",
-          },
-          {
-            label: "Social Media Content",
-            value: "social_media_content",
-          },
-          {
-            label: "Corporate",
-            value: "corporate",
-          },
-          {
-            label: "Event",
-            value: "event",
-          },
-          {
-            label: "Other",
-            value: "other",
-          },
-        ],
+        name: "iPhone",
+        description:
+          "Professional reel shoot using iPhone with appropriate lighting and production setup.",
+
+        price: 5000,
+
+        unit: "reel",
+
+        group: "shoot",
+
+        minQuantity: 1,
+
+        isActive: true,
+
         order: 1,
-      },
-      {
-        name: "shootDate",
-        label: "Preferred Shoot Date",
-        type: "date",
-        required: true,
-        order: 2,
-      },
-      {
-        name: "location",
-        label: "Shoot Location",
-        type: "text",
-        required: true,
-        placeholder: "Enter shoot location",
-        order: 3,
-      },
-      {
-        name: "duration",
-        label: "Expected Shoot Duration",
-        type: "select",
-        required: true,
-        options: [
+
+        fields: [
           {
-            label: "Up to 2 hours",
-            value: "up_to_2_hours",
+            name: "shootLocation",
+            label: "Shoot Location",
+            type: "text",
+            required: true,
+            placeholder: "Enter the shoot location",
+            order: 1,
           },
+
           {
-            label: "2–4 hours",
-            value: "2_to_4_hours",
+            name: "preferredShootDate",
+            label: "Preferred Shoot Date",
+            type: "date",
+            required: false,
+            order: 2,
           },
+
           {
-            label: "4–8 hours",
-            value: "4_to_8_hours",
+            name: "referenceLink",
+            label: "Reference / Inspiration Link",
+            type: "url",
+            required: false,
+            placeholder: "https://...",
+            order: 3,
           },
+
           {
-            label: "Full day",
-            value: "full_day",
+            name: "requirements",
+            label: "Reel Requirements",
+            type: "textarea",
+            required: false,
+            placeholder:
+              "Tell us about the reel concept, product/service, style and other requirements.",
+            order: 4,
           },
         ],
-        order: 4,
       },
+
       {
-        name: "requirements",
-        label: "Shoot Requirements",
-        type: "textarea",
-        required: true,
-        placeholder:
-          "Describe the shoot, equipment, people, location and other requirements...",
+        name: "Camera",
+        description:
+          "Professional reel shoot using a mirrorless camera with professional lighting.",
+
+        price: 3000,
+
+        unit: "reel",
+
+        group: "shoot",
+
+        minQuantity: 1,
+
+        isActive: true,
+
+        order: 2,
+
+        fields: [
+          {
+            name: "shootLocation",
+            label: "Shoot Location",
+            type: "text",
+            required: true,
+            placeholder: "Enter the shoot location",
+            order: 1,
+          },
+
+          {
+            name: "preferredShootDate",
+            label: "Preferred Shoot Date",
+            type: "date",
+            required: false,
+            order: 2,
+          },
+
+          {
+            name: "referenceLink",
+            label: "Reference / Inspiration Link",
+            type: "url",
+            required: false,
+            placeholder: "https://...",
+            order: 3,
+          },
+
+          {
+            name: "requirements",
+            label: "Reel Requirements",
+            type: "textarea",
+            required: false,
+            placeholder:
+              "Tell us about the reel concept, product/service, style and other requirements.",
+            order: 4,
+          },
+        ],
+      },
+
+      /*
+      |--------------------------------------------------------------------------
+      | Drone Group
+      |--------------------------------------------------------------------------
+      | Optional - Select/Deselect
+      |--------------------------------------------------------------------------
+      */
+
+      {
+        name: "Drone",
+        description:
+          "Professional drone shoot with an experienced pilot.",
+
+        price: 3500,
+
+        unit: "shoot",
+
+        group: "drone",
+
+        minQuantity: 1,
+
+        isActive: true,
+
+        order: 3,
+
+        fields: [
+          {
+            name: "droneShootLocation",
+            label: "Drone Shoot Location",
+            type: "text",
+            required: true,
+            placeholder: "Enter the drone shoot location",
+            order: 1,
+          },
+
+          {
+            name: "dronePreferredShootDate",
+            label: "Preferred Drone Shoot Date",
+            type: "date",
+            required: false,
+            order: 2,
+          },
+
+          {
+            name: "droneRequirements",
+            label: "Drone Shoot Requirements",
+            type: "textarea",
+            required: false,
+            placeholder:
+              "Tell us about the shots, location and other drone shoot requirements.",
+            order: 3,
+          },
+        ],
+      },
+
+      /*
+      |--------------------------------------------------------------------------
+      | Host Group
+      |--------------------------------------------------------------------------
+      | Optional - Select ONE
+      |--------------------------------------------------------------------------
+      */
+
+      {
+        name: "Exclusive",
+        description:
+          "Custom and exclusive host for professionally produced reels.",
+
+        price: 4000,
+
+        unit: "reel",
+
+        group: "host",
+
+        minQuantity: 5,
+
+        isActive: true,
+
+        order: 4,
+
+        fields: [
+          {
+            name: "hostRequirements",
+            label: "Host Requirements",
+            type: "textarea",
+            required: false,
+            placeholder:
+              "Describe your preferred host, appearance, language, style or other requirements.",
+            order: 1,
+          },
+
+          {
+            name: "hostPreferredShootDate",
+            label: "Preferred Shoot Date",
+            type: "date",
+            required: false,
+            order: 2,
+          },
+
+          {
+            name: "hostRequirementsDetails",
+            label: "Reel Requirements",
+            type: "textarea",
+            required: false,
+            placeholder:
+              "Tell us about the reel concept and requirements.",
+            order: 3,
+          },
+        ],
+      },
+
+      {
+        name: "Local",
+        description:
+          "Local host for professionally produced reels.",
+
+        price: 2800,
+
+        unit: "reel",
+
+        group: "host",
+
+        minQuantity: 1,
+
+        isActive: true,
+
         order: 5,
+
+        fields: [
+          {
+            name: "hostRequirements",
+            label: "Host Requirements",
+            type: "textarea",
+            required: false,
+            placeholder:
+              "Describe your preferred host, appearance, language, style or other requirements.",
+            order: 1,
+          },
+
+          {
+            name: "hostPreferredShootDate",
+            label: "Preferred Shoot Date",
+            type: "date",
+            required: false,
+            order: 2,
+          },
+
+          {
+            name: "hostRequirementsDetails",
+            label: "Reel Requirements",
+            type: "textarea",
+            required: false,
+            placeholder:
+              "Tell us about the reel concept and requirements.",
+            order: 3,
+          },
+        ],
+      },
+
+      {
+        name: "Founder Faced",
+        description:
+          "Founder face video production for reels.",
+
+        price: 0,
+
+        unit: "reel",
+
+        group: "host",
+
+        minQuantity: 1,
+
+        isActive: true,
+
+        order: 6,
+
+        fields: [
+          {
+            name: "founderShootLocation",
+            label: "Shoot Location",
+            type: "text",
+            required: true,
+            placeholder: "Enter the shoot location",
+            order: 1,
+          },
+
+          {
+            name: "founderPreferredShootDate",
+            label: "Preferred Shoot Date",
+            type: "date",
+            required: false,
+            order: 2,
+          },
+
+          {
+            name: "founderRequirements",
+            label: "Video Requirements",
+            type: "textarea",
+            required: false,
+            placeholder:
+              "Provide a short brief about the founder video and what you want to achieve.",
+            order: 3,
+          },
+        ],
       },
     ],
+
+    fields: [],
+
+    displayOrder: 5,
+
+    isActive: true,
+  },
+
+  /*
+  |--------------------------------------------------------------------------
+  | 6. Ads
+  |--------------------------------------------------------------------------
+  */
+
+  {
+    name: "Ads",
+    slug: "ads",
+    category: "Advertising",
+    description:
+      "Meta Ads and Google Ads campaign management with custom city-based targeting.",
+
+    pricingType: "custom",
+
+    basePrice: 0,
+
+    minQuantity: 1,
+
+    pricingOptions: [
+      {
+        name: "Meta Ads",
+        description:
+          "Meta Ads campaign management for 30 days.",
+        price: 30000,
+        unit: "30 days",
+        minQuantity: 1,
+        isActive: true,
+        order: 1,
+
+        fields: [
+          {
+            name: "adSpendAmount",
+            label: "Meta Ad Spend Amount",
+            type: "number",
+            required: true,
+            min: 0,
+            placeholder: "Enter Meta ad spend amount",
+            order: 1,
+          },
+
+          {
+            name: "adSpendDays",
+            label: "Meta Ad Spend Days",
+            type: "number",
+            required: true,
+            min: 1,
+            placeholder: "Enter number of days",
+            order: 2,
+          },
+
+          {
+            name: "targetCities",
+            label: "Target Cities",
+            type: "textarea",
+            required: true,
+            placeholder:
+              "Example: Ahmedabad, Surat, Vadodara",
+            order: 3,
+          },
+
+          {
+            name: "metaBusinessLink",
+            label: "Meta Business / Ad Account Link",
+            type: "url",
+            required: false,
+            placeholder:
+              "https://business.facebook.com/...",
+            order: 4,
+          },
+
+          {
+            name: "requirements",
+            label: "Campaign Requirements",
+            type: "textarea",
+            required: false,
+            placeholder:
+              "Tell us about your campaign goals, audience, products/services and other requirements.",
+            order: 5,
+          },
+        ],
+      },
+
+      {
+        name: "Google Ads",
+        description:
+          "Google Ads campaign management for 30 days.",
+        price: 15000,
+        unit: "30 days",
+        minQuantity: 1,
+        isActive: true,
+        order: 2,
+
+        fields: [
+          {
+            name: "adSpendAmount",
+            label: "Google Ad Spend Amount",
+            type: "number",
+            required: true,
+            min: 0,
+            placeholder: "Enter Google ad spend amount",
+            order: 1,
+          },
+
+          {
+            name: "adSpendDays",
+            label: "Google Ad Spend Days",
+            type: "number",
+            required: true,
+            min: 1,
+            placeholder: "Enter number of days",
+            order: 2,
+          },
+
+          {
+            name: "targetCities",
+            label: "Target Cities",
+            type: "textarea",
+            required: true,
+            placeholder:
+              "Example: Ahmedabad, Surat, Vadodara",
+            order: 3,
+          },
+
+          {
+            name: "googleAdsAccountLink",
+            label: "Google Ads Account Link",
+            type: "url",
+            required: false,
+            placeholder:
+              "https://ads.google.com/...",
+            order: 4,
+          },
+
+          {
+            name: "requirements",
+            label: "Campaign Requirements",
+            type: "textarea",
+            required: false,
+            placeholder:
+              "Tell us about your campaign goals, audience, products/services and other requirements.",
+            order: 5,
+          },
+        ],
+      },
+    ],
+
+    fields: [],
+
+    displayOrder: 6,
+
+    isActive: true,
   },
 ];
+
+/*
+|--------------------------------------------------------------------------
+| Seed Services
+|--------------------------------------------------------------------------
+*/
 
 const seedServices = async () => {
   try {
@@ -290,20 +883,30 @@ const seedServices = async () => {
 
     for (const service of services) {
       await Service.findOneAndUpdate(
-        { slug: service.slug },
+        {
+          slug: service.slug,
+        },
         service,
         {
           upsert: true,
           new: true,
           setDefaultsOnInsert: true,
+          runValidators: true,
         }
       );
     }
 
-    console.log("Services seeded successfully.");
+    console.log(
+      `${services.length} services seeded successfully.`
+    );
+
     process.exit(0);
   } catch (error) {
-    console.error("Service seeding failed:", error.message);
+    console.error(
+      "Service seeding failed:",
+      error.message
+    );
+
     process.exit(1);
   }
 };

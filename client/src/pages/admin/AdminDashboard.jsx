@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   ArrowUpRight,
@@ -33,14 +33,19 @@ const AdminDashboard = () => {
         adminUserService.getUsers(),
       ]);
 
-      setOrders(ordersResponse.orders || []);
-      setUsers(usersResponse.users || []);
+      const ordersData =
+        ordersResponse?.orders || ordersResponse?.data?.orders || [];
+
+      const usersData =
+        usersResponse?.users || usersResponse?.data?.users || [];
+
+      setOrders(Array.isArray(ordersData) ? ordersData : []);
+      setUsers(Array.isArray(usersData) ? usersData : []);
     } catch (error) {
       console.error("Load admin dashboard error:", error);
 
       setError(
-        error.response?.data?.message ||
-          "Unable to load dashboard data."
+        error.response?.data?.message || "Unable to load dashboard data.",
       );
     } finally {
       setLoading(false);
@@ -52,35 +57,77 @@ const AdminDashboard = () => {
   }, []);
 
   /* =========================================================
+     NORMALIZED ORDERS
+  ========================================================= */
+
+  const normalizedOrders = useMemo(() => {
+    return orders.map((order) => ({
+      ...order,
+      normalizedOrderStatus: String(
+        order.orderStatus || "pending",
+      ).toLowerCase(),
+
+      normalizedPaymentStatus: String(
+        order.paymentStatus || "pending",
+      ).toLowerCase(),
+
+      normalizedPaymentMethod: String(order.paymentMethod || "").toLowerCase(),
+
+      normalizedCodPinStatus: String(order.codPinStatus || "").toLowerCase(),
+    }));
+  }, [orders]);
+
+  /* =========================================================
      STATISTICS
   ========================================================= */
 
-  const totalClients = users.filter(
-    (user) => user.role === "client"
-  ).length;
+  const totalClients = useMemo(() => {
+    return users.filter(
+      (user) => String(user.role || "").toLowerCase() === "client",
+    ).length;
+  }, [users]);
 
-  const totalOrders = orders.length;
+  const totalOrders = normalizedOrders.length;
 
-  const inProgressOrders = orders.filter(
-    (order) =>
-      order.orderStatus === "processing" ||
-      order.orderStatus === "in_progress"
-  ).length;
+  const inProgressOrders = useMemo(() => {
+    return normalizedOrders.filter((order) =>
+      ["processing", "in_progress", "confirmed"].includes(
+        order.normalizedOrderStatus,
+      ),
+    ).length;
+  }, [normalizedOrders]);
 
-  const pendingCodOrders = orders.filter(
-    (order) =>
-      order.paymentMethod === "cod" &&
-      order.paymentStatus !== "collected"
-  ).length;
+  const pendingCodOrders = useMemo(() => {
+    return normalizedOrders.filter((order) => {
+      if (order.normalizedPaymentMethod !== "cod") {
+        return false;
+      }
 
-  const recentOrders = orders.slice(0, 5);
+      const paymentCompleted =
+        order.normalizedPaymentStatus === "paid" ||
+        order.normalizedPaymentStatus === "collected" ||
+        order.normalizedCodPinStatus === "verified" ||
+        order.normalizedCodPinStatus === "used";
+
+      return !paymentCompleted;
+    }).length;
+  }, [normalizedOrders]);
+
+  /* =========================================================
+     RECENT ORDERS
+  ========================================================= */
+
+  const recentOrders = useMemo(() => {
+    return [...normalizedOrders]
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+      .slice(0, 5);
+  }, [normalizedOrders]);
 
   return (
     <div className="mx-auto max-w-[1500px] animate-fade-up">
-
       {/* =====================================================
           PAGE HEADER
-      ====================================================== */}
+      ===================================================== */}
 
       <section
         className="
@@ -149,10 +196,8 @@ const AdminDashboard = () => {
         />
 
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-
           <div>
             <div className="flex items-center gap-3">
-
               <div
                 className="
                   flex h-10 w-10
@@ -169,10 +214,7 @@ const AdminDashboard = () => {
                   group-hover:text-zinc-800
                 "
               >
-                <Package
-                  size={18}
-                  strokeWidth={1.6}
-                />
+                <Package size={18} strokeWidth={1.6} />
               </div>
 
               <p
@@ -211,8 +253,7 @@ const AdminDashboard = () => {
                 sm:text-base
               "
             >
-              Manage your clients, orders and payment activity
-              from one place.
+              Manage your clients, orders and payment activity from one place.
             </p>
           </div>
 
@@ -253,14 +294,9 @@ const AdminDashboard = () => {
               className={`
                 transition-transform
                 duration-500
-                ${
-                  loading
-                    ? "animate-spin"
-                    : "group-hover/refresh:rotate-180"
-                }
+                ${loading ? "animate-spin" : "group-hover/refresh:rotate-180"}
               `}
             />
-
             Refresh
           </button>
         </div>
@@ -268,7 +304,7 @@ const AdminDashboard = () => {
 
       {/* =====================================================
           ERROR
-      ====================================================== */}
+      ===================================================== */}
 
       {error && (
         <div
@@ -288,9 +324,7 @@ const AdminDashboard = () => {
             sm:justify-between
           "
         >
-          <p className="text-sm text-red-600">
-            {error}
-          </p>
+          <p className="text-sm text-red-600">{error}</p>
 
           <button
             type="button"
@@ -314,10 +348,9 @@ const AdminDashboard = () => {
 
       {/* =====================================================
           STATS
-      ====================================================== */}
+      ===================================================== */}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-
         <StatCard
           icon={Users}
           label="Total Clients"
@@ -345,66 +378,60 @@ const AdminDashboard = () => {
           value={loading ? "—" : pendingCodOrders}
           description="COD payments awaiting action"
         />
-
       </section>
 
-     {/* =====================================================
-    QUICK ACTIONS
-====================================================== */}
+      {/* =====================================================
+          QUICK ACTIONS
+      ===================================================== */}
 
-<section className="mt-8">
-  <div className="mb-4">
-    <p
-      className="
-        text-[10px]
-        font-medium
-        uppercase
-        tracking-[0.2em]
-        text-zinc-400
-      "
-    >
-      Quick Access
-    </p>
+      <section className="mt-8">
+        <div className="mb-4">
+          <p
+            className="
+              text-[10px]
+              font-medium
+              uppercase
+              tracking-[0.2em]
+              text-zinc-400
+            "
+          >
+            Quick Access
+          </p>
 
-    <h2 className="mt-1 text-xl font-medium text-zinc-900">
-      Manage
-    </h2>
-  </div>
+          <h2 className="mt-1 text-xl font-medium text-zinc-900">Manage</h2>
+        </div>
 
-  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-    <QuickAction
-      icon={ClipboardList}
-      title="Orders"
-      description="View and manage client orders."
-      to="/admin/orders"
-    />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <QuickAction
+            icon={ClipboardList}
+            title="Orders"
+            description="View and manage client orders."
+            to="/admin/orders"
+          />
 
-    <QuickAction
-      icon={Users}
-      title="Users"
-      description="Manage registered clients."
-      to="/admin/users"
-    />
+          <QuickAction
+            icon={Users}
+            title="Users"
+            description="Manage registered clients."
+            to="/admin/users"
+          />
 
-    <QuickAction
-      icon={KeyRound}
-      title="COD Payments"
-      description="Generate COD payment PINs."
-      to="/admin/cod"
-    />
-  </div>
-</section>
+          <QuickAction
+            icon={KeyRound}
+            title="COD Payments"
+            description="Generate COD payment PINs."
+            to="/admin/cod"
+          />
+        </div>
+      </section>
 
       {/* =====================================================
           RECENT ORDERS
-      ====================================================== */}
+      ===================================================== */}
 
       <section className="mt-8">
-
         <div className="mb-4 flex items-end justify-between gap-4">
-
           <div>
-
             <p
               className="
                 text-[10px]
@@ -420,7 +447,6 @@ const AdminDashboard = () => {
             <h2 className="mt-1 text-xl font-medium text-zinc-900">
               Recent Orders
             </h2>
-
           </div>
 
           <Link
@@ -439,7 +465,6 @@ const AdminDashboard = () => {
             "
           >
             View all
-
             <ArrowUpRight
               size={15}
               className="
@@ -482,12 +507,7 @@ const AdminDashboard = () => {
             />
 
             <div className="relative flex items-center gap-3 text-sm text-zinc-500">
-
-              <Loader2
-                size={18}
-                className="animate-spin"
-              />
-
+              <Loader2 size={18} className="animate-spin" />
               Loading recent orders...
             </div>
           </div>
@@ -535,10 +555,7 @@ const AdminDashboard = () => {
               </div>
 
               {recentOrders.map((order) => (
-                <RecentOrderRow
-                  key={order._id}
-                  order={order}
-                />
+                <RecentOrderRow key={order._id || order.id} order={order} />
               ))}
             </div>
 
@@ -547,14 +564,9 @@ const AdminDashboard = () => {
             ================================================== */}
 
             <div className="space-y-3 md:hidden">
-
               {recentOrders.map((order) => (
-                <RecentOrderCard
-                  key={order._id}
-                  order={order}
-                />
+                <RecentOrderCard key={order._id || order.id} order={order} />
               ))}
-
             </div>
           </>
         )}
@@ -567,12 +579,7 @@ const AdminDashboard = () => {
    STAT CARD
 ========================================================= */
 
-const StatCard = ({
-  icon: Icon,
-  label,
-  value,
-  description,
-}) => {
+const StatCard = ({ icon: Icon, label, value, description }) => {
   return (
     <div
       className="
@@ -609,7 +616,6 @@ const StatCard = ({
       />
 
       <div className="relative flex items-start justify-between">
-
         <div
           className="
             flex h-10 w-10
@@ -626,10 +632,7 @@ const StatCard = ({
             group-hover:shadow-sm
           "
         >
-          <Icon
-            size={18}
-            strokeWidth={1.6}
-          />
+          <Icon size={18} strokeWidth={1.6} />
         </div>
 
         <span
@@ -645,15 +648,9 @@ const StatCard = ({
       </div>
 
       <div className="relative mt-5">
+        <p className="text-sm font-medium text-zinc-900">{label}</p>
 
-        <p className="text-sm font-medium text-zinc-900">
-          {label}
-        </p>
-
-        <p className="mt-1 text-xs text-zinc-500">
-          {description}
-        </p>
-
+        <p className="mt-1 text-xs text-zinc-500">{description}</p>
       </div>
     </div>
   );
@@ -663,12 +660,7 @@ const StatCard = ({
    QUICK ACTION
 ========================================================= */
 
-const QuickAction = ({
-  icon: Icon,
-  title,
-  description,
-  to,
-}) => {
+const QuickAction = ({ icon: Icon, title, description, to }) => {
   return (
     <Link
       to={to}
@@ -685,12 +677,10 @@ const QuickAction = ({
         duration-300
         ease-out
         hover:border-zinc-300
-        hover:bg-zinc-[50]
+        hover:bg-zinc-50
         hover:shadow-[0_14px_40px_rgba(0,0,0,0.06)]
       "
     >
-      {/* Subtle background glow */}
-
       <div
         className="
           pointer-events-none
@@ -711,8 +701,6 @@ const QuickAction = ({
       />
 
       <div className="relative flex items-start justify-between">
-        {/* Icon */}
-
         <div
           className="
             flex h-10 w-10
@@ -730,13 +718,8 @@ const QuickAction = ({
             group-hover:shadow-sm
           "
         >
-          <Icon
-            size={18}
-            strokeWidth={1.6}
-          />
+          <Icon size={18} strokeWidth={1.6} />
         </div>
-
-        {/* Arrow */}
 
         <div
           className="
@@ -770,17 +753,14 @@ const QuickAction = ({
       </div>
 
       <div className="relative mt-5">
-        <h3 className="text-sm font-medium text-zinc-900">
-          {title}
-        </h3>
+        <h3 className="text-sm font-medium text-zinc-900">{title}</h3>
 
-        <p className="mt-1 text-xs leading-5 text-zinc-500">
-          {description}
-        </p>
+        <p className="mt-1 text-xs leading-5 text-zinc-500">{description}</p>
       </div>
     </Link>
   );
 };
+
 /* =========================================================
    RECENT ORDER DESKTOP ROW
 ========================================================= */
@@ -793,13 +773,11 @@ const RecentOrderRow = ({ order }) => {
     "Client";
 
   const serviceName =
-    order.serviceSnapshot?.name ||
-    order.service?.name ||
-    "Service";
+    order.serviceSnapshot?.name || order.service?.name || "Service";
 
   return (
     <Link
-      to={`/admin/orders/${order._id}`}
+      to={`/admin/orders/${order._id || order.id}`}
       className="
         group
         grid
@@ -818,50 +796,41 @@ const RecentOrderRow = ({ order }) => {
       {/* Order */}
 
       <div className="min-w-0">
-
         <p className="truncate text-sm font-medium text-zinc-900">
-          {order.orderNumber}
+          {order.orderNumber || "—"}
         </p>
 
         <p className="mt-1 text-xs text-zinc-400">
           {formatDate(order.createdAt)}
         </p>
-
       </div>
 
       {/* Client */}
 
       <div className="min-w-0">
-
-        <p className="truncate text-sm text-zinc-700">
-          {clientName}
-        </p>
+        <p className="truncate text-sm text-zinc-700">{clientName}</p>
 
         {order.client?.email && (
           <p className="mt-1 truncate text-xs text-zinc-400">
             {order.client.email}
           </p>
         )}
-
       </div>
 
       {/* Service */}
 
-      <p className="truncate pr-4 text-sm text-zinc-600">
-        {serviceName}
-      </p>
+      <p className="truncate pr-4 text-sm text-zinc-600">{serviceName}</p>
 
       {/* Amount */}
 
       <p className="text-sm font-medium text-zinc-900">
-        ₹
-        {Number(order.amount || 0).toLocaleString("en-IN")}
+        ₹{Number(order.amount || 0).toLocaleString("en-IN")}
       </p>
 
       {/* Status */}
 
       <div>
-        <StatusBadge status={order.orderStatus} />
+        <StatusBadge status={order.normalizedOrderStatus} />
       </div>
 
       {/* View */}
@@ -909,13 +878,11 @@ const RecentOrderCard = ({ order }) => {
     "Client";
 
   const serviceName =
-    order.serviceSnapshot?.name ||
-    order.service?.name ||
-    "Service";
+    order.serviceSnapshot?.name || order.service?.name || "Service";
 
   return (
     <Link
-      to={`/admin/orders/${order._id}`}
+      to={`/admin/orders/${order._id || order.id}`}
       className="
         group
         block
@@ -932,22 +899,17 @@ const RecentOrderCard = ({ order }) => {
       "
     >
       <div className="flex items-start justify-between gap-4">
-
         <div className="min-w-0">
-
           <p className="truncate text-sm font-medium text-zinc-900">
-            {order.orderNumber}
+            {order.orderNumber || "—"}
           </p>
 
           <p className="mt-1 text-xs text-zinc-400">
             {formatDate(order.createdAt)}
           </p>
-
         </div>
 
-        <StatusBadge
-          status={order.orderStatus}
-        />
+        <StatusBadge status={order.normalizedOrderStatus} />
       </div>
 
       <div
@@ -961,86 +923,32 @@ const RecentOrderCard = ({ order }) => {
           pt-4
         "
       >
-
         <div className="min-w-0">
+          <p className="label">Client</p>
 
-          <p
-            className="
-              text-[10px]
-              font-medium
-              uppercase
-              tracking-[0.15em]
-              text-zinc-400
-            "
-          >
-            Client
-          </p>
-
-          <p className="mt-1 truncate text-sm text-zinc-700">
-            {clientName}
-          </p>
-
+          <p className="mt-1 truncate text-sm text-zinc-700">{clientName}</p>
         </div>
 
         <div className="min-w-0">
+          <p className="label">Service</p>
 
-          <p
-            className="
-              text-[10px]
-              font-medium
-              uppercase
-              tracking-[0.15em]
-              text-zinc-400
-            "
-          >
-            Service
-          </p>
-
-          <p className="mt-1 truncate text-sm text-zinc-700">
-            {serviceName}
-          </p>
-
+          <p className="mt-1 truncate text-sm text-zinc-700">{serviceName}</p>
         </div>
 
         <div>
-
-          <p
-            className="
-              text-[10px]
-              font-medium
-              uppercase
-              tracking-[0.15em]
-              text-zinc-400
-            "
-          >
-            Amount
-          </p>
+          <p className="label">Amount</p>
 
           <p className="mt-1 text-sm font-medium text-zinc-900">
-            ₹
-            {Number(order.amount || 0).toLocaleString("en-IN")}
+            ₹{Number(order.amount || 0).toLocaleString("en-IN")}
           </p>
-
         </div>
 
         <div>
-
-          <p
-            className="
-              text-[10px]
-              font-medium
-              uppercase
-              tracking-[0.15em]
-              text-zinc-400
-            "
-          >
-            Payment
-          </p>
+          <p className="label">Payment</p>
 
           <p className="mt-1 text-sm text-zinc-600">
-            {formatStatus(order.paymentStatus)}
+            {formatStatus(order.normalizedPaymentStatus)}
           </p>
-
         </div>
       </div>
 
@@ -1081,32 +989,26 @@ const RecentOrderCard = ({ order }) => {
 ========================================================= */
 
 const StatusBadge = ({ status }) => {
-  const normalizedStatus = status || "unknown";
+  const normalizedStatus = String(status || "unknown").toLowerCase();
 
   const styles = {
-    pending:
-      "border-amber-200 bg-amber-50 text-amber-700",
+    pending: "border-amber-200 bg-amber-50 text-amber-700",
 
-    processing:
-      "border-blue-200 bg-blue-50 text-blue-700",
+    confirmed: "border-blue-200 bg-blue-50 text-blue-700",
 
-    in_progress:
-      "border-blue-200 bg-blue-50 text-blue-700",
+    processing: "border-blue-200 bg-blue-50 text-blue-700",
 
-    completed:
-      "border-emerald-200 bg-emerald-50 text-emerald-700",
+    in_progress: "border-blue-200 bg-blue-50 text-blue-700",
 
-    delivered:
-      "border-emerald-200 bg-emerald-50 text-emerald-700",
+    completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
 
-    cancelled:
-      "border-red-200 bg-red-50 text-red-700",
+    delivered: "border-emerald-200 bg-emerald-50 text-emerald-700",
 
-    rejected:
-      "border-red-200 bg-red-50 text-red-700",
+    cancelled: "border-red-200 bg-red-50 text-red-700",
 
-    unknown:
-      "border-zinc-200 bg-zinc-50 text-zinc-500",
+    rejected: "border-red-200 bg-red-50 text-red-700",
+
+    unknown: "border-zinc-200 bg-zinc-50 text-zinc-500",
   };
 
   return (
@@ -1166,13 +1068,11 @@ const EmptyRecentOrders = () => {
       />
 
       <div className="relative">
-
         <div
           className="
             mx-auto
             flex h-12 w-12
-            items-center
-            justify-center
+            items-center justify-center
             rounded-2xl
             border border-zinc-200
             bg-zinc-50
@@ -1219,7 +1119,6 @@ const EmptyRecentOrders = () => {
           "
         >
           View Orders
-
           <ArrowUpRight
             size={15}
             className="
@@ -1244,11 +1143,9 @@ const formatStatus = (status) => {
     return "Unknown";
   }
 
-  return status
+  return String(status)
     .replace(/_/g, " ")
-    .replace(/\b\w/g, (letter) =>
-      letter.toUpperCase()
-    );
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 };
 
 const formatDate = (date) => {
@@ -1256,14 +1153,17 @@ const formatDate = (date) => {
     return "—";
   }
 
-  return new Date(date).toLocaleDateString(
-    "en-IN",
-    {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }
-  );
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "—";
+  }
+
+  return parsedDate.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 };
 
 export default AdminDashboard;

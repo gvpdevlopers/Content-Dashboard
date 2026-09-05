@@ -1,5 +1,30 @@
 const mongoose = require("mongoose");
 
+const serviceFieldOptionSchema = new mongoose.Schema(
+  {
+    label: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    value: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    price: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
 const serviceFieldSchema = new mongoose.Schema(
   {
     name: {
@@ -22,6 +47,7 @@ const serviceFieldSchema = new mongoose.Schema(
         "number",
         "select",
         "radio",
+        "checkbox",
         "date",
         "url",
       ],
@@ -34,30 +60,35 @@ const serviceFieldSchema = new mongoose.Schema(
       trim: true,
     },
 
+    helpText: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
     required: {
       type: Boolean,
       default: false,
     },
 
-    options: [
-      {
-        label: {
-          type: String,
-          trim: true,
-        },
-        value: {
-          type: String,
-          trim: true,
-        },
-      },
-    ],
+    options: {
+      type: [serviceFieldOptionSchema],
+      default: [],
+    },
 
     min: {
       type: Number,
+      default: undefined,
     },
 
     max: {
       type: Number,
+      default: undefined,
+    },
+
+    step: {
+      type: Number,
+      default: undefined,
     },
 
     order: {
@@ -67,6 +98,70 @@ const serviceFieldSchema = new mongoose.Schema(
   },
   {
     _id: false,
+  }
+);
+
+const servicePricingOptionSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    description: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    price: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    unit: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    group: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    minQuantity: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
+
+    maxQuantity: {
+      type: Number,
+      default: undefined,
+      min: 1,
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+
+    fields: {
+      type: [serviceFieldSchema],
+      default: [],
+    },
+
+    order: {
+      type: Number,
+      default: 0,
+    },
+  },
+  {
+    _id: true,
   }
 );
 
@@ -100,7 +195,7 @@ const serviceSchema = new mongoose.Schema(
 
     pricingType: {
       type: String,
-      enum: ["fixed", "starting_from", "custom"],
+      enum: ["fixed", "per_unit", "starting_from", "custom"],
       default: "fixed",
     },
 
@@ -110,11 +205,42 @@ const serviceSchema = new mongoose.Schema(
       min: 0,
     },
 
-    fields: [serviceFieldSchema],
+    unit: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    minQuantity: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
+
+    maxQuantity: {
+      type: Number,
+      default: undefined,
+      min: 1,
+    },
+
+    pricingOptions: {
+      type: [servicePricingOptionSchema],
+      default: [],
+    },
+
+    fields: {
+      type: [serviceFieldSchema],
+      default: [],
+    },
 
     isActive: {
       type: Boolean,
       default: true,
+    },
+
+    displayOrder: {
+      type: Number,
+      default: 0,
     },
   },
   {

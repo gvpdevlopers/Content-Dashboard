@@ -1,9 +1,6 @@
 import { useEffect, useState } from "react";
-
 import { ArrowRight, ClipboardList, Loader2, RefreshCw } from "lucide-react";
-
 import { Link } from "react-router-dom";
-
 import orderService from "../services/orderService";
 
 const OrderHistory = () => {
@@ -18,7 +15,7 @@ const OrderHistory = () => {
 
       const data = await orderService.getMyOrders();
 
-      setOrders(data.orders || []);
+      setOrders(Array.isArray(data?.orders) ? data.orders : []);
     } catch (error) {
       console.error("Get orders error:", error);
 
@@ -43,6 +40,7 @@ const OrderHistory = () => {
           <div
             className="
               flex h-9 w-9
+              shrink-0
               items-center justify-center
               rounded-xl
               border border-zinc-200
@@ -177,58 +175,7 @@ const OrderHistory = () => {
       ====================================================== */}
 
       {loading ? (
-        <div
-          className="
-            relative
-            flex
-            min-h-[400px]
-            items-center
-            justify-center
-            overflow-hidden
-            rounded-[28px]
-            border border-zinc-200
-            bg-white
-            shadow-[0_20px_80px_rgba(0,0,0,0.05)]
-          "
-        >
-          <div
-            className="
-              pointer-events-none
-              absolute
-              -right-20
-              -top-20
-              h-56
-              w-56
-              rounded-full
-              bg-cyan-300/[0.025]
-              blur-3xl
-            "
-          />
-
-          <div className="relative flex flex-col items-center gap-4 text-center">
-            <div
-              className="
-                flex h-12 w-12
-                items-center justify-center
-                rounded-2xl
-                border border-zinc-200
-                bg-zinc-50
-              "
-            >
-              <Loader2 size={19} className="animate-spin text-zinc-500" />
-            </div>
-
-            <div>
-              <p className="text-sm font-medium text-zinc-700">
-                Loading orders
-              </p>
-
-              <p className="mt-1 text-xs text-zinc-400">
-                Fetching your latest orders...
-              </p>
-            </div>
-          </div>
-        </div>
+        <LoadingOrders />
       ) : orders.length === 0 ? (
         <EmptyOrders />
       ) : (
@@ -253,7 +200,9 @@ const OrderHistory = () => {
             <div
               className="
                 grid
-                grid-cols-[1.4fr_1.2fr_1fr_1fr_1fr_70px]
+                grid-cols-[1.25fr_1.5fr_0.7fr_1fr_1.1fr_1.1fr_1fr_60px]
+                items-center
+                gap-4
                 border-b
                 border-zinc-200
                 bg-zinc-50
@@ -268,9 +217,11 @@ const OrderHistory = () => {
             >
               <span>Order</span>
               <span>Service</span>
-              <span>Date</span>
+              <span>Qty.</span>
               <span>Amount</span>
-              <span>Order Status</span>
+              <span>Payment</span>
+              <span>Status</span>
+              <span>Date</span>
               <span />
             </div>
 
@@ -278,7 +229,7 @@ const OrderHistory = () => {
 
             <div>
               {orders.map((order) => (
-                <OrderTableRow key={order._id} order={order} />
+                <OrderTableRow key={order._id || order.id} order={order} />
               ))}
             </div>
           </div>
@@ -289,7 +240,7 @@ const OrderHistory = () => {
 
           <div className="space-y-4 md:hidden">
             {orders.map((order) => (
-              <OrderMobileCard key={order._id} order={order} />
+              <OrderMobileCard key={order._id || order.id} order={order} />
             ))}
           </div>
         </>
@@ -298,27 +249,82 @@ const OrderHistory = () => {
   );
 };
 
-/* -------------------------------- */
-/* Desktop Order Row */
-/* -------------------------------- */
+/* ============================================================
+   LOADING
+============================================================ */
+
+const LoadingOrders = () => {
+  return (
+    <div
+      className="
+        relative
+        flex
+        min-h-[400px]
+        items-center
+        justify-center
+        overflow-hidden
+        rounded-[28px]
+        border border-zinc-200
+        bg-white
+        shadow-[0_20px_80px_rgba(0,0,0,0.05)]
+      "
+    >
+      <div
+        className="
+          pointer-events-none
+          absolute
+          -right-20
+          -top-20
+          h-56
+          w-56
+          rounded-full
+          bg-cyan-300/[0.025]
+          blur-3xl
+        "
+      />
+
+      <div className="relative flex flex-col items-center gap-4 text-center">
+        <div
+          className="
+            flex h-12 w-12
+            items-center justify-center
+            rounded-2xl
+            border border-zinc-200
+            bg-zinc-50
+          "
+        >
+          <Loader2 size={19} className="animate-spin text-zinc-500" />
+        </div>
+
+        <div>
+          <p className="text-sm font-medium text-zinc-700">Loading orders</p>
+
+          <p className="mt-1 text-xs text-zinc-400">
+            Fetching your latest orders...
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ============================================================
+   DESKTOP ORDER ROW
+============================================================ */
 
 const OrderTableRow = ({ order }) => {
-  const serviceName =
-    order.serviceSnapshot?.name || order.service?.name || "Service";
+  const serviceName = getServiceName(order);
 
-  const isCodPaymentDone =
-    order.paymentStatus === "collected" ||
-    order.codPinStatus === "used" ||
-    order.codPinStatus === "verified" ||
-    order.paymentStatus === "paid";
+  const paymentDone = isPaymentCompleted(order);
 
   return (
     <div
       className="
         group
         grid
-        grid-cols-[1.4fr_1.2fr_1fr_1fr_1fr_70px]
+        grid-cols-[1.25fr_1.5fr_0.7fr_1fr_1.1fr_1.1fr_1fr_60px]
         items-center
+        gap-4
         border-b
         border-zinc-100
         px-6
@@ -333,57 +339,60 @@ const OrderTableRow = ({ order }) => {
 
       <div className="min-w-0">
         <p className="truncate text-sm font-medium text-zinc-900">
-          {order.orderNumber}
-        </p>
-
-        <p className="mt-1 text-xs text-zinc-400">
-          {formatDate(order.createdAt)}
+          {order.orderNumber || "—"}
         </p>
       </div>
 
       {/* Service */}
 
-      <p className="truncate text-sm text-zinc-600">{serviceName}</p>
+      <div className="min-w-0">
+        <p className="truncate text-sm text-zinc-600">{serviceName}</p>
+
+        {order.service?.category && (
+          <p className="mt-1 truncate text-xs text-zinc-400">
+            {order.service.category}
+          </p>
+        )}
+      </div>
+
+      {/* Quantity */}
+
+      <p className="text-sm text-zinc-600">{formatQuantity(order.quantity)}</p>
+
+      {/* Amount */}
+
+      <p className="text-sm font-medium text-zinc-800">
+        {formatCurrency(order.amount)}
+      </p>
+
+      {/* Payment */}
+
+      <div>
+        {paymentDone ? (
+          <PaymentStatusBadge status="paid" />
+        ) : (
+          <PaymentStatusBadge status={order.paymentStatus} />
+        )}
+
+        <p className="mt-1 text-[11px] text-zinc-400">
+          {formatStatus(order.paymentMethod)}
+        </p>
+      </div>
+
+      {/* Order Status */}
+
+      <div>
+        <StatusBadge status={order.orderStatus} />
+      </div>
 
       {/* Date */}
 
       <p className="text-sm text-zinc-500">{formatDate(order.createdAt)}</p>
 
-      {/* Amount */}
-
-      <p className="text-sm font-medium text-zinc-800">
-        ₹{Number(order.amount || 0).toLocaleString("en-IN")}
-      </p>
-
-      {/* Status */}
-
-      <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge status={order.orderStatus} />
-
-        {isCodPaymentDone ? (
-          <span
-            className="
-              rounded-full
-              border border-emerald-200
-              bg-emerald-50
-              px-3
-              py-1.5
-              text-[11px]
-              font-medium
-              text-emerald-700
-            "
-          >
-            Payment Done
-          </span>
-        ) : (
-          <PaymentStatusBadge status={order.paymentStatus} />
-        )}
-      </div>
-
       {/* View */}
 
       <Link
-        to={`/dashboard/orders/${order._id}`}
+        to={`/dashboard/orders/${order._id || order.id}`}
         className="
           group/button
           flex h-9 w-9
@@ -401,7 +410,7 @@ const OrderTableRow = ({ order }) => {
           hover:text-zinc-900
           hover:shadow-md
         "
-        aria-label={`View ${order.orderNumber}`}
+        aria-label={`View ${order.orderNumber || "order"}`}
       >
         <ArrowRight
           size={16}
@@ -416,19 +425,13 @@ const OrderTableRow = ({ order }) => {
   );
 };
 
-/* -------------------------------- */
-/* Mobile Order Card */
-/* -------------------------------- */
+/* ============================================================
+   MOBILE ORDER CARD
+============================================================ */
 
 const OrderMobileCard = ({ order }) => {
-  const serviceName =
-    order.serviceSnapshot?.name || order.service?.name || "Service";
-
-  const isCodPaymentDone =
-    order.paymentStatus === "collected" ||
-    order.codPinStatus === "used" ||
-    order.codPinStatus === "verified" ||
-    order.paymentStatus === "paid";
+  const serviceName = getServiceName(order);
+  const paymentDone = isPaymentCompleted(order);
 
   return (
     <div
@@ -447,6 +450,8 @@ const OrderMobileCard = ({ order }) => {
         hover:shadow-[0_15px_45px_rgba(0,0,0,0.06)]
       "
     >
+      {/* Background decoration */}
+
       <div
         className="
           pointer-events-none
@@ -467,7 +472,7 @@ const OrderMobileCard = ({ order }) => {
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-zinc-900">
-              {order.orderNumber}
+              {order.orderNumber || "—"}
             </p>
 
             <p className="mt-1 text-xs text-zinc-400">
@@ -478,6 +483,41 @@ const OrderMobileCard = ({ order }) => {
           <StatusBadge status={order.orderStatus} />
         </div>
 
+        {/* Service */}
+
+        <div
+          className="
+            mt-5
+            rounded-2xl
+            border
+            border-zinc-100
+            bg-zinc-50/70
+            p-4
+          "
+        >
+          <p
+            className="
+              text-[10px]
+              font-medium
+              uppercase
+              tracking-[0.15em]
+              text-zinc-400
+            "
+          >
+            Service
+          </p>
+
+          <p className="mt-1 text-sm font-medium text-zinc-800">
+            {serviceName}
+          </p>
+
+          {order.service?.category && (
+            <p className="mt-1 text-xs text-zinc-400">
+              {order.service.category}
+            </p>
+          )}
+        </div>
+
         {/* Details */}
 
         <div
@@ -485,18 +525,19 @@ const OrderMobileCard = ({ order }) => {
             mt-5
             grid
             grid-cols-2
-            gap-4
+            gap-x-5
+            gap-y-5
             border-t
             border-zinc-100
             pt-5
           "
         >
-          <MobileDetail label="Service" value={serviceName} />
-
           <MobileDetail
-            label="Amount"
-            value={`₹${Number(order.amount || 0).toLocaleString("en-IN")}`}
+            label="Quantity"
+            value={formatQuantity(order.quantity)}
           />
+
+          <MobileDetail label="Amount" value={formatCurrency(order.amount)} />
 
           <MobileDetail
             label="Payment"
@@ -505,54 +546,60 @@ const OrderMobileCard = ({ order }) => {
 
           <MobileDetail
             label="Payment Status"
-            value={
-              isCodPaymentDone
-                ? "Payment Done"
-                : formatStatus(order.paymentStatus)
-            }
-            paymentDone={isCodPaymentDone}
+            value={paymentDone ? "Paid" : formatStatus(order.paymentStatus)}
+            paymentDone={paymentDone}
           />
+
+          <MobileDetail
+            label="Order Status"
+            value={formatStatus(order.orderStatus)}
+          />
+
+          <MobileDetail label="Date" value={formatDate(order.createdAt)} />
         </div>
 
-        {/* View */}
+        {/* View Order */}
 
         <Link
-          to={`/dashboard/orders/${order.id}`}
+          to={`/dashboard/orders/${order._id || order.id}`}
           className="
-    inline-flex
-    items-center
-    justify-center
-    gap-2
-    rounded-xl
-    border
-    border-zinc-900
-    bg-zinc-900
-    px-5
-    py-3
-    text-sm
-    font-medium
-    text-white
-    shadow-sm
-    transition-[transform,background-color,box-shadow]
-    duration-300
-    ease-out
-    hover:scale-[1.01]
-    hover:bg-zinc-800
-    hover:text-white
-    hover:shadow-md
-    active:scale-[0.99]
-  "
+            group/button
+            mt-6
+            inline-flex
+            w-full
+            items-center
+            justify-center
+            gap-2
+            rounded-xl
+            border
+            border-zinc-900
+            bg-zinc-900
+            px-5
+            py-3
+            text-sm
+            font-medium
+            text-white
+            shadow-sm
+            transition-[transform,background-color,box-shadow]
+            duration-300
+            ease-out
+            hover:scale-[1.01]
+            hover:bg-zinc-800
+            hover:text-white
+            hover:shadow-md
+            active:scale-[0.99]
+          "
         >
           View Order
           <ArrowRight
             size={16}
             className="
-      text-white
-      transition-transform
-      duration-300
-      ease-out
-      group-hover:translate-x-0.5
-    "
+              text-white
+              transition-transform
+              duration-300
+              ease-out
+              group-hover/button:translate-x-0.5
+            "
           />
         </Link>
       </div>
@@ -560,9 +607,9 @@ const OrderMobileCard = ({ order }) => {
   );
 };
 
-/* -------------------------------- */
-/* Mobile Detail */
-/* -------------------------------- */
+/* ============================================================
+   MOBILE DETAIL
+============================================================ */
 
 const MobileDetail = ({ label, value, paymentDone = false }) => {
   return (
@@ -593,9 +640,9 @@ const MobileDetail = ({ label, value, paymentDone = false }) => {
   );
 };
 
-/* -------------------------------- */
-/* Status Badge */
-/* -------------------------------- */
+/* ============================================================
+   ORDER STATUS BADGE
+============================================================ */
 
 const StatusBadge = ({ status }) => {
   const normalizedStatus = status || "unknown";
@@ -603,19 +650,13 @@ const StatusBadge = ({ status }) => {
   const statusStyles = {
     pending: "border-amber-200 bg-amber-50 text-amber-700",
 
-    confirmed: "border-blue-200 bg-blue-50 text-blue-700",
-
     processing: "border-blue-200 bg-blue-50 text-blue-700",
 
     in_progress: "border-blue-200 bg-blue-50 text-blue-700",
 
     completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
 
-    delivered: "border-emerald-200 bg-emerald-50 text-emerald-700",
-
     cancelled: "border-red-200 bg-red-50 text-red-700",
-
-    rejected: "border-red-200 bg-red-50 text-red-700",
   };
 
   return (
@@ -640,18 +681,29 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-/* -------------------------------- */
-/* Payment Status Badge */
-/* -------------------------------- */
+/* ============================================================
+   PAYMENT STATUS BADGE
+============================================================ */
 
 const PaymentStatusBadge = ({ status }) => {
   const normalizedStatus = status || "unknown";
 
-  const isPending = normalizedStatus === "pending";
+  const statusStyles = {
+    paid: "border-emerald-200 bg-emerald-50 text-emerald-700",
+
+    collected: "border-emerald-200 bg-emerald-50 text-emerald-700",
+
+    pending: "border-amber-200 bg-amber-50 text-amber-700",
+
+    processing: "border-blue-200 bg-blue-50 text-blue-700",
+
+    failed: "border-red-200 bg-red-50 text-red-700",
+  };
 
   return (
     <span
       className={`
+        inline-flex
         rounded-full
         border
         px-3
@@ -659,9 +711,8 @@ const PaymentStatusBadge = ({ status }) => {
         text-[11px]
         font-medium
         ${
-          isPending
-            ? "border-amber-200 bg-amber-50 text-amber-700"
-            : "border-zinc-200 bg-zinc-50 text-zinc-600"
+          statusStyles[normalizedStatus] ||
+          "border-zinc-200 bg-zinc-50 text-zinc-600"
         }
       `}
     >
@@ -670,9 +721,9 @@ const PaymentStatusBadge = ({ status }) => {
   );
 };
 
-/* -------------------------------- */
-/* Empty State */
-/* -------------------------------- */
+/* ============================================================
+   EMPTY STATE
+============================================================ */
 
 const EmptyOrders = () => {
   return (
@@ -693,8 +744,6 @@ const EmptyOrders = () => {
         shadow-[0_20px_80px_rgba(0,0,0,0.05)]
       "
     >
-      {/* Background glow */}
-
       <div
         className="
           pointer-events-none
@@ -754,7 +803,7 @@ const EmptyOrders = () => {
             text-zinc-500
           "
         >
-          Once you place your first content order, it will appear here.
+          Once you place your first service order, it will appear here.
         </p>
 
         <Link
@@ -795,14 +844,49 @@ const EmptyOrders = () => {
   );
 };
 
-/* -------------------------------- */
-/* Helpers */
-/* -------------------------------- */
+/* ============================================================
+   HELPERS
+============================================================ */
+
+const getServiceName = (order) => {
+  return order?.service?.name || order?.serviceSnapshot?.name || "Service";
+};
+
+const formatCurrency = (amount) => {
+  const value = Number(amount || 0);
+
+  return `₹${value.toLocaleString("en-IN")}`;
+};
+
+const formatQuantity = (quantity) => {
+  const value = Number(quantity);
+
+  if (!Number.isFinite(value) || value < 1) {
+    return "—";
+  }
+
+  return value.toLocaleString("en-IN");
+};
+
+const isPaymentCompleted = (order) => {
+  return (
+    order?.paymentStatus === "paid" ||
+    order?.paymentStatus === "collected" ||
+    order?.codPinStatus === "verified" ||
+    order?.codPinStatus === "used"
+  );
+};
 
 const formatDate = (date) => {
   if (!date) return "—";
 
-  return new Date(date).toLocaleDateString("en-IN", {
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "—";
+  }
+
+  return parsedDate.toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -812,7 +896,7 @@ const formatDate = (date) => {
 const formatStatus = (status) => {
   if (!status) return "Unknown";
 
-  return status
+  return String(status)
     .replace(/_/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 };

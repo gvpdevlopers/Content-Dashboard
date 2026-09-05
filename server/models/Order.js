@@ -21,21 +21,106 @@ const orderSchema = new mongoose.Schema(
       required: true,
     },
 
+    // Snapshot of the service at the time the order was created.
+    // This prevents future admin price/service changes from
+    // affecting historical orders.
     serviceSnapshot: {
       name: {
         type: String,
         required: true,
+        trim: true,
       },
+
       category: {
         type: String,
         required: true,
+        trim: true,
+      },
+
+      description: {
+        type: String,
+        default: "",
+        trim: true,
+      },
+
+      pricingType: {
+        type: String,
+        enum: ["fixed", "per_unit", "starting_from", "custom"],
+        default: "fixed",
+      },
+
+      basePrice: {
+        type: Number,
+        required: true,
+        min: 0,
+      },
+
+      unit: {
+        type: String,
+        default: "",
+        trim: true,
+      },
+
+      // If a service has a selected pricing option,
+      // store the option details as part of the snapshot.
+      selectedOption: {
+        id: {
+          type: mongoose.Schema.Types.ObjectId,
+          default: null,
+        },
+
+        name: {
+          type: String,
+          default: "",
+          trim: true,
+        },
+
+        description: {
+          type: String,
+          default: "",
+          trim: true,
+        },
+
+        price: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+
+        unit: {
+          type: String,
+          default: "",
+          trim: true,
+        },
+
+        minQuantity: {
+          type: Number,
+          default: 1,
+          min: 1,
+        },
       },
     },
 
+    // Quantity selected by the client.
+    quantity: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
+
+    // Stores dynamic fields submitted by the client.
+    // The structure depends on the selected service.
     formData: {
       type: Map,
       of: mongoose.Schema.Types.Mixed,
       default: {},
+    },
+
+    // Optional information provided by the client.
+    additionalRequirements: {
+      type: String,
+      default: "",
+      trim: true,
     },
 
     amount: {

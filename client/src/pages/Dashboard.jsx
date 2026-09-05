@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+
 import {
   ArrowRight,
   ArrowUpRight,
@@ -7,6 +8,7 @@ import {
   Package,
   WalletCards,
   RefreshCw,
+  IndianRupee,
 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
@@ -19,6 +21,10 @@ const Dashboard = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  /* =========================================================
+     LOAD ORDERS
+  ========================================================= */
 
   const loadOrders = async () => {
     try {
@@ -45,24 +51,24 @@ const Dashboard = () => {
     loadOrders();
   }, []);
 
-  /*
-   * ---------------------------------------------------------
-   * ORDER STATISTICS
-   * ---------------------------------------------------------
-   */
+  /* =========================================================
+     ORDER STATISTICS
+  ========================================================= */
 
   const stats = useMemo(() => {
     const total = orders.length;
 
-    const inProgress = orders.filter((order) =>
-      ["in_progress", "processing", "confirmed"].includes(
-        String(order.orderStatus || "").toLowerCase(),
-      ),
-    ).length;
+    const inProgress = orders.filter((order) => {
+      const status = String(order.orderStatus || "").toLowerCase();
 
-    const completed = orders.filter(
-      (order) => String(order.orderStatus || "").toLowerCase() === "completed",
-    ).length;
+      return ["in_progress", "processing", "confirmed"].includes(status);
+    }).length;
+
+    const completed = orders.filter((order) => {
+      const status = String(order.orderStatus || "").toLowerCase();
+
+      return ["completed", "delivered"].includes(status);
+    }).length;
 
     const pendingPayment = orders.filter((order) => {
       const paymentStatus = String(
@@ -79,19 +85,23 @@ const Dashboard = () => {
       return paymentStatus === "pending" && !isCodPaymentDone;
     }).length;
 
+    const totalAmount = orders.reduce(
+      (total, order) => total + Number(order.amount || 0),
+      0,
+    );
+
     return {
       total,
       inProgress,
       completed,
       pendingPayment,
+      totalAmount,
     };
   }, [orders]);
 
-  /*
-   * ---------------------------------------------------------
-   * RECENT ORDERS
-   * ---------------------------------------------------------
-   */
+  /* =========================================================
+     RECENT ORDERS
+  ========================================================= */
 
   const recentOrders = useMemo(() => {
     return [...orders]
@@ -155,6 +165,7 @@ const Dashboard = () => {
         "
       >
         {/* Top highlight */}
+
         <div
           className="
             pointer-events-none
@@ -170,6 +181,7 @@ const Dashboard = () => {
         />
 
         {/* Ambient glow */}
+
         <div
           className="
             pointer-events-none
@@ -230,70 +242,69 @@ const Dashboard = () => {
           <Link
             to="/dashboard/new-order"
             className="
-    group/button
-    relative
-    mt-7
-    inline-flex
-    items-center
-    gap-2
-    overflow-hidden
-    rounded-2xl
-    border
-    border-zinc-900
-    bg-zinc-900
-    px-5
-    py-3.5
-    text-sm
-    font-medium
-    text-white
-    shadow-[0_10px_30px_rgba(0,0,0,0.08)]
-    transition-[transform,background-color,box-shadow]
-    duration-300
-    ease-out
-    hover:
-    hover:bg-zinc-800
-    hover:text-white
-    hover:shadow-[0_12px_34px_rgba(0,0,0,0.10)]
-    active:scale-[0.99]
-  "
+              group/button
+              relative
+              mt-7
+              inline-flex
+              items-center
+              gap-2
+              overflow-hidden
+              rounded-2xl
+              border
+              border-zinc-900
+              bg-zinc-900
+              px-5
+              py-3.5
+              text-sm
+              font-medium
+              text-white
+              shadow-[0_10px_30px_rgba(0,0,0,0.08)]
+              transition-[transform,background-color,box-shadow]
+              duration-300
+              ease-out
+              hover:bg-zinc-800
+              hover:text-white
+              hover:shadow-[0_12px_34px_rgba(0,0,0,0.10)]
+              active:scale-[0.99]
+            "
           >
             <span
               className="
-      absolute
-      inset-0
-      bg-gradient-to-r
-      from-zinc-800
-      via-zinc-900
-      to-zinc-800
-      opacity-0
-      transition-opacity
-      duration-300
-      ease-out
-      group-hover/button:opacity-100
-    "
+                absolute
+                inset-0
+                bg-gradient-to-r
+                from-zinc-800
+                via-zinc-900
+                to-zinc-800
+                opacity-0
+                transition-opacity
+                duration-300
+                ease-out
+                group-hover/button:opacity-100
+              "
             />
 
             <span
               className="
-      relative
-      flex
-      items-center
-      gap-2
-      text-white
-    "
+                relative
+                flex
+                items-center
+                gap-2
+                text-white
+              "
             >
               <span className="text-white">Start a new order</span>
 
               <ArrowUpRight
                 size={17}
                 className="
-        text-white
-        transition-transform
-        duration-300
-        ease-out
-        group-hover/button:translate-x-0.5
-        group-hover/button:-translate-y-0.5
-      "
+                  text-white
+                  transition-transform
+                  duration-300
+                  ease-out
+                  group-hover/button:translate-x-0.5
+                  group-hover/button:-translate-y-0.5
+                "
               />
             </span>
           </Link>
@@ -354,7 +365,15 @@ const Dashboard = () => {
           STATS
       ====================================================== */}
 
-      <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section
+        className="
+          mt-6
+          grid
+          gap-4
+          sm:grid-cols-2
+          xl:grid-cols-4
+        "
+      >
         <StatCard
           icon={Package}
           label="Total Orders"
@@ -382,6 +401,97 @@ const Dashboard = () => {
           value={loading ? "—" : stats.pendingPayment}
           description="Orders awaiting payment"
         />
+      </section>
+
+      {/* =====================================================
+          TOTAL AMOUNT
+      ====================================================== */}
+
+      <section className="mt-4">
+        <div
+          className="
+            group
+            relative
+            overflow-hidden
+            rounded-[22px]
+            border border-zinc-200
+            bg-white
+            p-5
+            shadow-[0_10px_35px_rgba(0,0,0,0.04)]
+            transition-all
+            duration-200
+            hover:border-zinc-300
+            hover:shadow-[0_15px_45px_rgba(0,0,0,0.07)]
+          "
+        >
+          <div
+            className="
+              pointer-events-none
+              absolute
+              -right-10
+              -top-10
+              h-24
+              w-24
+              rounded-full
+              bg-cyan-300/[0.04]
+              blur-2xl
+              opacity-0
+              transition
+              duration-500
+              group-hover:opacity-100
+            "
+          />
+
+          <div className="relative flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div
+                className="
+                  flex h-10 w-10
+                  items-center justify-center
+                  rounded-xl
+                  border border-zinc-200
+                  bg-zinc-50
+                  transition
+                  duration-200
+                  group-hover:border-zinc-300
+                "
+              >
+                <IndianRupee
+                  size={18}
+                  strokeWidth={1.6}
+                  className="
+                    text-zinc-500
+                    transition-colors
+                    duration-200
+                    group-hover:text-zinc-800
+                  "
+                />
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-zinc-900">
+                  Total Amount
+                </p>
+
+                <p className="mt-1 text-xs text-zinc-500">
+                  Total value of your orders
+                </p>
+              </div>
+            </div>
+
+            <span
+              className="
+                text-xl
+                font-semibold
+                tracking-tight
+                text-zinc-900
+                sm:text-2xl
+              "
+            >
+              {loading ? "—" : `₹${stats.totalAmount.toLocaleString("en-IN")}`}
+            </span>
+          </div>
+        </div>
       </section>
 
       {/* =====================================================
@@ -435,6 +545,7 @@ const Dashboard = () => {
         </div>
 
         {/* Loading */}
+
         {loading && (
           <div
             className="
@@ -453,7 +564,8 @@ const Dashboard = () => {
                   animate-pulse
                   items-center
                   justify-between
-                  border-b border-zinc-100
+                  border-b
+                  border-zinc-100
                   px-5
                   py-5
                   last:border-b-0
@@ -471,46 +583,47 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* No orders */}
+        {/* No Orders */}
+
         {!loading && recentOrders.length === 0 && (
           <div
             className="
-              relative
-              overflow-hidden
-              rounded-[24px]
-              border border-zinc-200
-              bg-white
-              p-10
-              text-center
-              shadow-[0_10px_35px_rgba(0,0,0,0.04)]
-            "
+                relative
+                overflow-hidden
+                rounded-[24px]
+                border border-zinc-200
+                bg-white
+                p-10
+                text-center
+                shadow-[0_10px_35px_rgba(0,0,0,0.04)]
+              "
           >
             <div
               className="
-                pointer-events-none
-                absolute
-                left-1/2
-                top-0
-                h-40
-                w-40
-                -translate-x-1/2
-                rounded-full
-                bg-cyan-300/[0.04]
-                blur-3xl
-              "
+                  pointer-events-none
+                  absolute
+                  left-1/2
+                  top-0
+                  h-40
+                  w-40
+                  -translate-x-1/2
+                  rounded-full
+                  bg-cyan-300/[0.04]
+                  blur-3xl
+                "
             />
 
             <div className="relative">
               <div
                 className="
-                  mx-auto
-                  flex h-14 w-14
-                  items-center
-                  justify-center
-                  rounded-2xl
-                  border border-zinc-200
-                  bg-zinc-50
-                "
+                    mx-auto
+                    flex h-14 w-14
+                    items-center
+                    justify-center
+                    rounded-2xl
+                    border border-zinc-200
+                    bg-zinc-50
+                  "
               >
                 <Package
                   size={21}
@@ -525,13 +638,13 @@ const Dashboard = () => {
 
               <p
                 className="
-                  mx-auto
-                  mt-2
-                  max-w-sm
-                  text-sm
-                  leading-6
-                  text-zinc-500
-                "
+                    mx-auto
+                    mt-2
+                    max-w-sm
+                    text-sm
+                    leading-6
+                    text-zinc-500
+                  "
               >
                 Your recent content orders will appear here once you place your
                 first order.
@@ -540,28 +653,28 @@ const Dashboard = () => {
               <Link
                 to="/dashboard/new-order"
                 className="
-                  group
-                  mt-5
-                  inline-flex
-                  items-center
-                  gap-2
-                  text-sm
-                  font-medium
-                  text-zinc-900
-                  transition-colors
-                  duration-200
-                  hover:text-zinc-500
-                "
+                    group
+                    mt-5
+                    inline-flex
+                    items-center
+                    gap-2
+                    text-sm
+                    font-medium
+                    text-zinc-900
+                    transition-colors
+                    duration-200
+                    hover:text-zinc-500
+                  "
               >
                 Create your first order
                 <ArrowUpRight
                   size={16}
                   className="
-                    transition-transform
-                    duration-200
-                    group-hover:translate-x-0.5
-                    group-hover:-translate-y-0.5
-                  "
+                      transition-transform
+                      duration-200
+                      group-hover:translate-x-0.5
+                      group-hover:-translate-y-0.5
+                    "
                 />
               </Link>
             </div>
@@ -569,15 +682,16 @@ const Dashboard = () => {
         )}
 
         {/* Orders */}
+
         {!loading && recentOrders.length > 0 && (
           <div
             className="
-              overflow-hidden
-              rounded-[24px]
-              border border-zinc-200
-              bg-white
-              shadow-[0_10px_35px_rgba(0,0,0,0.04)]
-            "
+                overflow-hidden
+                rounded-[24px]
+                border border-zinc-200
+                bg-white
+                shadow-[0_10px_35px_rgba(0,0,0,0.04)]
+              "
           >
             {recentOrders.map((order) => (
               <RecentOrder key={order._id || order.id} order={order} />
@@ -612,7 +726,6 @@ const StatCard = ({ icon: Icon, label, value, description }) => {
         hover:shadow-[0_15px_45px_rgba(0,0,0,0.07)]
       "
     >
-      {/* Hover glow */}
       <div
         className="
           pointer-events-none
@@ -635,7 +748,8 @@ const StatCard = ({ icon: Icon, label, value, description }) => {
         <div
           className="
             flex h-10 w-10
-            items-center justify-center
+            items-center
+            justify-center
             rounded-xl
             border border-zinc-200
             bg-zinc-50
@@ -656,7 +770,14 @@ const StatCard = ({ icon: Icon, label, value, description }) => {
           />
         </div>
 
-        <span className="text-2xl font-semibold tracking-tight text-zinc-900">
+        <span
+          className="
+            text-2xl
+            font-semibold
+            tracking-tight
+            text-zinc-900
+          "
+        >
           {value}
         </span>
       </div>
@@ -673,6 +794,12 @@ const StatCard = ({ icon: Icon, label, value, description }) => {
 ========================================================= */
 
 const RecentOrder = ({ order }) => {
+  /*
+   * Service name comes from the snapshot first so that
+   * historical orders continue showing the service name
+   * that existed when the order was created.
+   */
+
   const serviceName =
     order.serviceSnapshot?.name || order.service?.name || "Content Service";
 
@@ -683,13 +810,14 @@ const RecentOrder = ({ order }) => {
   const codPinStatus = String(order.codPinStatus || "").toLowerCase();
 
   /*
-   * COD PIN verification is considered Payment Done
-   * in the client dashboard.
+   * COD PIN verification is considered Payment Done.
    *
-   * This supports both the current temporary backend
-   * state ("verified") and the final backend state
-   * ("used" / "collected").
+   * Supports:
+   * - verified
+   * - used
+   * - collected
    */
+
   const isCodPaymentDone =
     codPinStatus === "verified" ||
     codPinStatus === "used" ||
@@ -705,15 +833,18 @@ const RecentOrder = ({ order }) => {
       })
     : "—";
 
+  const orderId = order._id || order.id;
+
   return (
     <Link
-      to={`/dashboard/orders/${order._id || order.id}`}
+      to={`/dashboard/orders/${orderId}`}
       className="
         group
         flex
         flex-col
         gap-4
-        border-b border-zinc-100
+        border-b
+        border-zinc-100
         px-5
         py-5
         transition-all
@@ -756,7 +887,14 @@ const RecentOrder = ({ order }) => {
 
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate text-sm font-medium text-zinc-900">
+            <p
+              className="
+                truncate
+                text-sm
+                font-medium
+                text-zinc-900
+              "
+            >
               {serviceName}
             </p>
 
@@ -785,56 +923,22 @@ const RecentOrder = ({ order }) => {
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-4 sm:justify-end">
+      <div
+        className="
+          flex
+          items-center
+          justify-between
+          gap-4
+          sm:justify-end
+        "
+      >
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge label={statusLabel} type={status} />
 
-          {isCodPaymentDone ? (
-            <span
-              className="
-                rounded-full
-                border border-emerald-200
-                bg-emerald-50
-                px-3
-                py-1.5
-                text-[11px]
-                font-medium
-                text-emerald-700
-              "
-            >
-              Payment Done
-            </span>
-          ) : paymentStatus === "pending" ? (
-            <span
-              className="
-                rounded-full
-                border border-amber-200
-                bg-amber-50
-                px-3
-                py-1.5
-                text-[11px]
-                font-medium
-                text-amber-700
-              "
-            >
-              Payment Pending
-            </span>
-          ) : paymentStatus === "paid" ? (
-            <span
-              className="
-                rounded-full
-                border border-emerald-200
-                bg-emerald-50
-                px-3
-                py-1.5
-                text-[11px]
-                font-medium
-                text-emerald-700
-              "
-            >
-              Payment Done
-            </span>
-          ) : null}
+          <PaymentBadge
+            paymentStatus={paymentStatus}
+            isCodPaymentDone={isCodPaymentDone}
+          />
         </div>
 
         <ArrowRight
@@ -854,6 +958,70 @@ const RecentOrder = ({ order }) => {
 };
 
 /* =========================================================
+   PAYMENT BADGE
+========================================================= */
+
+const PaymentBadge = ({ paymentStatus, isCodPaymentDone }) => {
+  if (
+    isCodPaymentDone ||
+    ["paid", "completed", "success", "successful"].includes(paymentStatus)
+  ) {
+    return (
+      <span
+        className="
+          rounded-full
+          border border-emerald-200
+          bg-emerald-50
+          px-3
+          py-1.5
+          text-[11px]
+          font-medium
+          text-emerald-700
+        "
+      >
+        Payment Done
+      </span>
+    );
+  }
+
+  if (paymentStatus === "pending") {
+    return (
+      <span
+        className="
+          rounded-full
+          border border-amber-200
+          bg-amber-50
+          px-3
+          py-1.5
+          text-[11px]
+          font-medium
+          text-amber-700
+        "
+      >
+        Payment Pending
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="
+        rounded-full
+        border border-zinc-200
+        bg-zinc-50
+        px-3
+        py-1.5
+        text-[11px]
+        font-medium
+        text-zinc-600
+      "
+    >
+      {formatStatus(paymentStatus)}
+    </span>
+  );
+};
+
+/* =========================================================
    STATUS BADGE
 ========================================================= */
 
@@ -869,7 +1037,11 @@ const StatusBadge = ({ label, type }) => {
 
     completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
 
+    delivered: "border-emerald-200 bg-emerald-50 text-emerald-700",
+
     cancelled: "border-red-200 bg-red-50 text-red-700",
+
+    rejected: "border-red-200 bg-red-50 text-red-700",
   };
 
   return (
@@ -900,7 +1072,13 @@ const formatStatus = (status) => {
     in_progress: "In Progress",
     processing: "Processing",
     completed: "Completed",
+    delivered: "Delivered",
     cancelled: "Cancelled",
+    rejected: "Rejected",
+    paid: "Paid",
+    collected: "Collected",
+    successful: "Successful",
+    success: "Success",
   };
 
   return (

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   ArrowLeft,
@@ -41,6 +41,12 @@ const AdminOrderDetails = () => {
   const [copied, setCopied] = useState(false);
   const [adminNotes, setAdminNotes] = useState("");
 
+  /*
+  |----------------------------------------------------------------------
+  | Load order
+  |----------------------------------------------------------------------
+  */
+
   const loadOrder = async (isRefresh = false) => {
     try {
       if (isRefresh) {
@@ -52,20 +58,15 @@ const AdminOrderDetails = () => {
       setError("");
       setMessage("");
 
-      const data =
-        await adminOrderService.getAdminOrderById(id);
+      const data = await adminOrderService.getAdminOrderById(id);
 
-      setOrder(data.order);
+      setOrder(data.order || null);
       setAdminNotes(data.order?.notes || "");
     } catch (error) {
-      console.error(
-        "Get admin order details error:",
-        error
-      );
+      console.error("Get admin order details error:", error);
 
       setError(
-        error.response?.data?.message ||
-          "Unable to load order details."
+        error.response?.data?.message || "Unable to load order details.",
       );
     } finally {
       setLoading(false);
@@ -79,14 +80,14 @@ const AdminOrderDetails = () => {
     }
   }, [id]);
 
-  /* =====================================================
-     ORDER STATUS
-  ====================================================== */
+  /*
+  |----------------------------------------------------------------------
+  | Order status
+  |----------------------------------------------------------------------
+  */
 
   const handleStatusChange = async (value) => {
-    const newStatus = value;
-
-    if (!order || newStatus === order.orderStatus) {
+    if (!order || value === order.orderStatus) {
       return;
     }
 
@@ -95,61 +96,43 @@ const AdminOrderDetails = () => {
       setError("");
       setMessage("");
 
-      const data =
-        await adminOrderService.updateOrderStatus(
-          order._id,
-          newStatus
-        );
+      const data = await adminOrderService.updateOrderStatus(order._id, value);
 
       setOrder((currentOrder) => ({
         ...currentOrder,
         ...data.order,
       }));
 
-      setMessage(
-        "Order status updated successfully."
-      );
+      setMessage("Order status updated successfully.");
     } catch (error) {
-      console.error(
-        "Update order status error:",
-        error
-      );
+      console.error("Update order status error:", error);
 
       setError(
-        error.response?.data?.message ||
-          "Unable to update order status."
+        error.response?.data?.message || "Unable to update order status.",
       );
     } finally {
       setStatusLoading(false);
     }
   };
 
-  /* =====================================================
-     PAYMENT STATUS
-  ====================================================== */
+  /*
+  |----------------------------------------------------------------------
+  | Payment status
+  |----------------------------------------------------------------------
+  */
 
   const handlePaymentStatusChange = async (value) => {
-    const newPaymentStatus = value;
-
-    if (
-      !order ||
-      newPaymentStatus === order.paymentStatus
-    ) {
+    if (!order || value === order.paymentStatus) {
       return;
     }
 
     /*
-     * COD collected status should only happen
-     * through the COD PIN verification flow.
+     * COD collection must happen through
+     * the COD PIN verification flow.
      */
 
-    if (
-      order.paymentMethod === "cod" &&
-      newPaymentStatus === "collected"
-    ) {
-      setError(
-        "COD payment must be completed through COD PIN verification."
-      );
+    if (order.paymentMethod === "cod" && value === "collected") {
+      setError("COD payment must be completed through COD PIN verification.");
 
       return;
     }
@@ -159,38 +142,33 @@ const AdminOrderDetails = () => {
       setError("");
       setMessage("");
 
-      const data =
-        await adminOrderService.updatePaymentStatus(
-          order._id,
-          newPaymentStatus
-        );
+      const data = await adminOrderService.updatePaymentStatus(
+        order._id,
+        value,
+      );
 
       setOrder((currentOrder) => ({
         ...currentOrder,
         ...data.order,
       }));
 
-      setMessage(
-        "Payment status updated successfully."
-      );
+      setMessage("Payment status updated successfully.");
     } catch (error) {
-      console.error(
-        "Update payment status error:",
-        error
-      );
+      console.error("Update payment status error:", error);
 
       setError(
-        error.response?.data?.message ||
-          "Unable to update payment status."
+        error.response?.data?.message || "Unable to update payment status.",
       );
     } finally {
       setPaymentLoading(false);
     }
   };
 
-  /* =====================================================
-     ADMIN NOTES
-  ====================================================== */
+  /*
+  |----------------------------------------------------------------------
+  | Admin notes
+  |----------------------------------------------------------------------
+  */
 
   const handleSaveNotes = async () => {
     if (!order) {
@@ -202,16 +180,13 @@ const AdminOrderDetails = () => {
       setError("");
       setMessage("");
 
-      const data =
-        await adminOrderService.updateAdminNotes(
-          order._id,
-          adminNotes
-        );
+      const data = await adminOrderService.updateAdminNotes(
+        order._id,
+        adminNotes,
+      );
 
       const updatedNotes =
-        data.order?.notes !== undefined
-          ? data.order.notes
-          : adminNotes;
+        data.order?.notes !== undefined ? data.order.notes : adminNotes;
 
       setOrder((currentOrder) => ({
         ...currentOrder,
@@ -220,27 +195,23 @@ const AdminOrderDetails = () => {
 
       setAdminNotes(updatedNotes);
 
-      setMessage(
-        "Admin notes updated successfully."
-      );
+      setMessage("Admin notes updated successfully.");
     } catch (error) {
-      console.error(
-        "Update admin notes error:",
-        error
-      );
+      console.error("Update admin notes error:", error);
 
       setError(
-        error.response?.data?.message ||
-          "Unable to update admin notes."
+        error.response?.data?.message || "Unable to update admin notes.",
       );
     } finally {
       setNotesLoading(false);
     }
   };
 
-  /* =====================================================
-     COD PIN
-  ====================================================== */
+  /*
+  |----------------------------------------------------------------------
+  | COD PIN
+  |----------------------------------------------------------------------
+  */
 
   const handleGenerateCodPin = async () => {
     if (!order) {
@@ -253,32 +224,25 @@ const AdminOrderDetails = () => {
       setMessage("");
       setCopied(false);
 
-      const data =
-        await codService.generateCodPin(
-          order._id
-        );
+      const data = await codService.generateCodPin(order._id);
 
       setOrder((currentOrder) => ({
         ...currentOrder,
+
+        /*
+         * The actual PIN is intentionally only placed
+         * into local admin state after generation.
+         */
         codPin: data.codPin,
-        codPinStatus:
-          data.order?.codPinStatus ||
-          "active",
+
+        codPinStatus: data.order?.codPinStatus || "active",
       }));
 
-      setMessage(
-        "COD PIN generated successfully."
-      );
+      setMessage("COD PIN generated successfully.");
     } catch (error) {
-      console.error(
-        "Generate COD PIN error:",
-        error
-      );
+      console.error("Generate COD PIN error:", error);
 
-      setError(
-        error.response?.data?.message ||
-          "Unable to generate COD PIN."
-      );
+      setError(error.response?.data?.message || "Unable to generate COD PIN.");
     } finally {
       setCodLoading(false);
     }
@@ -290,9 +254,7 @@ const AdminOrderDetails = () => {
     }
 
     try {
-      await navigator.clipboard.writeText(
-        order.codPin
-      );
+      await navigator.clipboard.writeText(order.codPin);
 
       setCopied(true);
 
@@ -300,16 +262,53 @@ const AdminOrderDetails = () => {
         setCopied(false);
       }, 1500);
     } catch (error) {
-      console.error(
-        "Copy PIN error:",
-        error
-      );
+      console.error("Copy PIN error:", error);
     }
   };
 
-  /* =====================================================
-     LOADING
-  ====================================================== */
+  /*
+  |----------------------------------------------------------------------
+  | Derived values
+  |----------------------------------------------------------------------
+  */
+
+  const clientName =
+    order?.client?.name ||
+    order?.client?.username ||
+    order?.client?.email ||
+    "Unknown Client";
+
+  const serviceSnapshot = order?.serviceSnapshot || {};
+
+  const formDataEntries = useMemo(() => {
+    if (!order?.formData) {
+      return [];
+    }
+
+    let entries = [];
+
+    if (order.formData instanceof Map) {
+      entries = Array.from(order.formData.entries());
+    } else if (typeof order.formData === "object") {
+      entries = Object.entries(order.formData);
+    }
+
+    return entries.filter(
+      ([, value]) => value !== undefined && value !== null && value !== "",
+    );
+  }, [order]);
+
+  const hasAdditionalRequirements = Boolean(
+    order?.additionalRequirements?.trim(),
+  );
+
+  const hasCodPin = Boolean(order?.codPin);
+
+  /*
+  |----------------------------------------------------------------------
+  | Loading
+  |----------------------------------------------------------------------
+  */
 
   if (loading) {
     return (
@@ -321,8 +320,7 @@ const AdminOrderDetails = () => {
           justify-center
         "
       >
-        <div className="flex flex-col items-center gap-4 text-center">
-
+        <div className="flex flex-col items-center text-center">
           <div
             className="
               flex h-12 w-12
@@ -333,175 +331,29 @@ const AdminOrderDetails = () => {
               shadow-sm
             "
           >
-            <Loader2
-              size={19}
-              className="animate-spin text-zinc-500"
-            />
+            <Loader2 size={20} className="animate-spin text-zinc-400" />
           </div>
 
-          <div>
-            <p className="text-sm font-medium text-zinc-700">
-              Loading order
-            </p>
-
-            <p className="mt-1 text-xs text-zinc-400">
-              Fetching order details...
-            </p>
-          </div>
-
-        </div>
-      </div>
-    );
-  }
-
-  /* =====================================================
-     ERROR
-  ====================================================== */
-
-  if (error && !order) {
-    return (
-      <div
-        className="
-          mx-auto
-          flex
-          min-h-[60vh]
-          max-w-xl
-          items-center
-          justify-center
-          px-5
-          text-center
-        "
-      >
-        <div>
-
-          <div
-            className="
-              mx-auto
-              flex h-14 w-14
-              items-center
-              justify-center
-              rounded-2xl
-              border border-red-200
-              bg-red-50
-            "
-          >
-            <Package
-              size={22}
-              className="text-red-500"
-            />
-          </div>
-
-          <h1
-            className="
-              mt-5
-              text-xl
-              font-medium
-              text-zinc-900
-            "
-          >
-            Unable to load order
-          </h1>
-
-          <p
-            className="
-              mt-2
-              text-sm
-              leading-6
-              text-zinc-500
-            "
-          >
-            {error}
+          <p className="mt-4 text-sm font-medium text-zinc-700">
+            Loading order
           </p>
 
-          <Link
-            to="/admin/orders"
-            className="
-              group
-              mt-6
-              inline-flex
-              items-center
-              gap-2
-              rounded-xl
-              border border-zinc-200
-              bg-white
-              px-5
-              py-3
-              text-sm
-              font-medium
-              text-zinc-600
-              shadow-sm
-              transition-all
-              duration-200
-              hover:border-zinc-300
-              hover:bg-zinc-50
-              hover:text-zinc-900
-              hover:shadow-md
-            "
-          >
-            <ArrowLeft
-              size={16}
-              className="
-                transition-transform
-                duration-200
-                group-hover:-translate-x-1
-              "
-            />
-
-            Back to Orders
-          </Link>
-
+          <p className="mt-1 text-xs text-zinc-400">
+            Fetching order details...
+          </p>
         </div>
       </div>
     );
   }
 
-  if (!order) {
-    return null;
-  }
-
-  /* =====================================================
-     DERIVED VALUES
-  ====================================================== */
-
-  const serviceName =
-    order.serviceSnapshot?.name ||
-    order.service?.name ||
-    "Service";
-
-  const clientName =
-    order.client?.name ||
-    order.client?.username ||
-    "Unknown Client";
-
-  const formData = order.formData || {};
-
-  const isCod =
-    order.paymentMethod === "cod";
-
-  const hasCodPin =
-    Boolean(order.codPin);
-
-  const isCancelled =
-    order.orderStatus === "cancelled";
-
-  const isCompleted =
-    order.orderStatus === "completed";
-
-  const paymentOptions = isCod
-    ? ["pending", "collected"]
-    : [
-        "pending",
-        "processing",
-        "paid",
-        "failed",
-      ];
-
-  const notesChanged =
-    adminNotes !== (order.notes || "");
+  /*
+  |----------------------------------------------------------------------
+  | Main render
+  |----------------------------------------------------------------------
+  */
 
   return (
-    <div className="mx-auto max-w-[1200px] animate-fade-up">
-
+    <div className="mx-auto max-w-[1500px] animate-fade-up">
       {/* =====================================================
           BACK
       ====================================================== */}
@@ -510,13 +362,10 @@ const AdminOrderDetails = () => {
         to="/admin/orders"
         className="
           group
-          mb-6
+          mb-5
           inline-flex
           items-center
           gap-2
-          rounded-lg
-          py-1
-          pr-3
           text-sm
           text-zinc-500
           transition
@@ -532,28 +381,96 @@ const AdminOrderDetails = () => {
             group-hover:-translate-x-1
           "
         />
-
         Back to Orders
       </Link>
+
+      {/* =====================================================
+          ERROR
+      ====================================================== */}
+
+      {error && (
+        <div
+          className="
+            mb-5
+            flex
+            flex-col
+            gap-3
+            rounded-2xl
+            border border-red-200
+            bg-red-50
+            px-5
+            py-4
+            sm:flex-row
+            sm:items-center
+            sm:justify-between
+          "
+        >
+          <div className="flex items-start gap-3">
+            <XCircle size={18} className="mt-0.5 shrink-0 text-red-500" />
+
+            <p className="text-sm text-red-600">{error}</p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => loadOrder()}
+            className="
+              self-start
+              text-sm
+              font-medium
+              text-red-600
+              underline
+              underline-offset-4
+              hover:text-red-800
+              sm:self-auto
+            "
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
+      {/* =====================================================
+          SUCCESS MESSAGE
+      ====================================================== */}
+
+      {message && (
+        <div
+          className="
+            mb-5
+            flex
+            items-center
+            gap-3
+            rounded-2xl
+            border border-emerald-200
+            bg-emerald-50
+            px-5
+            py-4
+            text-sm
+            text-emerald-700
+          "
+        >
+          <Check size={17} className="shrink-0" />
+
+          {message}
+        </div>
+      )}
 
       {/* =====================================================
           PAGE HEADER
       ====================================================== */}
 
-      <div
+      <section
         className="
           group
           relative
+          mb-6
           overflow-hidden
           rounded-[28px]
           border border-zinc-200
           bg-white
           p-6
           shadow-[0_20px_80px_rgba(0,0,0,0.06)]
-          transition
-          duration-300
-          hover:border-zinc-300
-          hover:shadow-[0_24px_90px_rgba(0,0,0,0.08)]
           sm:p-8
         "
       >
@@ -589,7 +506,6 @@ const AdminOrderDetails = () => {
         />
 
         <div className="relative">
-
           <div
             className="
               flex
@@ -600,11 +516,8 @@ const AdminOrderDetails = () => {
               lg:justify-between
             "
           >
-
             <div className="min-w-0">
-
               <div className="flex items-center gap-3">
-
                 <div
                   className="
                     flex h-10 w-10
@@ -614,292 +527,266 @@ const AdminOrderDetails = () => {
                     border border-zinc-200
                     bg-zinc-50
                     text-zinc-500
-                    shadow-sm
-                    transition
-                    duration-200
-                    group-hover:border-zinc-300
-                    group-hover:bg-white
-                    group-hover:text-zinc-800
                   "
                 >
-                  <Package
-                    size={18}
-                    strokeWidth={1.6}
-                  />
+                  <Package size={18} strokeWidth={1.6} />
                 </div>
 
-                <p
-                  className="
-                    text-[10px]
-                    font-medium
-                    uppercase
-                    tracking-[0.2em]
-                    text-zinc-400
-                  "
-                >
-                  Order
-                </p>
+                <div>
+                  <p
+                    className="
+                      text-[10px]
+                      font-medium
+                      uppercase
+                      tracking-[0.2em]
+                      text-zinc-400
+                    "
+                  >
+                    Order Details
+                  </p>
 
+                  <h1
+                    className="
+                      mt-1
+                      break-all
+                      text-2xl
+                      font-medium
+                      tracking-tight
+                      text-zinc-900
+                      sm:text-3xl
+                    "
+                  >
+                    {order?.orderNumber || "Order"}
+                  </h1>
+                </div>
               </div>
-
-              <h1
-                className="
-                  mt-5
-                  break-all
-                  text-3xl
-                  font-medium
-                  tracking-tight
-                  text-zinc-900
-                  sm:text-4xl
-                "
-              >
-                {order.orderNumber}
-              </h1>
 
               <div
                 className="
-                  mt-3
+                  mt-5
                   flex
                   flex-wrap
                   items-center
-                  gap-x-5
-                  gap-y-2
-                  text-sm
-                  text-zinc-500
+                  gap-2
                 "
               >
-                <span className="inline-flex items-center gap-2">
-                  <CalendarDays size={15} />
-                  {formatDateTime(order.createdAt)}
-                </span>
+                <StatusBadge status={order?.orderStatus} />
 
-                <span className="text-zinc-300">
-                  /
-                </span>
+                <PaymentStatusBadge status={order?.paymentStatus} />
 
-                <span>
-                  {serviceName}
+                <span
+                  className="
+                    inline-flex
+                    items-center
+                    rounded-full
+                    border border-zinc-200
+                    bg-zinc-50
+                    px-2.5
+                    py-1
+                    text-[10px]
+                    font-medium
+                    text-zinc-500
+                  "
+                >
+                  {formatPaymentMethod(order?.paymentMethod)}
                 </span>
               </div>
 
-            </div>
-
-            <div
-              className="
-                flex
-                flex-col
-                gap-3
-                sm:flex-row
-                sm:items-center
-              "
-            >
-              <StatusBadge
-                status={order.orderStatus}
-              />
-
-              <button
-                type="button"
-                onClick={() => loadOrder(true)}
-                disabled={refreshing}
+              <p
                 className="
-                  group/refresh
-                  inline-flex
-                  items-center
-                  justify-center
-                  gap-2
-                  rounded-xl
-                  border border-zinc-200
-                  bg-white
-                  px-4
-                  py-2.5
+                  mt-4
+                  max-w-2xl
                   text-sm
+                  leading-6
                   text-zinc-500
-                  shadow-sm
-                  transition-all
-                  duration-200
-                  hover:border-zinc-300
-                  hover:bg-zinc-50
-                  hover:text-zinc-900
-                  hover:shadow-md
-                  disabled:cursor-not-allowed
-                  disabled:opacity-50
                 "
               >
-                <RefreshCw
-                  size={15}
-                  className={`
-                    transition-transform
-                    duration-500
-                    ${
-                      refreshing
-                        ? "animate-spin"
-                        : "group-hover/refresh:rotate-180"
-                    }
-                  `}
-                />
-
-                Refresh
-              </button>
+                Review the client's submitted information, payment details and
+                order status.
+              </p>
             </div>
 
+            <button
+              type="button"
+              onClick={() => loadOrder(true)}
+              disabled={
+                refreshing ||
+                statusLoading ||
+                paymentLoading ||
+                notesLoading ||
+                codLoading
+              }
+              className="
+                group/refresh
+                inline-flex
+                items-center
+                justify-center
+                gap-2
+                self-start
+                rounded-xl
+                border border-zinc-200
+                bg-white
+                px-4
+                py-3
+                text-sm
+                text-zinc-500
+                shadow-sm
+                transition-all
+                duration-200
+                hover:border-zinc-300
+                hover:bg-zinc-50
+                hover:text-zinc-900
+                hover:shadow-md
+                disabled:cursor-not-allowed
+                disabled:opacity-50
+                lg:self-auto
+              "
+            >
+              <RefreshCw
+                size={16}
+                className={`
+                  transition-transform
+                  duration-500
+                  ${
+                    refreshing
+                      ? "animate-spin"
+                      : "group-hover/refresh:rotate-180"
+                  }
+                `}
+              />
+
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </button>
           </div>
 
-          {/* Summary Cards */}
+          {/* Summary */}
 
           <div
             className="
-              mt-8
+              mt-7
               grid
               gap-3
               sm:grid-cols-2
-              lg:grid-cols-4
+              xl:grid-cols-4
             "
           >
-
-            <SummaryCard
-              icon={User}
-              label="Client"
-              value={clientName}
-            />
+            <SummaryCard icon={User} label="Client" value={clientName} />
 
             <SummaryCard
               icon={Package}
               label="Service"
-              value={serviceName}
+              value={serviceSnapshot.name || order?.service?.name || "Service"}
             />
 
             <SummaryCard
               icon={CreditCard}
-              label="Payment"
-              value={formatStatus(
-                order.paymentMethod
-              )}
+              label="Order Amount"
+              value={formatCurrency(order?.amount)}
             />
 
             <SummaryCard
-              icon={CreditCard}
-              label="Amount"
-              value={`₹${Number(
-                order.amount || 0
-              ).toLocaleString("en-IN")}`}
+              icon={CalendarDays}
+              label="Placed"
+              value={formatDateTime(order?.createdAt)}
             />
-
           </div>
         </div>
-      </div>
+      </section>
 
       {/* =====================================================
-          MESSAGES
+          MAIN GRID
       ====================================================== */}
 
-      {message && (
-        <div
-          className="
-            mt-6
-            flex
-            items-start
-            gap-3
-            rounded-2xl
-            border border-emerald-200
-            bg-emerald-50
-            px-5
-            py-4
-            text-sm
-            text-emerald-700
-          "
-        >
-          <Check
-            size={18}
-            className="mt-0.5 shrink-0"
-          />
-
-          <span>{message}</span>
-        </div>
-      )}
-
-      {error && order && (
-        <div
-          className="
-            mt-6
-            flex
-            items-start
-            gap-3
-            rounded-2xl
-            border border-red-200
-            bg-red-50
-            px-5
-            py-4
-            text-sm
-            text-red-600
-          "
-        >
-          <XCircle
-            size={18}
-            className="mt-0.5 shrink-0"
-          />
-
-          <span>{error}</span>
-        </div>
-      )}
-
-      {/* =====================================================
-          MAIN CONTENT
-      ====================================================== */}
-
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
-
+      <div
+        className="
+          grid
+          gap-6
+          xl:grid-cols-[minmax(0,1.65fr)_minmax(330px,0.85fr)]
+        "
+      >
         {/* ===================================================
-            CLIENT INFORMATION
+            LEFT
         ==================================================== */}
 
-        <InfoCard
-          icon={User}
-          eyebrow="Client"
-          title="Client Information"
-        >
-          <InfoRow
-            label="Name"
-            value={clientName}
-          />
+        <div className="space-y-6">
+          {/* =================================================
+              CLIENT
+          ================================================== */}
 
-          <InfoRow
-            label="Email"
-            value={order.client?.email || "—"}
-          />
+          <InfoCard icon={User} eyebrow="Client" title="Client Information">
+            <div
+              className="
+                grid
+                gap-x-8
+                gap-y-5
+                sm:grid-cols-2
+              "
+            >
+              <DetailItem label="Name" value={clientName} />
 
-          <InfoRow
-            label="Username"
-            value={order.client?.username || "—"}
-          />
-        </InfoCard>
+              <DetailItem label="Email" value={order?.client?.email} />
 
-        {/* ===================================================
-            ORDER STATUS
-        ==================================================== */}
+              <DetailItem label="Username" value={order?.client?.username} />
 
-        <InfoCard
-          icon={Clipboard}
-          eyebrow="Workflow"
-          title="Order Status"
-        >
-          <div
-            className="
-              rounded-xl
-              border border-zinc-200
-              bg-zinc-50
-              p-4
-            "
+              <DetailItem label="Client ID" value={order?.client?._id} mono />
+            </div>
+          </InfoCard>
+
+          {/* =================================================
+              SERVICE
+          ================================================== */}
+
+          <InfoCard
+            icon={Package}
+            eyebrow="Service"
+            title="Order Configuration"
           >
             <div
               className="
-                flex
-                items-center
-                justify-between
-                gap-4
+                grid
+                gap-x-8
+                gap-y-5
+                sm:grid-cols-2
               "
             >
-              <div>
+              <DetailItem
+                label="Service"
+                value={serviceSnapshot.name || order?.service?.name}
+              />
 
+              <DetailItem
+                label="Category"
+                value={serviceSnapshot.category || order?.service?.category}
+              />
+
+              <DetailItem
+                label="Pricing Type"
+                value={formatStatus(serviceSnapshot.pricingType)}
+              />
+
+              <DetailItem label="Quantity" value={order?.quantity} />
+
+              <DetailItem label="Unit" value={serviceSnapshot.unit} />
+
+              <DetailItem
+                label="Base Price"
+                value={
+                  serviceSnapshot.basePrice !== undefined
+                    ? formatCurrency(serviceSnapshot.basePrice)
+                    : "—"
+                }
+              />
+            </div>
+
+            {serviceSnapshot.description && (
+              <div
+                className="
+                  mt-6
+                  border-t
+                  border-zinc-100
+                  pt-5
+                "
+              >
                 <p
                   className="
                     text-[10px]
@@ -909,355 +796,353 @@ const AdminOrderDetails = () => {
                     text-zinc-400
                   "
                 >
-                  Current Status
+                  Service Description
                 </p>
 
-                <p className="mt-1 text-sm text-zinc-700">
-                  {formatStatus(
-                    order.orderStatus
-                  )}
+                <p
+                  className="
+                    mt-2
+                    text-sm
+                    leading-6
+                    text-zinc-600
+                  "
+                >
+                  {serviceSnapshot.description}
                 </p>
-
               </div>
-
-              <StatusBadge
-                status={order.orderStatus}
-              />
-            </div>
-          </div>
-
-          <div className="mt-4">
-
-            <label
-              className="
-                mb-2
-                block
-                text-[10px]
-                font-medium
-                uppercase
-                tracking-[0.15em]
-                text-zinc-400
-              "
-            >
-              Update Status
-            </label>
-
-            <div className="relative">
-
-              <CustomSelect
-                value={
-                  order.orderStatus ||
-                  "pending"
-                }
-                onChange={handleStatusChange}
-                disabled={statusLoading}
-                options={[
-                  {
-                    value: "pending",
-                    label: "Pending",
-                  },
-                  {
-                    value: "processing",
-                    label: "Processing",
-                  },
-                  {
-                    value: "in_progress",
-                    label: "In Progress",
-                  },
-                  {
-                    value: "completed",
-                    label: "Completed",
-                  },
-                  {
-                    value: "cancelled",
-                    label: "Cancelled",
-                  },
-                ]}
-              />
-
-              {statusLoading && (
-                <Loader2
-                  size={16}
-                  className="
-                    pointer-events-none
-                    absolute
-                    right-4
-                    top-1/2
-                    z-20
-                    -translate-y-1/2
-                    animate-spin
-                    text-zinc-400
-                  "
-                />
-              )}
-
-            </div>
-          </div>
-
-          {isCancelled && (
-            <div
-              className="
-                mt-4
-                rounded-xl
-                border border-red-200
-                bg-red-50
-                px-4
-                py-3
-                text-xs
-                leading-5
-                text-red-600
-              "
-            >
-              This order has been cancelled.
-            </div>
-          )}
-
-          {isCompleted && (
-            <div
-              className="
-                mt-4
-                rounded-xl
-                border border-emerald-200
-                bg-emerald-50
-                px-4
-                py-3
-                text-xs
-                leading-5
-                text-emerald-700
-              "
-            >
-              This order has been completed.
-            </div>
-          )}
-
-          <div
-            className="
-              mt-5
-              border-t
-              border-zinc-100
-              pt-4
-            "
-          >
-            <InfoRow
-              label="Created"
-              value={formatDateTime(
-                order.createdAt
-              )}
-            />
-
-            <InfoRow
-              label="Last Updated"
-              value={formatDateTime(
-                order.updatedAt
-              )}
-            />
-          </div>
-        </InfoCard>
-
-        {/* ===================================================
-            PAYMENT INFORMATION
-        ==================================================== */}
-
-        <InfoCard
-          icon={CreditCard}
-          eyebrow="Payment"
-          title="Payment Information"
-        >
-          <InfoRow
-            label="Method"
-            value={formatStatus(
-              order.paymentMethod
             )}
-          />
 
-          <InfoRow
-            label="Current Payment Status"
-            value={
-              <PaymentStatusBadge
-                status={
-                  order.paymentStatus
-                }
-              />
-            }
-          />
-
-          <InfoRow
-            label="Amount"
-            value={`₹${Number(
-              order.amount || 0
-            ).toLocaleString("en-IN")}`}
-          />
-
-          {/* Payment Status */}
-
-          <div
-            className="
-              mt-5
-              border-t
-              border-zinc-100
-              pt-5
-            "
-          >
-            <label
-              className="
-                mb-2
-                block
-                text-[10px]
-                font-medium
-                uppercase
-                tracking-[0.15em]
-                text-zinc-400
-              "
-            >
-              Update Payment Status
-            </label>
-
-            <div className="relative">
-
-              <select
-                value={
-                  order.paymentStatus ||
-                  "pending"
-                }
-                onChange={(event) =>
-                  handlePaymentStatusChange(
-                    event.target.value
-                  )
-                }
-                disabled={
-                  paymentLoading ||
-                  order.paymentStatus ===
-                    "collected"
-                }
-                className="
-                  h-12
-                  w-full
-                  appearance-none
-                  rounded-xl
-                  border border-zinc-200
-                  bg-zinc-50
-                  px-4
-                  pr-10
-                  text-sm
-                  text-zinc-800
-                  outline-none
-                  transition
-                  duration-200
-                  hover:border-zinc-300
-                  hover:bg-white
-                  focus:border-zinc-400
-                  focus:bg-white
-                  focus:ring-2
-                  focus:ring-zinc-900/5
-                  disabled:cursor-not-allowed
-                  disabled:opacity-50
-                "
-              >
-                {paymentOptions.map(
-                  (status) => (
-                    <option
-                      key={status}
-                      value={status}
-                    >
-                      {formatStatus(
-                        status
-                      )}
-                    </option>
-                  )
-                )}
-              </select>
-
-              {paymentLoading && (
-                <Loader2
-                  size={16}
-                  className="
-                    pointer-events-none
-                    absolute
-                    right-4
-                    top-1/2
-                    -translate-y-1/2
-                    animate-spin
-                    text-zinc-400
-                  "
-                />
-              )}
-
-            </div>
-
-            {isCod && (
-              <p
-                className="
-                  mt-3
-                  text-xs
-                  leading-5
-                  text-zinc-400
-                "
-              >
-                COD payment is marked as
-                collected only after successful
-                PIN verification.
-              </p>
-            )}
-          </div>
-
-          {order.razorpayOrderId && (
-            <InfoRow
-              label="Razorpay Order ID"
-              value={
-                order.razorpayOrderId
-              }
-            />
-          )}
-
-          {order.razorpayPaymentId && (
-            <InfoRow
-              label="Razorpay Payment ID"
-              value={
-                order.razorpayPaymentId
-              }
-            />
-          )}
-
-          {order.razorpaySignature && (
-            <InfoRow
-              label="Razorpay Signature"
-              value={
-                order.razorpaySignature
-              }
-            />
-          )}
-        </InfoCard>
-
-        {/* ===================================================
-            COD MANAGEMENT
-        ==================================================== */}
-
-        {isCod && (
-          <InfoCard
-            icon={KeyRound}
-            eyebrow="Cash on Delivery"
-            title="COD Payment"
-          >
-            <div
-              className="
-                rounded-xl
-                border border-zinc-200
-                bg-zinc-50
-                p-4
-              "
-            >
+            {serviceSnapshot.selectedOption && (
               <div
                 className="
-                  flex
-                  items-start
-                  justify-between
-                  gap-4
+                  mt-6
+                  rounded-2xl
+                  border
+                  border-zinc-200
+                  bg-zinc-50
+                  p-5
                 "
               >
-                <div>
+                <div
+                  className="
+                    flex
+                    items-start
+                    justify-between
+                    gap-4
+                  "
+                >
+                  <div>
+                    <p
+                      className="
+                        text-[10px]
+                        font-medium
+                        uppercase
+                        tracking-[0.15em]
+                        text-zinc-400
+                      "
+                    >
+                      Selected Service Option
+                    </p>
+
+                    <p
+                      className="
+                        mt-1
+                        text-sm
+                        font-medium
+                        text-zinc-900
+                      "
+                    >
+                      {serviceSnapshot.selectedOption.name}
+                    </p>
+                  </div>
 
                   <p
                     className="
+                      shrink-0
+                      text-sm
+                      font-semibold
+                      text-zinc-900
+                    "
+                  >
+                    {formatCurrency(serviceSnapshot.selectedOption.price)}
+                  </p>
+                </div>
+
+                {serviceSnapshot.selectedOption.description && (
+                  <p
+                    className="
+                      mt-3
+                      text-xs
+                      leading-5
+                      text-zinc-500
+                    "
+                  >
+                    {serviceSnapshot.selectedOption.description}
+                  </p>
+                )}
+              </div>
+            )}
+          </InfoCard>
+
+          {/* =================================================
+              CLIENT SUBMISSION
+          ================================================== */}
+
+          <InfoCard
+            icon={Clipboard}
+            eyebrow="Client Submission"
+            title="Submitted Information"
+          >
+            <p
+              className="
+                mb-6
+                text-xs
+                leading-5
+                text-zinc-400
+              "
+            >
+              This is the information submitted by the client when placing the
+              order.
+            </p>
+
+            {formDataEntries.length > 0 ? (
+              <div
+                className="
+                  divide-y
+                  divide-zinc-100
+                  rounded-2xl
+                  border
+                  border-zinc-200
+                  bg-zinc-50
+                "
+              >
+                {formDataEntries.map(([key, value]) => (
+                  <SubmittedField key={key} name={key} value={value} />
+                ))}
+              </div>
+            ) : (
+              <EmptySubmittedData />
+            )}
+          </InfoCard>
+
+          {/* =================================================
+              ADDITIONAL REQUIREMENTS
+          ================================================== */}
+
+          {hasAdditionalRequirements && (
+            <InfoCard
+              icon={FileText}
+              eyebrow="Client Submission"
+              title="Additional Requirements"
+            >
+              <div
+                className="
+                  rounded-2xl
+                  border
+                  border-zinc-200
+                  bg-zinc-50
+                  p-5
+                "
+              >
+                <p
+                  className="
+                    whitespace-pre-wrap
+                    break-words
+                    text-sm
+                    leading-7
+                    text-zinc-600
+                  "
+                >
+                  {order.additionalRequirements}
+                </p>
+              </div>
+            </InfoCard>
+          )}
+        </div>
+
+        {/* ===================================================
+            RIGHT
+        ==================================================== */}
+
+        <aside className="space-y-6">
+          {/* =================================================
+              ORDER STATUS
+          ================================================== */}
+
+          <InfoCard icon={Package} eyebrow="Management" title="Order Status">
+            <p
+              className="
+                mb-4
+                text-xs
+                leading-5
+                text-zinc-400
+              "
+            >
+              Update the current processing status of this order.
+            </p>
+
+            <CustomSelect
+              value={order?.orderStatus || "pending"}
+              onChange={handleStatusChange}
+              options={[
+                {
+                  value: "pending",
+                  label: "Pending",
+                },
+                {
+                  value: "processing",
+                  label: "Processing",
+                },
+                {
+                  value: "in_progress",
+                  label: "In Progress",
+                },
+                {
+                  value: "completed",
+                  label: "Completed",
+                },
+                {
+                  value: "cancelled",
+                  label: "Cancelled",
+                },
+              ]}
+            />
+
+            {statusLoading && (
+              <LoadingMessage text="Updating order status..." />
+            )}
+          </InfoCard>
+
+          {/* =================================================
+              PAYMENT
+          ================================================== */}
+
+          <InfoCard icon={CreditCard} eyebrow="Payment" title="Payment Status">
+            <div
+              className="
+                mb-5
+                grid
+                grid-cols-2
+                gap-3
+              "
+            >
+              <SummaryCard
+                icon={CreditCard}
+                label="Method"
+                value={formatPaymentMethod(order?.paymentMethod)}
+              />
+
+              <SummaryCard
+                icon={CreditCard}
+                label="Amount"
+                value={formatCurrency(order?.amount)}
+              />
+            </div>
+
+            <p
+              className="
+                mb-4
+                text-xs
+                leading-5
+                text-zinc-400
+              "
+            >
+              Online payment statuses can be updated here. COD collection is
+              completed through PIN verification.
+            </p>
+
+            <CustomSelect
+              value={order?.paymentStatus || "pending"}
+              onChange={handlePaymentStatusChange}
+              options={[
+                {
+                  value: "pending",
+                  label: "Pending",
+                },
+                {
+                  value: "processing",
+                  label: "Processing",
+                },
+                {
+                  value: "paid",
+                  label: "Paid",
+                },
+                {
+                  value: "failed",
+                  label: "Failed",
+                },
+                {
+                  value: "collected",
+                  label: "Collected",
+                },
+              ]}
+            />
+
+            {paymentLoading && (
+              <LoadingMessage text="Updating payment status..." />
+            )}
+          </InfoCard>
+
+          {/* =================================================
+              COD
+          ================================================== */}
+
+          {order?.paymentMethod === "cod" && (
+            <InfoCard
+              icon={KeyRound}
+              eyebrow="Cash on Delivery"
+              title="COD Payment"
+            >
+              <div
+                className="
+                  rounded-xl
+                  border
+                  border-zinc-200
+                  bg-zinc-50
+                  p-4
+                "
+              >
+                <div
+                  className="
+                    flex
+                    items-start
+                    justify-between
+                    gap-4
+                  "
+                >
+                  <div>
+                    <p
+                      className="
+                        text-[10px]
+                        font-medium
+                        uppercase
+                        tracking-[0.15em]
+                        text-zinc-400
+                      "
+                    >
+                      PIN Status
+                    </p>
+
+                    <p
+                      className="
+                        mt-1
+                        text-sm
+                        text-zinc-700
+                      "
+                    >
+                      {formatCodPinStatus(order?.codPinStatus)}
+                    </p>
+                  </div>
+
+                  <CodPinStatusBadge status={order?.codPinStatus} />
+                </div>
+              </div>
+
+              {hasCodPin ? (
+                <div className="mt-5">
+                  <p
+                    className="
+                      mb-2
                       text-[10px]
                       font-medium
                       uppercase
@@ -1265,403 +1150,325 @@ const AdminOrderDetails = () => {
                       text-zinc-400
                     "
                   >
-                    PIN Status
+                    COD PIN
                   </p>
 
-                  <p className="mt-1 text-sm text-zinc-700">
-                    {formatCodPinStatus(
-                      order.codPinStatus
-                    )}
-                  </p>
-
-                </div>
-
-                <CodPinStatusBadge
-                  status={
-                    order.codPinStatus
-                  }
-                />
-              </div>
-            </div>
-
-            {hasCodPin ? (
-              <div className="mt-5">
-
-                <p
-                  className="
-                    mb-2
-                    text-[10px]
-                    font-medium
-                    uppercase
-                    tracking-[0.15em]
-                    text-zinc-400
-                  "
-                >
-                  COD PIN
-                </p>
-
-                <div className="flex gap-2">
-
-                  <div
-                    className="
-                      flex
-                      min-w-0
-                      flex-1
-                      items-center
-                      rounded-xl
-                      border border-zinc-200
-                      bg-zinc-50
-                      px-5
-                      py-3.5
-                    "
-                  >
-                    <span
+                  <div className="flex gap-2">
+                    <div
                       className="
-                        font-mono
-                        text-xl
-                        tracking-[0.3em]
-                        text-zinc-900
+                        flex
+                        min-w-0
+                        flex-1
+                        items-center
+                        rounded-xl
+                        border
+                        border-zinc-200
+                        bg-zinc-50
+                        px-5
+                        py-3.5
                       "
                     >
-                      {order.codPin}
-                    </span>
+                      <span
+                        className="
+                          font-mono
+                          text-xl
+                          tracking-[0.3em]
+                          text-zinc-900
+                        "
+                      >
+                        {order.codPin}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={copyPin}
+                      className="
+                        flex
+                        h-[52px]
+                        w-[52px]
+                        shrink-0
+                        items-center
+                        justify-center
+                        rounded-xl
+                        border
+                        border-zinc-200
+                        bg-white
+                        text-zinc-400
+                        shadow-sm
+                        transition-all
+                        duration-200
+                        hover:border-zinc-300
+                        hover:bg-zinc-50
+                        hover:text-zinc-900
+                        hover:shadow-md
+                      "
+                      title="Copy PIN"
+                    >
+                      {copied ? <Check size={18} /> : <Clipboard size={18} />}
+                    </button>
                   </div>
 
+                  <p
+                    className="
+                      mt-3
+                      text-xs
+                      leading-5
+                      text-zinc-400
+                    "
+                  >
+                    Share this PIN with the payment collector. The client uses
+                    the PIN to complete COD verification.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-5">
                   <button
                     type="button"
-                    onClick={copyPin}
+                    onClick={handleGenerateCodPin}
+                    disabled={
+                      codLoading || order?.paymentStatus === "collected"
+                    }
                     className="
-                      flex
-                      h-[52px]
-                      w-[52px]
-                      shrink-0
+                      group
+                      inline-flex
+                      w-full
                       items-center
                       justify-center
+                      gap-2
                       rounded-xl
-                      border border-zinc-200
-                      bg-white
-                      text-zinc-400
+                      bg-zinc-900
+                      px-4
+                      py-3
+                      text-sm
+                      font-medium
+                      text-white
                       shadow-sm
                       transition-all
                       duration-200
-                      hover:border-zinc-300
-                      hover:bg-zinc-50
-                      hover:text-zinc-900
+                      hover:bg-zinc-800
                       hover:shadow-md
+                      disabled:cursor-not-allowed
+                      disabled:opacity-50
                     "
-                    title="Copy PIN"
                   >
-                    {copied ? (
-                      <Check size={18} />
+                    {codLoading ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Generating PIN...
+                      </>
                     ) : (
-                      <Clipboard size={18} />
+                      <>
+                        <KeyRound size={16} />
+                        Generate COD PIN
+                      </>
                     )}
                   </button>
 
+                  <p
+                    className="
+                      mt-3
+                      text-xs
+                      leading-5
+                      text-zinc-400
+                    "
+                  >
+                    Generate a PIN when the COD payment needs to be verified.
+                  </p>
                 </div>
+              )}
 
-                <p
+              {order?.paymentStatus === "collected" && (
+                <div
                   className="
-                    mt-3
-                    text-xs
-                    leading-5
-                    text-zinc-400
-                  "
-                >
-                  Share this PIN with the
-                  payment collector. The client
-                  will enter the PIN from their
-                  order page.
-                </p>
-              </div>
-            ) : (
-              <div className="mt-5">
-
-                <button
-                  type="button"
-                  onClick={handleGenerateCodPin}
-                  disabled={codLoading}
-                  className="
-                    group
-                    inline-flex
-                    w-full
+                    mt-4
+                    flex
                     items-center
-                    justify-center
                     gap-2
                     rounded-xl
-                    bg-zinc-900
-                    px-5
+                    border
+                    border-emerald-200
+                    bg-emerald-50
+                    px-4
                     py-3
                     text-sm
-                    font-medium
-                    text-white
-                    shadow-sm
-                    transition-all
-                    duration-200
-                    hover:bg-zinc-800
-                    hover:shadow-md
-                    disabled:cursor-not-allowed
-                    disabled:opacity-50
+                    text-emerald-700
                   "
                 >
-                  {codLoading ? (
-                    <>
-                      <Loader2
-                        size={17}
-                        className="animate-spin"
-                      />
+                  <Check size={16} />
+                  COD payment has been collected.
+                </div>
+              )}
+            </InfoCard>
+          )}
 
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <KeyRound
-                        size={17}
-                      />
+          {/* =================================================
+              ADMIN NOTES
+          ================================================== */}
 
-                      Generate COD PIN
-                    </>
-                  )}
-                </button>
-
-              </div>
-            )}
-
-            {order.codPinVerifiedAt && (
-              <div
-                className="
-                  mt-5
-                  border-t
-                  border-zinc-100
-                  pt-4
-                "
-              >
-                <InfoRow
-                  label="PIN Verified"
-                  value={formatDateTime(
-                    order.codPinVerifiedAt
-                  )}
-                />
-              </div>
-            )}
-
-            {order.codCollectedAt && (
-              <div
-                className="
-                  border-t
-                  border-zinc-100
-                "
-              >
-                <InfoRow
-                  label="Payment Collected"
-                  value={formatDateTime(
-                    order.codCollectedAt
-                  )}
-                />
-              </div>
-            )}
-
-            {order.paymentStatus ===
-              "collected" && (
-              <div
-                className="
-                  mt-4
-                  flex
-                  items-center
-                  gap-2
-                  rounded-xl
-                  border border-emerald-200
-                  bg-emerald-50
-                  px-4
-                  py-3
-                  text-sm
-                  text-emerald-700
-                "
-              >
-                <Check size={16} />
-
-                COD payment has been collected.
-              </div>
-            )}
-          </InfoCard>
-        )}
-
-        {/* ===================================================
-            ADMIN NOTES
-        ==================================================== */}
-
-        <InfoCard
-          icon={FileText}
-          eyebrow="Internal"
-          title="Admin Notes"
-        >
-          <p
-            className="
-              mb-4
-              text-xs
-              leading-5
-              text-zinc-400
-            "
-          >
-            These notes are for internal admin
-            use and are not visible to the client.
-          </p>
-
-          <textarea
-            value={adminNotes}
-            onChange={(event) =>
-              setAdminNotes(
-                event.target.value
-              )
-            }
-            rows={7}
-            placeholder="Add internal notes about this order..."
-            className="
-              w-full
-              resize-y
-              rounded-xl
-              border border-zinc-200
-              bg-zinc-50
-              px-4
-              py-3
-              text-sm
-              leading-6
-              text-zinc-900
-              outline-none
-              placeholder:text-zinc-400
-              transition
-              duration-200
-              hover:border-zinc-300
-              hover:bg-white
-              focus:border-zinc-400
-              focus:bg-white
-              focus:ring-2
-              focus:ring-zinc-900/5
-            "
-          />
-
-          <div
-            className="
-              mt-4
-              flex
-              flex-col
-              gap-3
-              sm:flex-row
-              sm:items-center
-              sm:justify-between
-            "
-          >
-            <p className="text-xs text-zinc-400">
-              {adminNotes.length} characters
-            </p>
-
-            <button
-              type="button"
-              onClick={handleSaveNotes}
-              disabled={
-                notesLoading ||
-                !notesChanged
-              }
+          <InfoCard icon={FileText} eyebrow="Internal" title="Admin Notes">
+            <p
               className="
-                group
-                inline-flex
-                items-center
-                justify-center
-                gap-2
-                rounded-xl
-                bg-zinc-900
-                px-5
-                py-3
-                text-sm
-                font-medium
-                text-white
-                shadow-sm
-                transition-all
-                duration-200
-                hover:bg-zinc-800
-                hover:shadow-md
-                disabled:cursor-not-allowed
-                disabled:opacity-40
+                mb-4
+                text-xs
+                leading-5
+                text-zinc-400
               "
             >
-              {notesLoading ? (
-                <>
-                  <Loader2
-                    size={16}
-                    className="animate-spin"
-                  />
+              These notes are for internal admin use and are not visible to the
+              client.
+            </p>
 
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save size={16} />
-
-                  Save Notes
-                </>
-              )}
-            </button>
-          </div>
-        </InfoCard>
-      </div>
-
-      {/* =====================================================
-          PROJECT REQUIREMENTS
-      ====================================================== */}
-
-      <div
-        className="
-          group
-          relative
-          mt-6
-          overflow-hidden
-          rounded-[24px]
-          border border-zinc-200
-          bg-white
-          p-6
-          shadow-[0_15px_55px_rgba(0,0,0,0.05)]
-          transition
-          duration-300
-          hover:border-zinc-300
-          hover:shadow-[0_20px_65px_rgba(0,0,0,0.07)]
-          sm:p-8
-        "
-      >
-        <div
-          className="
-            pointer-events-none
-            absolute
-            -right-20
-            -top-20
-            h-48
-            w-48
-            rounded-full
-            bg-cyan-300/[0.03]
-            blur-3xl
-          "
-        />
-
-        <div className="relative">
-
-          <div className="flex items-center gap-3">
+            <textarea
+              value={adminNotes}
+              onChange={(event) => setAdminNotes(event.target.value)}
+              rows={7}
+              placeholder="Add internal notes about this order..."
+              className="
+                w-full
+                resize-y
+                rounded-xl
+                border
+                border-zinc-200
+                bg-zinc-50
+                px-4
+                py-3
+                text-sm
+                leading-6
+                text-zinc-900
+                outline-none
+                placeholder:text-zinc-400
+                transition
+                duration-200
+                hover:border-zinc-300
+                hover:bg-white
+                focus:border-zinc-400
+                focus:bg-white
+                focus:ring-2
+                focus:ring-zinc-900/5
+              "
+            />
 
             <div
               className="
+                mt-4
+                flex
+                flex-col
+                gap-3
+                sm:flex-row
+                sm:items-center
+                sm:justify-between
+              "
+            >
+              <p className="text-xs text-zinc-400">
+                {adminNotes.length} characters
+              </p>
+
+              <button
+                type="button"
+                onClick={handleSaveNotes}
+                disabled={notesLoading}
+                className="
+                  inline-flex
+                  items-center
+                  justify-center
+                  gap-2
+                  rounded-xl
+                  bg-zinc-900
+                  px-4
+                  py-2.5
+                  text-sm
+                  font-medium
+                  text-white
+                  shadow-sm
+                  transition-all
+                  duration-200
+                  hover:bg-zinc-800
+                  hover:shadow-md
+                  disabled:cursor-not-allowed
+                  disabled:opacity-50
+                "
+              >
+                {notesLoading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save size={16} />
+                    Save Notes
+                  </>
+                )}
+              </button>
+            </div>
+          </InfoCard>
+
+          {/* =================================================
+              ORDER TIMELINE / META
+          ================================================== */}
+
+          <InfoCard
+            icon={CalendarDays}
+            eyebrow="Metadata"
+            title="Order Information"
+          >
+            <div className="space-y-5">
+              <DetailItem
+                label="Order Number"
+                value={order?.orderNumber}
+                mono
+              />
+
+              <DetailItem label="Order ID" value={order?._id} mono />
+
+              <DetailItem
+                label="Created"
+                value={formatDateTime(order?.createdAt)}
+              />
+
+              <DetailItem
+                label="Last Updated"
+                value={formatDateTime(order?.updatedAt)}
+              />
+            </div>
+          </InfoCard>
+        </aside>
+      </div>
+
+      {/* =====================================================
+          SAVED NOTES
+      ====================================================== */}
+
+      {order?.notes?.trim() && (
+        <section
+          className="
+            mt-6
+            rounded-[24px]
+            border
+            border-zinc-200
+            bg-white
+            p-6
+            shadow-[0_12px_45px_rgba(0,0,0,0.04)]
+            sm:p-7
+          "
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="
                 flex h-10 w-10
+                shrink-0
                 items-center justify-center
                 rounded-xl
-                border border-zinc-200
+                border
+                border-zinc-200
                 bg-zinc-50
               "
             >
-              <FileText
-                size={18}
-                className="text-zinc-500"
-              />
+              <FileText size={18} className="text-zinc-500" />
             </div>
 
             <div>
-
               <p
                 className="
                   text-[10px]
@@ -1671,139 +1478,36 @@ const AdminOrderDetails = () => {
                   text-zinc-400
                 "
               >
-                Requirements
+                Internal
               </p>
 
-              <h2 className="mt-1 text-lg font-medium text-zinc-900">
-                Project Details
-              </h2>
-
-            </div>
-          </div>
-
-          {Object.keys(formData).length ===
-          0 ? (
-            <div
-              className="
-                mt-6
-                rounded-xl
-                border border-zinc-200
-                bg-zinc-50
-                p-5
-                text-sm
-                text-zinc-400
-              "
-            >
-              No project requirements were
-              provided.
-            </div>
-          ) : (
-            <div
-              className="
-                mt-7
-                grid
-                gap-4
-                sm:grid-cols-2
-              "
-            >
-              {Object.entries(
-                formData
-              ).map(
-                ([key, value]) => (
-                  <DetailField
-                    key={key}
-                    label={formatLabel(key)}
-                    value={formatValue(
-                      value
-                    )}
-                  />
-                )
-              )}
-            </div>
-          )}
-
-        </div>
-      </div>
-
-      {/* =====================================================
-          SAVED NOTES
-      ====================================================== */}
-
-      {order.notes && (
-        <div
-          className="
-            group
-            relative
-            mt-6
-            overflow-hidden
-            rounded-[24px]
-            border border-zinc-200
-            bg-white
-            p-6
-            shadow-[0_15px_55px_rgba(0,0,0,0.05)]
-            transition
-            duration-300
-            hover:border-zinc-300
-            sm:p-8
-          "
-        >
-          <div className="relative">
-
-            <div className="flex items-center gap-3">
-
-              <div
+              <h2
                 className="
-                  flex h-10 w-10
-                  items-center justify-center
-                  rounded-xl
-                  border border-zinc-200
-                  bg-zinc-50
+                  mt-1
+                  text-lg
+                  font-medium
+                  text-zinc-900
                 "
               >
-                <FileText
-                  size={18}
-                  className="text-zinc-500"
-                />
-              </div>
-
-              <div>
-
-                <p
-                  className="
-                    text-[10px]
-                    font-medium
-                    uppercase
-                    tracking-[0.2em]
-                    text-zinc-400
-                  "
-                >
-                  Internal
-                </p>
-
-                <h2 className="mt-1 text-lg font-medium text-zinc-900">
-                  Saved Notes
-                </h2>
-
-              </div>
+                Saved Notes
+              </h2>
             </div>
-
-            <p
-              className="
-                mt-6
-                whitespace-pre-wrap
-                break-words
-                text-sm
-                leading-7
-                text-zinc-600
-              "
-            >
-              {order.notes}
-            </p>
-
           </div>
-        </div>
-      )}
 
+          <p
+            className="
+              mt-6
+              whitespace-pre-wrap
+              break-words
+              text-sm
+              leading-7
+              text-zinc-600
+            "
+          >
+            {order.notes}
+          </p>
+        </section>
+      )}
     </div>
   );
 };
@@ -1812,17 +1516,14 @@ const AdminOrderDetails = () => {
    SUMMARY CARD
 ========================================================= */
 
-const SummaryCard = ({
-  icon: Icon,
-  label,
-  value,
-}) => {
+const SummaryCard = ({ icon: Icon, label, value }) => {
   return (
     <div
       className="
         group/card
         rounded-2xl
-        border border-zinc-200
+        border
+        border-zinc-200
         bg-zinc-50
         p-4
         transition-all
@@ -1834,14 +1535,14 @@ const SummaryCard = ({
       "
     >
       <div className="flex items-center gap-3">
-
         <div
           className="
             flex h-9 w-9
             shrink-0
             items-center justify-center
             rounded-xl
-            border border-zinc-200
+            border
+            border-zinc-200
             bg-white
             text-zinc-400
             shadow-sm
@@ -1851,14 +1552,10 @@ const SummaryCard = ({
             group-hover/card:text-zinc-700
           "
         >
-          <Icon
-            size={17}
-            strokeWidth={1.6}
-          />
+          <Icon size={17} strokeWidth={1.6} />
         </div>
 
         <div className="min-w-0">
-
           <p
             className="
               text-[10px]
@@ -1880,9 +1577,8 @@ const SummaryCard = ({
               text-zinc-800
             "
           >
-            {value}
+            {value || "—"}
           </p>
-
         </div>
       </div>
     </div>
@@ -1893,20 +1589,16 @@ const SummaryCard = ({
    INFO CARD
 ========================================================= */
 
-const InfoCard = ({
-  icon: Icon,
-  eyebrow,
-  title,
-  children,
-}) => {
+const InfoCard = ({ icon: Icon, eyebrow, title, children }) => {
   return (
-    <div
+    <section
       className="
         group
         relative
         overflow-hidden
         rounded-[24px]
-        border border-zinc-200
+        border
+        border-zinc-200
         bg-white
         p-6
         shadow-[0_12px_45px_rgba(0,0,0,0.04)]
@@ -1936,16 +1628,15 @@ const InfoCard = ({
       />
 
       <div className="relative">
-
         <div className="flex items-center gap-3">
-
           <div
             className="
               flex h-10 w-10
               shrink-0
               items-center justify-center
               rounded-xl
-              border border-zinc-200
+              border
+              border-zinc-200
               bg-zinc-50
               transition
               duration-300
@@ -1967,7 +1658,6 @@ const InfoCard = ({
           </div>
 
           <div>
-
             <p
               className="
                 text-[10px]
@@ -1980,88 +1670,32 @@ const InfoCard = ({
               {eyebrow}
             </p>
 
-            <h2 className="mt-1 text-lg font-medium text-zinc-900">
+            <h2
+              className="
+                mt-1
+                text-lg
+                font-medium
+                text-zinc-900
+              "
+            >
               {title}
             </h2>
-
           </div>
         </div>
 
-        <div className="relative mt-6">
-          {children}
-        </div>
-
+        <div className="relative mt-6">{children}</div>
       </div>
-    </div>
+    </section>
   );
 };
 
 /* =========================================================
-   INFO ROW
+   DETAIL ITEM
 ========================================================= */
 
-const InfoRow = ({
-  label,
-  value,
-}) => {
+const DetailItem = ({ label, value, mono = false }) => {
   return (
-    <div
-      className="
-        flex
-        flex-col
-        gap-1.5
-        border-b
-        border-zinc-100
-        py-3.5
-        last:border-b-0
-        sm:flex-row
-        sm:items-center
-        sm:justify-between
-        sm:gap-5
-      "
-    >
-      <span className="text-sm text-zinc-500">
-        {label}
-      </span>
-
-      <span
-        className="
-          break-all
-          text-left
-          text-sm
-          text-zinc-700
-          sm:text-right
-        "
-      >
-        {value}
-      </span>
-    </div>
-  );
-};
-
-/* =========================================================
-   DETAIL FIELD
-========================================================= */
-
-const DetailField = ({
-  label,
-  value,
-}) => {
-  return (
-    <div
-      className="
-        group/field
-        rounded-xl
-        border border-zinc-200
-        bg-zinc-50
-        p-4
-        transition
-        duration-200
-        hover:border-zinc-300
-        hover:bg-white
-        hover:shadow-sm
-      "
-    >
+    <div className="min-w-0">
       <p
         className="
           text-[10px]
@@ -2074,66 +1708,220 @@ const DetailField = ({
         {label}
       </p>
 
+      <p
+        className={`
+          mt-1.5
+          break-words
+          text-sm
+          text-zinc-700
+          ${mono ? "font-mono text-xs" : ""}
+        `}
+      >
+        {value === undefined || value === null || value === "" ? "—" : value}
+      </p>
+    </div>
+  );
+};
+
+/* =========================================================
+   SUBMITTED FIELD
+========================================================= */
+
+const SubmittedField = ({ name, value }) => {
+  return (
+    <div className="p-5 first:pt-5 last:pb-5">
+      <p
+        className="
+          text-[10px]
+          font-medium
+          uppercase
+          tracking-[0.15em]
+          text-zinc-400
+        "
+      >
+        {formatLabel(name)}
+      </p>
+
       <div
         className="
           mt-2
-          break-words
-          text-sm
-          leading-6
-          text-zinc-600
+          rounded-xl
+          border
+          border-zinc-200
+          bg-white
+          px-4
+          py-3
         "
       >
-        {value || "—"}
+        <FormattedValue value={value} />
       </div>
     </div>
   );
 };
 
 /* =========================================================
-   ORDER STATUS BADGE
+   FORMATTED VALUE
 ========================================================= */
 
-const StatusBadge = ({
-  status,
-}) => {
+const FormattedValue = ({ value }) => {
+  if (value === null || value === undefined || value === "") {
+    return <span className="text-sm text-zinc-400">—</span>;
+  }
+
+  if (Array.isArray(value)) {
+    return (
+      <div className="space-y-1.5">
+        {value.map((item, index) => (
+          <p
+            key={index}
+            className="
+                break-words
+                text-sm
+                leading-6
+                text-zinc-700
+              "
+          >
+            {formatValue(item)}
+          </p>
+        ))}
+      </div>
+    );
+  }
+
+  if (typeof value === "object") {
+    return (
+      <pre
+        className="
+          overflow-x-auto
+          whitespace-pre-wrap
+          break-words
+          text-xs
+          leading-6
+          text-zinc-600
+        "
+      >
+        {JSON.stringify(value, null, 2)}
+      </pre>
+    );
+  }
+
+  const stringValue = String(value);
+
+  const looksLikeUrl = /^https?:\/\//i.test(stringValue);
+
+  if (looksLikeUrl) {
+    return (
+      <a
+        href={stringValue}
+        target="_blank"
+        rel="noreferrer"
+        className="
+          break-all
+          text-sm
+          text-blue-600
+          underline
+          underline-offset-4
+          hover:text-blue-800
+        "
+      >
+        {stringValue}
+      </a>
+    );
+  }
+
+  return (
+    <p
+      className="
+        whitespace-pre-wrap
+        break-words
+        text-sm
+        leading-6
+        text-zinc-700
+      "
+    >
+      {stringValue}
+    </p>
+  );
+};
+
+/* =========================================================
+   EMPTY SUBMITTED DATA
+========================================================= */
+
+const EmptySubmittedData = () => {
+  return (
+    <div
+      className="
+        rounded-2xl
+        border
+        border-dashed
+        border-zinc-200
+        bg-zinc-50
+        px-5
+        py-10
+        text-center
+      "
+    >
+      <div
+        className="
+          mx-auto
+          flex h-12 w-12
+          items-center
+          justify-center
+          rounded-2xl
+          border
+          border-zinc-200
+          bg-white
+        "
+      >
+        <Clipboard size={19} className="text-zinc-400" />
+      </div>
+
+      <p
+        className="
+          mt-4
+          text-sm
+          font-medium
+          text-zinc-700
+        "
+      >
+        No additional information
+      </p>
+
+      <p
+        className="
+          mt-1
+          text-xs
+          leading-5
+          text-zinc-400
+        "
+      >
+        This service did not require any additional client-submitted fields.
+      </p>
+    </div>
+  );
+};
+
+/* =========================================================
+   STATUS BADGE
+========================================================= */
+
+const StatusBadge = ({ status }) => {
   const config = {
-    pending: {
-      label: "Pending",
-      className:
-        "border-amber-200 bg-amber-50 text-amber-700",
-    },
+    pending: "border-amber-200 bg-amber-50 text-amber-700",
 
-    processing: {
-      label: "Processing",
-      className:
-        "border-blue-200 bg-blue-50 text-blue-700",
-    },
+    processing: "border-blue-200 bg-blue-50 text-blue-700",
 
-    in_progress: {
-      label: "In Progress",
-      className:
-        "border-purple-200 bg-purple-50 text-purple-700",
-    },
+    in_progress: "border-purple-200 bg-purple-50 text-purple-700",
 
-    completed: {
-      label: "Completed",
-      className:
-        "border-emerald-200 bg-emerald-50 text-emerald-700",
-    },
+    completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
 
-    cancelled: {
-      label: "Cancelled",
-      className:
-        "border-red-200 bg-red-50 text-red-700",
-    },
+    delivered: "border-emerald-200 bg-emerald-50 text-emerald-700",
+
+    cancelled: "border-red-200 bg-red-50 text-red-700",
+
+    rejected: "border-red-200 bg-red-50 text-red-700",
   };
-
-  const current =
-    config[status] || {
-      label: formatStatus(status),
-      className:
-        "border-zinc-200 bg-zinc-50 text-zinc-500",
-    };
 
   return (
     <span
@@ -2142,14 +1930,14 @@ const StatusBadge = ({
         whitespace-nowrap
         rounded-full
         border
-        px-3
-        py-1.5
-        text-[11px]
+        px-2.5
+        py-1
+        text-[10px]
         font-medium
-        ${current.className}
+        ${config[status] || "border-zinc-200 bg-zinc-50 text-zinc-500"}
       `}
     >
-      {current.label}
+      {formatStatus(status)}
     </span>
   );
 };
@@ -2158,62 +1946,34 @@ const StatusBadge = ({
    PAYMENT STATUS BADGE
 ========================================================= */
 
-const PaymentStatusBadge = ({
-  status,
-}) => {
+const PaymentStatusBadge = ({ status }) => {
   const config = {
-    paid: {
-      label: "Paid",
-      className:
-        "border-emerald-200 bg-emerald-50 text-emerald-700",
-    },
+    pending: "border-amber-200 bg-amber-50 text-amber-700",
 
-    collected: {
-      label: "Collected",
-      className:
-        "border-emerald-200 bg-emerald-50 text-emerald-700",
-    },
+    processing: "border-blue-200 bg-blue-50 text-blue-700",
 
-    processing: {
-      label: "Processing",
-      className:
-        "border-blue-200 bg-blue-50 text-blue-700",
-    },
+    paid: "border-emerald-200 bg-emerald-50 text-emerald-700",
 
-    failed: {
-      label: "Failed",
-      className:
-        "border-red-200 bg-red-50 text-red-700",
-    },
+    collected: "border-emerald-200 bg-emerald-50 text-emerald-700",
 
-    pending: {
-      label: "Pending",
-      className:
-        "border-amber-200 bg-amber-50 text-amber-700",
-    },
+    failed: "border-red-200 bg-red-50 text-red-700",
   };
-
-  const current =
-    config[status] || {
-      label: formatStatus(status),
-      className:
-        "border-zinc-200 bg-zinc-50 text-zinc-500",
-    };
 
   return (
     <span
       className={`
         inline-flex
+        whitespace-nowrap
         rounded-full
         border
         px-2.5
         py-1
-        text-[11px]
+        text-[10px]
         font-medium
-        ${current.className}
+        ${config[status] || "border-zinc-200 bg-zinc-50 text-zinc-500"}
       `}
     >
-      {current.label}
+      Payment: {formatStatus(status)}
     </span>
   );
 };
@@ -2222,47 +1982,38 @@ const PaymentStatusBadge = ({
    COD PIN STATUS BADGE
 ========================================================= */
 
-const CodPinStatusBadge = ({
-  status,
-}) => {
+const CodPinStatusBadge = ({ status }) => {
   const config = {
     not_generated: {
       label: "Not Generated",
-      className:
-        "border-zinc-200 bg-zinc-50 text-zinc-500",
+      className: "border-zinc-200 bg-zinc-50 text-zinc-500",
     },
 
     active: {
       label: "Active",
-      className:
-        "border-blue-200 bg-blue-50 text-blue-700",
+      className: "border-blue-200 bg-blue-50 text-blue-700",
     },
 
     verified: {
       label: "Verified",
-      className:
-        "border-emerald-200 bg-emerald-50 text-emerald-700",
+      className: "border-emerald-200 bg-emerald-50 text-emerald-700",
     },
 
     used: {
       label: "Used",
-      className:
-        "border-emerald-200 bg-emerald-50 text-emerald-700",
+      className: "border-emerald-200 bg-emerald-50 text-emerald-700",
     },
 
     expired: {
       label: "Expired",
-      className:
-        "border-red-200 bg-red-50 text-red-700",
+      className: "border-red-200 bg-red-50 text-red-700",
     },
   };
 
-  const current =
-    config[status] || {
-      label: formatCodPinStatus(status),
-      className:
-        "border-zinc-200 bg-zinc-50 text-zinc-500",
-    };
+  const current = config[status] || {
+    label: formatCodPinStatus(status),
+    className: "border-zinc-200 bg-zinc-50 text-zinc-500",
+  };
 
   return (
     <span
@@ -2284,88 +2035,89 @@ const CodPinStatusBadge = ({
 };
 
 /* =========================================================
+   LOADING MESSAGE
+========================================================= */
+
+const LoadingMessage = ({ text }) => {
+  return (
+    <div
+      className="
+        mt-4
+        flex
+        items-center
+        gap-2
+        text-xs
+        text-zinc-400
+      "
+    >
+      <Loader2 size={14} className="animate-spin" />
+
+      {text}
+    </div>
+  );
+};
+
+/* =========================================================
    HELPERS
 ========================================================= */
 
-const formatLabel = (
-  value
-) => {
+const formatLabel = (value) => {
+  if (!value) {
+    return "Unknown";
+  }
+
   return String(value)
-    .replace(
-      /([A-Z])/g,
-      " $1"
-    )
-    .replace(
-      /_/g,
-      " "
-    )
-    .replace(
-      /\b\w/g,
-      (letter) =>
-        letter.toUpperCase()
-    )
+    .replace(/([A-Z])/g, " $1")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
     .trim();
 };
 
-const formatValue = (
-  value
-) => {
-  if (
-    value === null ||
-    value === undefined
-  ) {
+const formatValue = (value) => {
+  if (value === null || value === undefined) {
     return "—";
   }
 
-  if (
-    typeof value ===
-    "object"
-  ) {
-    if (
-      Array.isArray(value)
-    ) {
-      return value.join(
-        ", "
-      );
-    }
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
 
-    return JSON.stringify(
-      value
-    );
+  if (typeof value === "object") {
+    return JSON.stringify(value);
   }
 
   return String(value);
 };
 
-const formatStatus = (
-  status
-) => {
+const formatStatus = (status) => {
   if (!status) {
     return "Unknown";
   }
 
   return String(status)
-    .replace(
-      /_/g,
-      " "
-    )
-    .replace(
-      /\b\w/g,
-      (letter) =>
-        letter.toUpperCase()
-    );
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 };
 
-const formatCodPinStatus = (
-  status
-) => {
+const formatPaymentMethod = (method) => {
+  if (method === "cod") {
+    return "Cash on Delivery";
+  }
+
+  if (method === "online") {
+    return "Online Payment";
+  }
+
+  return formatStatus(method);
+};
+
+const formatCodPinStatus = (status) => {
   if (!status) {
     return "Not Generated";
   }
 
   const labels = {
-    not_generated:
-      "Not Generated",
+    not_generated: "Not Generated",
 
     active: "Active",
 
@@ -2376,31 +2128,35 @@ const formatCodPinStatus = (
     expired: "Expired",
   };
 
-  return (
-    labels[status] ||
-    formatStatus(status)
-  );
+  return labels[status] || formatStatus(status);
 };
 
-const formatDateTime = (
-  date
-) => {
+const formatCurrency = (amount) => {
+  if (amount === null || amount === undefined || amount === "") {
+    return "₹0";
+  }
+
+  return `₹${Number(amount).toLocaleString("en-IN")}`;
+};
+
+const formatDateTime = (date) => {
   if (!date) {
     return "—";
   }
 
-  return new Date(
-    date
-  ).toLocaleString(
-    "en-IN",
-    {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }
-  );
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "—";
+  }
+
+  return parsedDate.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 
 export default AdminOrderDetails;

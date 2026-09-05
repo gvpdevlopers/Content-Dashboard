@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   ArrowLeft,
   CalendarDays,
   CheckCircle2,
   CreditCard,
+  ExternalLink,
   FileText,
   KeyRound,
   Loader2,
@@ -24,7 +25,7 @@ const OrderDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  /* COD */
+  // COD
   const [codPin, setCodPin] = useState("");
   const [codLoading, setCodLoading] = useState(false);
   const [codError, setCodError] = useState("");
@@ -43,8 +44,7 @@ const OrderDetails = () => {
         console.error("Get order details error:", error);
 
         setError(
-          error.response?.data?.message ||
-            "Unable to load order details."
+          error.response?.data?.message || "Unable to load order details.",
         );
       } finally {
         setLoading(false);
@@ -56,9 +56,9 @@ const OrderDetails = () => {
     }
   }, [id]);
 
-  /* -------------------------------- */
-  /* COD Verification */
-  /* -------------------------------- */
+  // ---------------------------------------------------------
+  // COD Verification
+  // ---------------------------------------------------------
 
   const handleCodVerification = async () => {
     if (codPin.length !== 6) {
@@ -71,75 +71,45 @@ const OrderDetails = () => {
       setCodError("");
       setCodMessage("");
 
-      const response = await codService.verifyCodPin(
-        id,
-        codPin
-      );
+      const response = await codService.verifyCodPin(id, codPin);
 
       setCodPin("");
-
-      /*
-       * Update the order immediately in local React state.
-       *
-       * This supports both:
-       * 1. Final backend response:
-       *    paymentStatus: "collected"
-       *    codPinStatus: "used"
-       *
-       * 2. Current temporary backend response:
-       *    paymentStatus: "pending"
-       *    codPinStatus: "verified"
-       */
 
       if (response.order) {
         setOrder((currentOrder) => ({
           ...currentOrder,
 
-          paymentStatus:
-            response.order.paymentStatus ||
-            "collected",
+          paymentStatus: response.order.paymentStatus || "collected",
 
-          codPinStatus:
-            response.order.codPinStatus ||
-            "used",
+          codPinStatus: response.order.codPinStatus || "used",
 
-          codCollectedAt:
-            response.order.codCollectedAt ||
-            null,
+          codCollectedAt: response.order.codCollectedAt || null,
 
           codPinVerifiedAt:
-            response.order.codPinVerifiedAt ||
-            new Date().toISOString(),
+            response.order.codPinVerifiedAt || new Date().toISOString(),
         }));
       } else {
         setOrder((currentOrder) => ({
           ...currentOrder,
           paymentStatus: "collected",
           codPinStatus: "used",
-          codCollectedAt:
-            new Date().toISOString(),
+          codCollectedAt: new Date().toISOString(),
         }));
       }
 
       setCodMessage("Payment Done");
     } catch (error) {
-      console.error(
-        "COD verification error:",
-        error
-      );
+      console.error("COD verification error:", error);
 
-      setCodError(
-        error.response?.data?.message ||
-          "Unable to verify COD PIN."
-      );
+      setCodError(error.response?.data?.message || "Unable to verify COD PIN.");
     } finally {
       setCodLoading(false);
     }
   };
 
-  /* -------------------------------- */
-  /* Loading */
-  /* -------------------------------- */
+  // ---------------------------------------------------------
+  // Loading
+  // ---------------------------------------------------------
 
   if (loading) {
     return (
@@ -155,16 +125,11 @@ const OrderDetails = () => {
               shadow-[0_10px_40px_rgba(0,0,0,0.06)]
             "
           >
-            <Loader2
-              size={19}
-              className="animate-spin text-zinc-500"
-            />
+            <Loader2 size={19} className="animate-spin text-zinc-500" />
           </div>
 
           <div>
-            <p className="text-sm font-medium text-zinc-700">
-              Loading order
-            </p>
+            <p className="text-sm font-medium text-zinc-700">Loading order</p>
 
             <p className="mt-1 text-xs text-zinc-400">
               Fetching order details...
@@ -175,13 +140,13 @@ const OrderDetails = () => {
     );
   }
 
-  /* -------------------------------- */
-  /* Error */
-  /* -------------------------------- */
+  // ---------------------------------------------------------
+  // Error
+  // ---------------------------------------------------------
 
   if (error || !order) {
     return (
-      <div className="mx-auto flex min-h-[60vh] max-w-xl items-center justify-center text-center">
+      <div className="mx-auto flex min-h-[60vh] max-w-xl items-center justify-center px-4 text-center">
         <div>
           <div
             className="
@@ -194,10 +159,7 @@ const OrderDetails = () => {
               bg-red-50
             "
           >
-            <Package
-              size={22}
-              className="text-red-500"
-            />
+            <Package size={22} className="text-red-500" />
           </div>
 
           <p
@@ -253,7 +215,6 @@ const OrderDetails = () => {
                 group-hover:-translate-x-1
               "
             />
-
             Back to Orders
           </Link>
         </div>
@@ -261,56 +222,65 @@ const OrderDetails = () => {
     );
   }
 
-  /* -------------------------------- */
-  /* Order Data */
-  /* -------------------------------- */
-
-  const serviceName =
-    order.serviceSnapshot?.name ||
-    order.service?.name ||
-    "Service";
-
-  const formData = order.formData || {};
-
-  /* -------------------------------- */
-  /* COD State */
-  /* -------------------------------- */
-
-  const isCodOrder =
-    order.paymentMethod === "cod";
+  // ---------------------------------------------------------
+  // Order Data
+  // ---------------------------------------------------------
 
   /*
-   * Treat all successful COD states as completed.
-   *
-   * "verified" supports your current backend.
-   * "used" is the final intended backend state.
-   * "collected" is the final payment state.
+   * IMPORTANT:
+   * Historical order information should come from
+   * serviceSnapshot rather than the current Service document.
    */
+  const service = order.serviceSnapshot || {};
+
+  const serviceName = service.name || "Service";
+  const serviceCategory = service.category || "";
+  const serviceDescription = service.description || "";
+
+  const formData =
+    order.formData instanceof Map
+      ? Object.fromEntries(order.formData)
+      : order.formData || {};
+
+  const selectedOption = service.selectedOption || null;
+
+  const quantity = Number(order.quantity || 1);
+
+  const quantityUnit = selectedOption?.unit || service.unit || "";
+
+  // ---------------------------------------------------------
+  // Dynamic form fields
+  // ---------------------------------------------------------
+
+  const dynamicFields = useMemo(() => {
+    return Object.entries(formData).filter(
+      ([, value]) => value !== null && value !== undefined && value !== "",
+    );
+  }, [formData]);
+
+  // ---------------------------------------------------------
+  // COD State
+  // ---------------------------------------------------------
+
+  const isCodOrder = order.paymentMethod === "cod";
+
   const isCodPaymentDone =
     order.paymentStatus === "collected" ||
     order.codPinStatus === "used" ||
     order.codPinStatus === "verified";
 
-  const isCodPinActive =
-    order.codPinStatus === "active";
+  const isCodPinActive = order.codPinStatus === "active";
 
   const isCodPinPending =
-    order.codPinStatus === "not_generated" ||
-    !order.codPinStatus;
+    order.codPinStatus === "not_generated" || !order.codPinStatus;
 
-  /*
-   * If payment is already done/verified,
-   * completely hide the COD verification card.
-   */
-  const showCodVerification =
-    isCodOrder && !isCodPaymentDone;
+  const showCodVerification = isCodOrder && !isCodPaymentDone;
 
   return (
     <div className="mx-auto max-w-[1100px] animate-fade-up">
-
-      {/* -------------------------------- */}
-      {/* Back Navigation */}
-      {/* -------------------------------- */}
+      {/* =====================================================
+          BACK NAVIGATION
+      ====================================================== */}
 
       <Link
         to="/dashboard/orders"
@@ -338,13 +308,12 @@ const OrderDetails = () => {
             group-hover:-translate-x-1
           "
         />
-
         Back to Order History
       </Link>
 
-      {/* -------------------------------- */}
-      {/* Main Header Card */}
-      {/* -------------------------------- */}
+      {/* =====================================================
+          MAIN ORDER HEADER
+      ====================================================== */}
 
       <div
         className="
@@ -363,8 +332,6 @@ const OrderDetails = () => {
           sm:p-8
         "
       >
-        {/* Background glow */}
-
         <div
           className="
             pointer-events-none
@@ -383,14 +350,20 @@ const OrderDetails = () => {
         />
 
         <div className="relative">
-
           {/* Header */}
 
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+          <div
+            className="
+              flex
+              flex-col
+              gap-6
+              sm:flex-row
+              sm:items-start
+              sm:justify-between
+            "
+          >
             <div className="min-w-0">
-
               <div className="flex items-center gap-2">
-
                 <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
 
                 <p
@@ -404,7 +377,6 @@ const OrderDetails = () => {
                 >
                   Order Details
                 </p>
-
               </div>
 
               <h1
@@ -422,49 +394,191 @@ const OrderDetails = () => {
               </h1>
 
               <p className="mt-2 text-sm text-zinc-500">
-                Placed on{" "}
-                {formatDateTime(order.createdAt)}
+                Placed on {formatDateTime(order.createdAt)}
               </p>
             </div>
 
-            <StatusBadge
-              status={order.orderStatus}
-            />
+            <StatusBadge status={order.orderStatus} />
           </div>
 
-          {/* Summary Cards */}
+          {/* Summary */}
 
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
-
-            <SummaryCard
-              icon={Package}
-              label="Service"
-              value={serviceName}
-            />
+            <SummaryCard icon={Package} label="Service" value={serviceName} />
 
             <SummaryCard
               icon={CreditCard}
               label="Payment"
-              value={formatStatus(
-                order.paymentMethod
-              )}
+              value={formatStatus(order.paymentMethod)}
             />
 
             <SummaryCard
               icon={CalendarDays}
               label="Amount"
-              value={`₹${Number(
-                order.amount || 0
-              ).toLocaleString("en-IN")}`}
+              value={`₹${Number(order.amount || 0).toLocaleString("en-IN")}`}
             />
-
           </div>
         </div>
       </div>
 
-      {/* -------------------------------- */}
-      {/* COD Verification */}
-      {/* -------------------------------- */}
+      {/* =====================================================
+          SERVICE INFORMATION
+      ====================================================== */}
+
+      <div
+        className="
+          group
+          relative
+          mt-6
+          overflow-hidden
+          rounded-[28px]
+          border border-zinc-200
+          bg-white
+          p-6
+          shadow-[0_20px_80px_rgba(0,0,0,0.05)]
+          transition
+          duration-300
+          hover:border-zinc-300
+          hover:shadow-[0_22px_85px_rgba(0,0,0,0.07)]
+          sm:p-8
+        "
+      >
+        <div
+          className="
+            pointer-events-none
+            absolute
+            -right-24
+            -top-24
+            h-64
+            w-64
+            rounded-full
+            bg-cyan-300/[0.025]
+            blur-3xl
+            transition
+            duration-700
+            group-hover:bg-cyan-300/[0.045]
+          "
+        />
+
+        <div className="relative">
+          <div className="flex items-start gap-3">
+            <div
+              className="
+                flex h-10 w-10
+                shrink-0
+                items-center justify-center
+                rounded-xl
+                border border-zinc-200
+                bg-zinc-50
+              "
+            >
+              <Package size={18} strokeWidth={1.6} className="text-zinc-500" />
+            </div>
+
+            <div className="min-w-0">
+              <p
+                className="
+                  text-[10px]
+                  font-medium
+                  uppercase
+                  tracking-[0.18em]
+                  text-zinc-400
+                "
+              >
+                Service Information
+              </p>
+
+              <h2 className="mt-1 text-lg font-medium text-zinc-900">
+                {serviceName}
+              </h2>
+
+              {serviceCategory && (
+                <p className="mt-1 text-xs text-zinc-400">{serviceCategory}</p>
+              )}
+            </div>
+          </div>
+
+          {serviceDescription && (
+            <p
+              className="
+                mt-5
+                max-w-3xl
+                text-sm
+                leading-6
+                text-zinc-500
+              "
+            >
+              {serviceDescription}
+            </p>
+          )}
+
+          {/* Order pricing information */}
+
+          <div
+            className="
+              mt-6
+              grid
+              gap-3
+              sm:grid-cols-2
+              lg:grid-cols-3
+            "
+          >
+            <SummaryCard
+              icon={Package}
+              label="Quantity"
+              value={`${quantity}${quantityUnit ? ` ${quantityUnit}` : ""}`}
+            />
+
+            {selectedOption?.name && (
+              <SummaryCard
+                icon={FileText}
+                label="Selected Option"
+                value={selectedOption.name}
+              />
+            )}
+
+            <SummaryCard
+              icon={CreditCard}
+              label="Order Amount"
+              value={`₹${Number(order.amount || 0).toLocaleString("en-IN")}`}
+            />
+          </div>
+
+          {/* Pricing option details */}
+
+          {selectedOption?.description && (
+            <div
+              className="
+                mt-4
+                rounded-2xl
+                border border-zinc-200
+                bg-zinc-50
+                p-4
+              "
+            >
+              <p
+                className="
+                  text-[10px]
+                  font-medium
+                  uppercase
+                  tracking-[0.15em]
+                  text-zinc-400
+                "
+              >
+                Selected Option
+              </p>
+
+              <p className="mt-1 text-sm text-zinc-600">
+                {selectedOption.description}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* =====================================================
+          COD VERIFICATION
+      ====================================================== */}
 
       {showCodVerification && (
         <div
@@ -484,8 +598,6 @@ const OrderDetails = () => {
             sm:p-7
           "
         >
-          {/* Glow */}
-
           <div
             className="
               pointer-events-none
@@ -504,61 +616,49 @@ const OrderDetails = () => {
           />
 
           <div className="relative">
+            <div className="flex items-start gap-3">
+              <div
+                className="
+                  flex h-10 w-10
+                  shrink-0
+                  items-center justify-center
+                  rounded-xl
+                  border border-amber-200
+                  bg-amber-50
+                "
+              >
+                <KeyRound
+                  size={19}
+                  className="text-amber-600"
+                  strokeWidth={1.7}
+                />
+              </div>
 
-            {/* Section Header */}
-
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-
-              <div className="flex items-start gap-3">
-
-                <div
+              <div>
+                <p
                   className="
-                    flex h-10 w-10
-                    shrink-0
-                    items-center justify-center
-                    rounded-xl
-                    border border-amber-200
-                    bg-amber-50
+                    text-[10px]
+                    font-medium
+                    uppercase
+                    tracking-[0.2em]
+                    text-amber-600/70
                   "
                 >
-                  <KeyRound
-                    size={19}
-                    className="text-amber-600"
-                    strokeWidth={1.7}
-                  />
-                </div>
+                  Cash on Delivery
+                </p>
 
-                <div>
+                <h2 className="mt-1 text-lg font-medium text-zinc-900">
+                  Verify COD Payment
+                </h2>
 
-                  <p
-                    className="
-                      text-[10px]
-                      font-medium
-                      uppercase
-                      tracking-[0.2em]
-                      text-amber-600/70
-                    "
-                  >
-                    Cash on Delivery
-                  </p>
-
-                  <h2 className="mt-1 text-lg font-medium text-zinc-900">
-                    Verify COD Payment
-                  </h2>
-
-                  <p className="mt-1 max-w-xl text-xs leading-5 text-zinc-500">
-                    Enter the 6-digit PIN provided
-                    by the payment collector to
-                    complete your payment.
-                  </p>
-
-                </div>
+                <p className="mt-1 max-w-xl text-xs leading-5 text-zinc-500">
+                  Enter the 6-digit PIN provided by the payment collector to
+                  complete your payment.
+                </p>
               </div>
             </div>
 
-            {/* -------------------------------- */}
-            {/* PIN Not Generated */}
-            {/* -------------------------------- */}
+            {/* PIN not generated */}
 
             {isCodPinPending && (
               <div
@@ -571,7 +671,6 @@ const OrderDetails = () => {
                 "
               >
                 <div className="flex items-start gap-3">
-
                   <div
                     className="
                       mt-0.5
@@ -583,36 +682,27 @@ const OrderDetails = () => {
                       bg-white
                     "
                   >
-                    <KeyRound
-                      size={16}
-                      className="text-zinc-400"
-                    />
+                    <KeyRound size={16} className="text-zinc-400" />
                   </div>
 
                   <div>
-
                     <p className="text-sm font-medium text-zinc-700">
                       PIN not available yet
                     </p>
 
                     <p className="mt-1 text-xs leading-5 text-zinc-500">
-                      The payment collector will
-                      provide you with a COD PIN
-                      once it has been generated.
+                      The payment collector will provide you with a COD PIN once
+                      it has been generated.
                     </p>
-
                   </div>
                 </div>
               </div>
             )}
 
-            {/* -------------------------------- */}
             {/* Active PIN */}
-            {/* -------------------------------- */}
 
             {isCodPinActive && (
               <div className="mt-6">
-
                 <div
                   className="
                     rounded-2xl
@@ -622,10 +712,16 @@ const OrderDetails = () => {
                     sm:p-5
                   "
                 >
-                  <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
-
+                  <div
+                    className="
+                      flex
+                      flex-col
+                      gap-5
+                      sm:flex-row
+                      sm:items-end
+                    "
+                  >
                     <div className="flex-1">
-
                       <label
                         htmlFor="cod-pin"
                         className="
@@ -642,7 +738,6 @@ const OrderDetails = () => {
                       </label>
 
                       <div className="relative">
-
                         <input
                           id="cod-pin"
                           type="password"
@@ -655,9 +750,7 @@ const OrderDetails = () => {
                             setCodMessage("");
 
                             setCodPin(
-                              event.target.value
-                                .replace(/\D/g, "")
-                                .slice(0, 6)
+                              event.target.value.replace(/\D/g, "").slice(0, 6),
                             );
                           }}
                           onKeyDown={(event) => {
@@ -705,23 +798,17 @@ const OrderDetails = () => {
                             text-zinc-300
                           "
                         />
-
                       </div>
 
                       <p className="mt-2 text-[11px] text-zinc-400">
-                        Enter the PIN provided by the
-                        payment collector.
+                        Enter the PIN provided by the payment collector.
                       </p>
-
                     </div>
 
                     <button
                       type="button"
                       onClick={handleCodVerification}
-                      disabled={
-                        codLoading ||
-                        codPin.length !== 6
-                      }
+                      disabled={codLoading || codPin.length !== 6}
                       className="
                         group
                         inline-flex
@@ -745,14 +832,9 @@ const OrderDetails = () => {
                         disabled:opacity-40
                       "
                     >
-
                       {codLoading ? (
                         <>
-                          <Loader2
-                            size={16}
-                            className="animate-spin"
-                          />
-
+                          <Loader2 size={16} className="animate-spin" />
                           Verifying...
                         </>
                       ) : (
@@ -765,17 +847,12 @@ const OrderDetails = () => {
                               group-hover:scale-105
                             "
                           />
-
                           Verify PIN
                         </>
                       )}
-
                     </button>
-
                   </div>
                 </div>
-
-                {/* Success */}
 
                 {codMessage && (
                   <div
@@ -806,8 +883,6 @@ const OrderDetails = () => {
                   </div>
                 )}
 
-                {/* Error */}
-
                 {codError && (
                   <div
                     className="
@@ -819,54 +894,36 @@ const OrderDetails = () => {
                       py-3.5
                     "
                   >
-                    <p className="text-sm leading-5 text-red-600">
-                      {codError}
-                    </p>
+                    <p className="text-sm leading-5 text-red-600">{codError}</p>
                   </div>
                 )}
-
               </div>
             )}
-
           </div>
         </div>
       )}
 
-      {/* -------------------------------- */}
-      {/* Status + Payment */}
-      {/* -------------------------------- */}
+      {/* =====================================================
+          STATUS + PAYMENT
+      ====================================================== */}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-
         <InfoCard
           icon={CheckCircle2}
           title="Order Status"
           description="Current progress of your order."
         >
-
           <InfoRow
             label="Current Status"
-            value={
-              <StatusBadge
-                status={order.orderStatus}
-              />
-            }
+            value={<StatusBadge status={order.orderStatus} />}
           />
 
-          <InfoRow
-            label="Created"
-            value={formatDateTime(
-              order.createdAt
-            )}
-          />
+          <InfoRow label="Created" value={formatDateTime(order.createdAt)} />
 
           <InfoRow
             label="Last Updated"
-            value={formatDateTime(
-              order.updatedAt
-            )}
+            value={formatDateTime(order.updatedAt)}
           />
-
         </InfoCard>
 
         <InfoCard
@@ -874,13 +931,7 @@ const OrderDetails = () => {
           title="Payment Information"
           description="Payment details for this order."
         >
-
-          <InfoRow
-            label="Method"
-            value={formatStatus(
-              order.paymentMethod
-            )}
-          />
+          <InfoRow label="Method" value={formatStatus(order.paymentMethod)} />
 
           <InfoRow
             label="Payment Status"
@@ -896,30 +947,23 @@ const OrderDetails = () => {
             label="Amount"
             value={
               <span className="font-medium text-zinc-900">
-                ₹{Number(
-                  order.amount || 0
-                ).toLocaleString("en-IN")}
+                ₹{Number(order.amount || 0).toLocaleString("en-IN")}
               </span>
             }
           />
 
-          {isCodOrder &&
-            order.codCollectedAt && (
-              <InfoRow
-                label="Collected On"
-                value={formatDateTime(
-                  order.codCollectedAt
-                )}
-              />
-            )}
-
+          {isCodOrder && order.codCollectedAt && (
+            <InfoRow
+              label="Collected On"
+              value={formatDateTime(order.codCollectedAt)}
+            />
+          )}
         </InfoCard>
-
       </div>
 
-      {/* -------------------------------- */}
-      {/* Project Details */}
-      {/* -------------------------------- */}
+      {/* =====================================================
+          REQUIREMENTS / DYNAMIC FORM DATA
+      ====================================================== */}
 
       <div
         className="
@@ -939,9 +983,6 @@ const OrderDetails = () => {
           sm:p-8
         "
       >
-
-        {/* Glow */}
-
         <div
           className="
             pointer-events-none
@@ -960,11 +1001,9 @@ const OrderDetails = () => {
         />
 
         <div className="relative">
-
-          {/* Section Header */}
+          {/* Header */}
 
           <div className="flex items-center gap-3">
-
             <div
               className="
                 flex h-10 w-10
@@ -992,7 +1031,6 @@ const OrderDetails = () => {
             </div>
 
             <div>
-
               <p
                 className="
                   text-xs
@@ -1008,42 +1046,62 @@ const OrderDetails = () => {
               <h2 className="mt-1 text-lg font-medium text-zinc-900">
                 Project Details
               </h2>
-
             </div>
           </div>
 
-          {/* Fields */}
+          {/* Dynamic Fields */}
 
-          <div className="mt-7 grid gap-4 sm:grid-cols-2">
-
-            {Object.entries(formData).map(
-              ([key, value]) => (
+          {dynamicFields.length > 0 ? (
+            <div className="mt-7 grid gap-4 sm:grid-cols-2">
+              {dynamicFields.map(([key, value]) => (
                 <DetailField
                   key={key}
                   label={formatLabel(key)}
-                  value={formatValue(value)}
+                  value={formatDynamicValue(value)}
                 />
-              )
-            )}
+              ))}
+            </div>
+          ) : (
+            <div
+              className="
+                mt-7
+                rounded-2xl
+                border border-dashed
+                border-zinc-200
+                bg-zinc-50
+                px-5
+                py-8
+                text-center
+              "
+            >
+              <p className="text-sm text-zinc-500">
+                No additional project details were provided.
+              </p>
+            </div>
+          )}
 
-          </div>
+          {/* Additional Requirements */}
 
+          {order.additionalRequirements && (
+            <div className="mt-4">
+              <DetailField
+                label="Additional Requirements"
+                value={order.additionalRequirements}
+                fullWidth
+              />
+            </div>
+          )}
         </div>
       </div>
-
     </div>
   );
 };
 
-/* -------------------------------- */
-/* Summary Card */
-/* -------------------------------- */
+/* =========================================================
+   SUMMARY CARD
+========================================================= */
 
-const SummaryCard = ({
-  icon: Icon,
-  label,
-  value,
-}) => {
+const SummaryCard = ({ icon: Icon, label, value }) => {
   return (
     <div
       className="
@@ -1081,7 +1139,6 @@ const SummaryCard = ({
       />
 
       <div className="relative flex items-center gap-3">
-
         <div
           className="
             flex h-10 w-10
@@ -1110,7 +1167,6 @@ const SummaryCard = ({
         </div>
 
         <div className="min-w-0">
-
           <p
             className="
               text-[10px]
@@ -1126,23 +1182,17 @@ const SummaryCard = ({
           <p className="mt-1 truncate text-sm font-medium text-zinc-800">
             {value}
           </p>
-
         </div>
       </div>
     </div>
   );
 };
 
-/* -------------------------------- */
-/* Information Card */
-/* -------------------------------- */
+/* =========================================================
+   INFORMATION CARD
+========================================================= */
 
-const InfoCard = ({
-  icon: Icon,
-  title,
-  description,
-  children,
-}) => {
+const InfoCard = ({ icon: Icon, title, description, children }) => {
   return (
     <div
       className="
@@ -1179,9 +1229,7 @@ const InfoCard = ({
       />
 
       <div className="relative">
-
         <div className="flex items-center gap-3">
-
           <div
             className="
               flex h-9 w-9
@@ -1208,30 +1256,21 @@ const InfoCard = ({
           </div>
 
           <div>
+            <h2 className="text-lg font-medium text-zinc-900">{title}</h2>
 
-            <h2 className="text-lg font-medium text-zinc-900">
-              {title}
-            </h2>
-
-            <p className="mt-0.5 text-xs text-zinc-400">
-              {description}
-            </p>
-
+            <p className="mt-0.5 text-xs text-zinc-400">{description}</p>
           </div>
         </div>
 
-        <div className="mt-5">
-          {children}
-        </div>
-
+        <div className="mt-5">{children}</div>
       </div>
     </div>
   );
 };
 
-/* -------------------------------- */
-/* Information Row */
-/* -------------------------------- */
+/* =========================================================
+   INFORMATION ROW
+========================================================= */
 
 const InfoRow = ({ label, value }) => {
   return (
@@ -1239,12 +1278,15 @@ const InfoRow = ({ label, value }) => {
       className="
         group/row
         flex
-        items-center
-        justify-between
-        gap-5
+        flex-col
+        gap-2
         border-b
         border-zinc-100
         py-3.5
+        sm:flex-row
+        sm:items-center
+        sm:justify-between
+        sm:gap-5
         last:border-b-0
       "
     >
@@ -1260,21 +1302,21 @@ const InfoRow = ({ label, value }) => {
         {label}
       </span>
 
-      <span className="text-right text-sm text-zinc-700">
+      <span className="text-left text-sm text-zinc-700 sm:text-right">
         {value}
       </span>
     </div>
   );
 };
 
-/* -------------------------------- */
-/* Detail Field */
-/* -------------------------------- */
+/* =========================================================
+   DETAIL FIELD
+========================================================= */
 
-const DetailField = ({ label, value }) => {
+const DetailField = ({ label, value, fullWidth = false }) => {
   return (
     <div
-      className="
+      className={`
         group/field
         relative
         overflow-hidden
@@ -1288,7 +1330,8 @@ const DetailField = ({ label, value }) => {
         hover:border-zinc-300
         hover:bg-white
         hover:shadow-sm
-      "
+        ${fullWidth ? "sm:col-span-2" : ""}
+      `}
     >
       <div
         className="
@@ -1309,7 +1352,6 @@ const DetailField = ({ label, value }) => {
       />
 
       <div className="relative">
-
         <p
           className="
             text-[10px]
@@ -1327,40 +1369,32 @@ const DetailField = ({ label, value }) => {
         <div className="mt-2 break-words text-sm leading-6 text-zinc-600">
           {value || "—"}
         </div>
-
       </div>
     </div>
   );
 };
 
-/* -------------------------------- */
-/* Status Badge */
-/* -------------------------------- */
+/* =========================================================
+   STATUS BADGE
+========================================================= */
 
 const StatusBadge = ({ status }) => {
   const normalizedStatus = status || "unknown";
 
   const styles = {
-    pending:
-      "border-amber-200 bg-amber-50 text-amber-700",
+    pending: "border-amber-200 bg-amber-50 text-amber-700",
 
-    processing:
-      "border-blue-200 bg-blue-50 text-blue-700",
+    processing: "border-blue-200 bg-blue-50 text-blue-700",
 
-    in_progress:
-      "border-blue-200 bg-blue-50 text-blue-700",
+    in_progress: "border-blue-200 bg-blue-50 text-blue-700",
 
-    completed:
-      "border-emerald-200 bg-emerald-50 text-emerald-700",
+    completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
 
-    cancelled:
-      "border-red-200 bg-red-50 text-red-700",
+    cancelled: "border-red-200 bg-red-50 text-red-700",
 
-    rejected:
-      "border-red-200 bg-red-50 text-red-700",
+    rejected: "border-red-200 bg-red-50 text-red-700",
 
-    delivered:
-      "border-emerald-200 bg-emerald-50 text-emerald-700",
+    delivered: "border-emerald-200 bg-emerald-50 text-emerald-700",
   };
 
   return (
@@ -1379,8 +1413,7 @@ const StatusBadge = ({ status }) => {
         transition
         duration-200
         ${
-          styles[normalizedStatus] ||
-          "border-zinc-200 bg-zinc-50 text-zinc-600"
+          styles[normalizedStatus] || "border-zinc-200 bg-zinc-50 text-zinc-600"
         }
       `}
     >
@@ -1391,29 +1424,17 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-/* -------------------------------- */
-/* Payment Status */
-/* -------------------------------- */
+/* =========================================================
+   PAYMENT STATUS
+========================================================= */
 
-const PaymentStatus = ({
-  status,
-  codPinStatus,
-}) => {
+const PaymentStatus = ({ status, codPinStatus }) => {
   const normalizedStatus = status || "unknown";
 
-  /*
-   * COD can be considered successfully completed
-   * when either the payment itself is collected OR
-   * the current temporary backend marks the PIN verified.
-   */
   const successful =
-    [
-      "paid",
-      "collected",
-      "completed",
-      "success",
-      "successful",
-    ].includes(normalizedStatus) ||
+    ["paid", "collected", "completed", "success", "successful"].includes(
+      normalizedStatus,
+    ) ||
     codPinStatus === "verified" ||
     codPinStatus === "used";
 
@@ -1423,55 +1444,104 @@ const PaymentStatus = ({
         inline-flex
         items-center
         gap-1.5
-        ${
-          successful
-            ? "font-medium text-emerald-600"
-            : "text-zinc-500"
-        }
+        ${successful ? "font-medium text-emerald-600" : "text-zinc-500"}
       `}
     >
-      {successful && (
-        <CheckCircle2
-          size={14}
-          strokeWidth={1.8}
-        />
-      )}
+      {successful && <CheckCircle2 size={14} strokeWidth={1.8} />}
 
-      {successful
-        ? "Payment Done"
-        : formatStatus(normalizedStatus)}
+      {successful ? "Payment Done" : formatStatus(normalizedStatus)}
     </span>
   );
 };
 
-/* -------------------------------- */
-/* Helpers */
-/* -------------------------------- */
+/* =========================================================
+   DYNAMIC VALUE FORMATTER
+========================================================= */
 
-const formatLabel = (value) => {
-  return value
-    .replace(/([A-Z])/g, " $1")
-    .replace(/\_/g, " ")
-    .replace(/\b\w/g, (letter) =>
-      letter.toUpperCase()
-    )
-    .trim();
-};
-
-const formatValue = (value) => {
-  if (
-    value === null ||
-    value === undefined
-  ) {
+const formatDynamicValue = (value) => {
+  if (value === null || value === undefined || value === "") {
     return "—";
   }
 
-  if (typeof value === "object") {
-    return JSON.stringify(value);
+  // Arrays
+  if (Array.isArray(value)) {
+    return value.map((item) => formatDynamicValue(item)).join(", ");
   }
 
-  return String(value);
+  // Objects
+  if (typeof value === "object") {
+    return (
+      <pre className="whitespace-pre-wrap font-sans text-sm leading-6 text-zinc-600">
+        {JSON.stringify(value, null, 2)}
+      </pre>
+    );
+  }
+
+  const stringValue = String(value);
+
+  // URL
+  if (/^https?:\/\//i.test(stringValue)) {
+    return (
+      <a
+        href={stringValue}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="
+          inline-flex
+          max-w-full
+          items-start
+          gap-1.5
+          break-all
+          text-zinc-700
+          underline
+          decoration-zinc-300
+          underline-offset-4
+          transition
+          hover:text-zinc-900
+          hover:decoration-zinc-500
+        "
+      >
+        <span>{stringValue}</span>
+
+        <ExternalLink size={13} className="mt-1 shrink-0" />
+      </a>
+    );
+  }
+
+  return formatDisplayValue(stringValue);
 };
+
+/* =========================================================
+   DISPLAY VALUE
+========================================================= */
+
+const formatDisplayValue = (value) => {
+  if (!value) return "—";
+
+  return value
+    .replace(/_/g, " ")
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+};
+
+/* =========================================================
+   LABEL FORMATTER
+========================================================= */
+
+const formatLabel = (value) => {
+  if (!value) return "";
+
+  return value
+    .replace(/([A-Z])/g, " $1")
+    .replace(/_/g, " ")
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+    .trim();
+};
+
+/* =========================================================
+   STATUS FORMATTER
+========================================================= */
 
 const formatStatus = (status) => {
   if (!status) {
@@ -1479,42 +1549,42 @@ const formatStatus = (status) => {
   }
 
   return status
-    .replace(/\_/g, " ")
-    .replace(/\b\w/g, (letter) =>
-      letter.toUpperCase()
-    );
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 };
+
+/* =========================================================
+   DATE
+========================================================= */
 
 const formatDate = (date) => {
   if (!date) {
     return "—";
   }
 
-  return new Date(date).toLocaleDateString(
-    "en-IN",
-    {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }
-  );
+  return new Date(date).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 };
+
+/* =========================================================
+   DATE + TIME
+========================================================= */
 
 const formatDateTime = (date) => {
   if (!date) {
     return "—";
   }
 
-  return new Date(date).toLocaleString(
-    "en-IN",
-    {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }
-  );
+  return new Date(date).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 
 export default OrderDetails;
