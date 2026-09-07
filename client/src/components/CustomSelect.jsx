@@ -104,7 +104,7 @@ const CustomSelect = ({
           outline-none
           transition-all
           duration-200
-
+          hover: cursor-pointer
           ${
             open
               ? `
@@ -199,7 +199,7 @@ const CustomSelect = ({
                       text-sm
                       transition-all
                       duration-150
-
+                      hover: cursor-pointer
                       ${
                         isSelected
                           ? `

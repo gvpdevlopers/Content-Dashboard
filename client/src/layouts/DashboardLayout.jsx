@@ -306,6 +306,8 @@ const DashboardLayout = () => {
               transition-all duration-200
               hover:bg-red-50
               hover:text-red-600
+                hover:cursor-pointer
+
             "
           >
             <LogOut

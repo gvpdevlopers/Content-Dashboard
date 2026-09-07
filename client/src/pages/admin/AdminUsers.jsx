@@ -31,31 +31,23 @@ const AdminUsers = () => {
   const navigate = useNavigate();
 
   // Progressive loading
-  const [visibleCount, setVisibleCount] =
-    useState(USERS_PER_BATCH);
+  const [visibleCount, setVisibleCount] = useState(USERS_PER_BATCH);
 
   const loadUsers = async () => {
     try {
       setLoading(true);
       setError("");
 
-      const data =
-        await adminUserService.getUsers();
+      const data = await adminUserService.getUsers();
 
       setUsers(data.users || []);
 
       // Reset visible users after refresh
       setVisibleCount(USERS_PER_BATCH);
     } catch (error) {
-      console.error(
-        "Get admin users error:",
-        error
-      );
+      console.error("Get admin users error:", error);
 
-      setError(
-        error.response?.data?.message ||
-          "Unable to load users."
-      );
+      setError(error.response?.data?.message || "Unable to load users.");
     } finally {
       setLoading(false);
     }
@@ -72,75 +64,41 @@ const AdminUsers = () => {
    * search/filter always works across the complete user list.
    */
   const filteredUsers = useMemo(() => {
-    const query =
-      search.trim().toLowerCase();
+    const query = search.trim().toLowerCase();
 
     return users.filter((user) => {
       const matchesSearch =
         !query ||
-        user.name
-          ?.toLowerCase()
-          .includes(query) ||
-        user.email
-          ?.toLowerCase()
-          .includes(query) ||
-        user.username
-          ?.toLowerCase()
-          .includes(query);
+        user.name?.toLowerCase().includes(query) ||
+        user.email?.toLowerCase().includes(query) ||
+        user.username?.toLowerCase().includes(query);
 
       const matchesStatus =
         statusFilter === "all" ||
-        (statusFilter === "active" &&
-          user.isActive) ||
-        (statusFilter === "inactive" &&
-          !user.isActive);
+        (statusFilter === "active" && user.isActive) ||
+        (statusFilter === "inactive" && !user.isActive);
 
-      const matchesRole =
-        roleFilter === "all" ||
-        user.role === roleFilter;
+      const matchesRole = roleFilter === "all" || user.role === roleFilter;
 
-      return (
-        matchesSearch &&
-        matchesStatus &&
-        matchesRole
-      );
+      return matchesSearch && matchesStatus && matchesRole;
     });
-  }, [
-    users,
-    search,
-    statusFilter,
-    roleFilter,
-  ]);
+  }, [users, search, statusFilter, roleFilter]);
 
   /*
    * Only render the currently visible batch.
    */
   const visibleUsers = useMemo(() => {
-    return filteredUsers.slice(
-      0,
-      visibleCount
-    );
-  }, [
-    filteredUsers,
-    visibleCount,
-  ]);
+    return filteredUsers.slice(0, visibleCount);
+  }, [filteredUsers, visibleCount]);
 
-  const hasMoreUsers =
-    visibleCount <
-    filteredUsers.length;
+  const hasMoreUsers = visibleCount < filteredUsers.length;
 
   /*
    * Reset visible count whenever search/filter changes.
    */
   useEffect(() => {
-    setVisibleCount(
-      USERS_PER_BATCH
-    );
-  }, [
-    search,
-    statusFilter,
-    roleFilter,
-  ]);
+    setVisibleCount(USERS_PER_BATCH);
+  }, [search, statusFilter, roleFilter]);
 
   /*
    * Infinite / scroll-based loading.
@@ -151,83 +109,40 @@ const AdminUsers = () => {
     }
 
     const handleScroll = () => {
-      const scrollPosition =
-        window.innerHeight +
-        window.scrollY;
+      const scrollPosition = window.innerHeight + window.scrollY;
 
-      const threshold =
-        document.documentElement
-          .scrollHeight - 500;
+      const threshold = document.documentElement.scrollHeight - 500;
 
-      if (
-        scrollPosition >=
-        threshold
-      ) {
-        setVisibleCount(
-          (current) => {
-            if (
-              current >=
-              filteredUsers.length
-            ) {
-              return current;
-            }
-
-            return Math.min(
-              current +
-                USERS_PER_BATCH,
-              filteredUsers.length
-            );
+      if (scrollPosition >= threshold) {
+        setVisibleCount((current) => {
+          if (current >= filteredUsers.length) {
+            return current;
           }
-        );
+
+          return Math.min(current + USERS_PER_BATCH, filteredUsers.length);
+        });
       }
     };
 
-    window.addEventListener(
-      "scroll",
-      handleScroll,
-      {
-        passive: true,
-      }
-    );
+    window.addEventListener("scroll", handleScroll, {
+      passive: true,
+    });
 
     return () => {
-      window.removeEventListener(
-        "scroll",
-        handleScroll
-      );
+      window.removeEventListener("scroll", handleScroll);
     };
-  }, [
-    hasMoreUsers,
-    loading,
-    filteredUsers.length,
-  ]);
+  }, [hasMoreUsers, loading, filteredUsers.length]);
 
-  const activeUsers =
-    users.filter(
-      (user) => user.isActive
-    ).length;
+  const activeUsers = users.filter((user) => user.isActive).length;
 
-  const inactiveUsers =
-    users.filter(
-      (user) => !user.isActive
-    ).length;
+  const inactiveUsers = users.filter((user) => !user.isActive).length;
 
-  const clientUsers =
-    users.filter(
-      (user) =>
-        user.role === "client"
-    ).length;
+  const clientUsers = users.filter((user) => user.role === "client").length;
 
-  const adminUsers =
-    users.filter(
-      (user) =>
-        user.role === "admin"
-    ).length;
+  const adminUsers = users.filter((user) => user.role === "admin").length;
 
   const hasFilters =
-    Boolean(search) ||
-    statusFilter !== "all" ||
-    roleFilter !== "all";
+    Boolean(search) || statusFilter !== "all" || roleFilter !== "all";
 
   return (
     <div
@@ -337,10 +252,7 @@ const AdminUsers = () => {
                   group-hover:text-zinc-800
                 "
               >
-                <Users
-                  size={18}
-                  strokeWidth={1.6}
-                />
+                <Users size={18} strokeWidth={1.6} />
               </div>
 
               <p
@@ -379,9 +291,7 @@ const AdminUsers = () => {
                 sm:text-base
               "
             >
-              Manage client accounts and
-              monitor account access from
-              one place.
+              Manage client accounts and monitor account access from one place.
             </p>
           </div>
 
@@ -400,11 +310,7 @@ const AdminUsers = () => {
 
             <button
               type="button"
-              onClick={() =>
-                navigate(
-                  "/admin/users/new"
-                )
-              }
+              onClick={() => navigate("/admin/users/new")}
               className="
                 inline-flex
                 items-center
@@ -463,14 +369,9 @@ const AdminUsers = () => {
                 className={`
                   transition-transform
                   duration-500
-                  ${
-                    loading
-                      ? "animate-spin"
-                      : "group-hover/refresh:rotate-180"
-                  }
+                  ${loading ? "animate-spin" : "group-hover/refresh:rotate-180"}
                 `}
               />
-
               Refresh
             </button>
           </div>
@@ -490,23 +391,11 @@ const AdminUsers = () => {
           xl:grid-cols-4
         "
       >
-        <StatCard
-          icon={Users}
-          label="Total Users"
-          value={users.length}
-        />
+        <StatCard icon={Users} label="Total Users" value={users.length} />
 
-        <StatCard
-          icon={UserRound}
-          label="Clients"
-          value={clientUsers}
-        />
+        <StatCard icon={UserRound} label="Clients" value={clientUsers} />
 
-        <StatCard
-          icon={ShieldCheck}
-          label="Admins"
-          value={adminUsers}
-        />
+        <StatCard icon={ShieldCheck} label="Admins" value={adminUsers} />
 
         <StatCard
           icon={CheckCircle2}
@@ -536,9 +425,7 @@ const AdminUsers = () => {
             sm:justify-between
           "
         >
-          <p className="text-sm text-red-600">
-            {error}
-          </p>
+          <p className="text-sm text-red-600">{error}</p>
 
           <button
             type="button"
@@ -604,11 +491,7 @@ const AdminUsers = () => {
             <input
               type="text"
               value={search}
-              onChange={(event) =>
-                setSearch(
-                  event.target.value
-                )
-              }
+              onChange={(event) => setSearch(event.target.value)}
               placeholder="Search by name, email or username..."
               className="
                 h-[50px]
@@ -645,9 +528,7 @@ const AdminUsers = () => {
           >
             <CustomSelect
               value={statusFilter}
-              onChange={
-                setStatusFilter
-              }
+              onChange={setStatusFilter}
               options={[
                 {
                   value: "all",
@@ -676,9 +557,7 @@ const AdminUsers = () => {
           >
             <CustomSelect
               value={roleFilter}
-              onChange={
-                setRoleFilter
-              }
+              onChange={setRoleFilter}
               options={[
                 {
                   value: "all",
@@ -727,9 +606,7 @@ const AdminUsers = () => {
               type="button"
               onClick={() => {
                 setSearch("");
-                setStatusFilter(
-                  "all"
-                );
+                setStatusFilter("all");
                 setRoleFilter("all");
               }}
               className="
@@ -781,16 +658,11 @@ const AdminUsers = () => {
                 bg-zinc-50
               "
             >
-              <Loader2
-                size={19}
-                className="animate-spin text-zinc-400"
-              />
+              <Loader2 size={19} className="animate-spin text-zinc-400" />
             </div>
 
             <div>
-              <p className="text-sm font-medium text-zinc-700">
-                Loading users
-              </p>
+              <p className="text-sm font-medium text-zinc-700">Loading users</p>
 
               <p className="mt-1 text-xs text-zinc-400">
                 Fetching account data...
@@ -799,9 +671,7 @@ const AdminUsers = () => {
           </div>
         </div>
       ) : filteredUsers.length === 0 ? (
-        <EmptyUsers
-          hasFilters={hasFilters}
-        />
+        <EmptyUsers hasFilters={hasFilters} />
       ) : (
         <>
           {/* =================================================
@@ -844,17 +714,13 @@ const AdminUsers = () => {
             </div>
 
             <div>
-              {visibleUsers.map(
-                (user) => (
-                  <UserTableRow
-                    key={user._id}
-                    user={user}
-                    onStatusChange={
-                      loadUsers
-                    }
-                  />
-                )
-              )}
+              {visibleUsers.map((user) => (
+                <UserTableRow
+                  key={user._id}
+                  user={user}
+                  onStatusChange={loadUsers}
+                />
+              ))}
             </div>
           </div>
 
@@ -863,17 +729,13 @@ const AdminUsers = () => {
           ================================================== */}
 
           <div className="space-y-3 md:hidden">
-            {visibleUsers.map(
-              (user) => (
-                <UserMobileCard
-                  key={user._id}
-                  user={user}
-                  onStatusChange={
-                    loadUsers
-                  }
-                />
-              )
-            )}
+            {visibleUsers.map((user) => (
+              <UserMobileCard
+                key={user._id}
+                user={user}
+                onStatusChange={loadUsers}
+              />
+            ))}
           </div>
 
           {/* =================================================
@@ -898,11 +760,7 @@ const AdminUsers = () => {
                   text-zinc-400
                 "
               >
-                <Loader2
-                  size={17}
-                  className="animate-spin"
-                />
-
+                <Loader2 size={17} className="animate-spin" />
                 Loading more users...
               </div>
             </div>
@@ -912,17 +770,13 @@ const AdminUsers = () => {
               ALL USERS LOADED
           ================================================== */}
 
-          {!hasMoreUsers &&
-            filteredUsers.length >
-              USERS_PER_BATCH && (
-              <div className="py-8 text-center">
-                <p className="text-xs text-zinc-400">
-                  Showing all{" "}
-                  {filteredUsers.length}{" "}
-                  users
-                </p>
-              </div>
-            )}
+          {!hasMoreUsers && filteredUsers.length > USERS_PER_BATCH && (
+            <div className="py-8 text-center">
+              <p className="text-xs text-zinc-400">
+                Showing all {filteredUsers.length} users
+              </p>
+            </div>
+          )}
         </>
       )}
     </div>
@@ -933,12 +787,7 @@ const AdminUsers = () => {
    STAT CARD
 ========================================================= */
 
-const StatCard = ({
-  icon: Icon,
-  label,
-  value,
-  secondary,
-}) => {
+const StatCard = ({ icon: Icon, label, value, secondary }) => {
   return (
     <div
       className="
@@ -977,10 +826,7 @@ const StatCard = ({
             group-hover:text-zinc-800
           "
         >
-          <Icon
-            size={18}
-            strokeWidth={1.6}
-          />
+          <Icon size={18} strokeWidth={1.6} />
         </div>
 
         <span
@@ -1006,11 +852,7 @@ const StatCard = ({
         {label}
       </p>
 
-      {secondary && (
-        <p className="mt-1 text-xs text-zinc-400">
-          {secondary}
-        </p>
-      )}
+      {secondary && <p className="mt-1 text-xs text-zinc-400">{secondary}</p>}
     </div>
   );
 };
@@ -1019,10 +861,7 @@ const StatCard = ({
    DESKTOP USER ROW
 ========================================================= */
 
-const UserTableRow = ({
-  user,
-  onStatusChange,
-}) => {
+const UserTableRow = ({ user, onStatusChange }) => {
   return (
     <div
       className="
@@ -1050,9 +889,7 @@ const UserTableRow = ({
           gap-3
         "
       >
-        <UserAvatar
-          user={user}
-        />
+        <UserAvatar user={user} />
 
         <div className="min-w-0">
           <p
@@ -1063,8 +900,7 @@ const UserTableRow = ({
               text-zinc-900
             "
           >
-            {user.name ||
-              "Unnamed User"}
+            {user.name || "Unnamed User"}
           </p>
 
           <p
@@ -1075,8 +911,7 @@ const UserTableRow = ({
               text-zinc-400
             "
           >
-            @{user.username ||
-              "—"}
+            @{user.username || "—"}
           </p>
         </div>
       </div>
@@ -1097,51 +932,39 @@ const UserTableRow = ({
       {/* Role */}
 
       <div>
-        <RoleBadge
-          role={user.role}
-        />
+        <RoleBadge role={user.role} />
       </div>
 
       {/* Status */}
 
       <div>
-        <StatusBadge
-          isActive={
-            user.isActive
-          }
-        />
+        <StatusBadge isActive={user.isActive} />
       </div>
 
       {/* Joined */}
 
-      <p className="text-sm text-zinc-500">
-        {formatDate(
-          user.createdAt
-        )}
-      </p>
+      <p className="text-sm text-zinc-500">{formatDate(user.createdAt)}</p>
 
       {/* Action */}
 
       <Link
         to={`/admin/users/${user._id}`}
         className="
-          flex h-9 w-9
-          items-center justify-center
-          justify-self-end
-          rounded-lg
-          border border-zinc-200
-          bg-white
-          text-zinc-400
-          shadow-sm
-          transition-all
-          duration-200
-          hover:border-zinc-900
-          hover:bg-zinc-900
-          hover:text-white
-        "
-        aria-label={`View ${
-          user.name || "user"
-        }`}
+    flex h-9 w-9
+    items-center justify-center
+    justify-self-end
+    rounded-lg
+    border border-zinc-200
+    bg-white
+    text-zinc-400
+    shadow-sm
+    transition-all
+    duration-200
+    hover:border-zinc-900
+    hover:bg-zinc-900
+    !hover:text-white
+  "
+        aria-label={`View ${user.name || "user"}`}
       >
         <ChevronRight size={16} />
       </Link>
@@ -1153,35 +976,22 @@ const UserTableRow = ({
    MOBILE USER CARD
 ========================================================= */
 
-const UserMobileCard = ({
-  user,
-  onStatusChange,
-}) => {
-  const [
-    updating,
-    setUpdating,
-  ] = useState(false);
+const UserMobileCard = ({ user, onStatusChange }) => {
+  const [updating, setUpdating] = useState(false);
 
-  const toggleStatus =
-    async () => {
-      try {
-        setUpdating(true);
+  const toggleStatus = async () => {
+    try {
+      setUpdating(true);
 
-        await adminUserService.updateUserStatus(
-          user._id,
-          !user.isActive
-        );
+      await adminUserService.updateUserStatus(user._id, !user.isActive);
 
-        await onStatusChange();
-      } catch (error) {
-        console.error(
-          "Update user status error:",
-          error
-        );
-      } finally {
-        setUpdating(false);
-      }
-    };
+      await onStatusChange();
+    } catch (error) {
+      console.error("Update user status error:", error);
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   return (
     <div
@@ -1214,9 +1024,7 @@ const UserMobileCard = ({
             gap-3
           "
         >
-          <UserAvatar
-            user={user}
-          />
+          <UserAvatar user={user} />
 
           <div className="min-w-0">
             <p
@@ -1227,8 +1035,7 @@ const UserMobileCard = ({
                 text-zinc-900
               "
             >
-              {user.name ||
-                "Unnamed User"}
+              {user.name || "Unnamed User"}
             </p>
 
             <p
@@ -1244,11 +1051,7 @@ const UserMobileCard = ({
           </div>
         </div>
 
-        <StatusBadge
-          isActive={
-            user.isActive
-          }
-        />
+        <StatusBadge isActive={user.isActive} />
       </div>
 
       <div
@@ -1283,8 +1086,7 @@ const UserMobileCard = ({
               text-zinc-600
             "
           >
-            @{user.username ||
-              "—"}
+            @{user.username || "—"}
           </p>
         </div>
 
@@ -1302,9 +1104,7 @@ const UserMobileCard = ({
           </p>
 
           <div className="mt-1">
-            <RoleBadge
-              role={user.role}
-            />
+            <RoleBadge role={user.role} />
           </div>
         </div>
 
@@ -1322,9 +1122,7 @@ const UserMobileCard = ({
           </p>
 
           <p className="mt-1 text-sm text-zinc-500">
-            {formatDate(
-              user.createdAt
-            )}
+            {formatDate(user.createdAt)}
           </p>
         </div>
 
@@ -1342,9 +1140,7 @@ const UserMobileCard = ({
           </p>
 
           <p className="mt-1 text-sm text-zinc-500">
-            {user.isActive
-              ? "Active"
-              : "Inactive"}
+            {user.isActive ? "Active" : "Inactive"}
           </p>
         </div>
       </div>
@@ -1375,7 +1171,6 @@ const UserMobileCard = ({
           "
         >
           View User
-
           <ChevronRight
             size={16}
             className="
@@ -1386,16 +1181,11 @@ const UserMobileCard = ({
           />
         </Link>
 
-        {user.role !==
-          "admin" && (
+        {user.role !== "admin" && (
           <button
             type="button"
-            onClick={
-              toggleStatus
-            }
-            disabled={
-              updating
-            }
+            onClick={toggleStatus}
+            disabled={updating}
             className="
               flex
               items-center
@@ -1416,10 +1206,7 @@ const UserMobileCard = ({
             "
           >
             {updating ? (
-              <Loader2
-                size={16}
-                className="animate-spin"
-              />
+              <Loader2 size={16} className="animate-spin" />
             ) : user.isActive ? (
               "Disable"
             ) : (
@@ -1436,14 +1223,8 @@ const UserMobileCard = ({
    AVATAR
 ========================================================= */
 
-const UserAvatar = ({
-  user,
-}) => {
-  const initial =
-    user.name
-      ?.charAt(0)
-      ?.toUpperCase() ||
-    "U";
+const UserAvatar = ({ user }) => {
+  const initial = user.name?.charAt(0)?.toUpperCase() || "U";
 
   return (
     <div
@@ -1469,9 +1250,7 @@ const UserAvatar = ({
    STATUS BADGE
 ========================================================= */
 
-const StatusBadge = ({
-  isActive,
-}) => {
+const StatusBadge = ({ isActive }) => {
   return (
     <span
       className={`
@@ -1504,17 +1283,11 @@ const StatusBadge = ({
           h-1.5
           w-1.5
           rounded-full
-          ${
-            isActive
-              ? "bg-emerald-500"
-              : "bg-red-500"
-          }
+          ${isActive ? "bg-emerald-500" : "bg-red-500"}
         `}
       />
 
-      {isActive
-        ? "Active"
-        : "Inactive"}
+      {isActive ? "Active" : "Inactive"}
     </span>
   );
 };
@@ -1523,11 +1296,8 @@ const StatusBadge = ({
    ROLE BADGE
 ========================================================= */
 
-const RoleBadge = ({
-  role,
-}) => {
-  const isAdmin =
-    role === "admin";
+const RoleBadge = ({ role }) => {
+  const isAdmin = role === "admin";
 
   return (
     <span
@@ -1556,16 +1326,9 @@ const RoleBadge = ({
         }
       `}
     >
-      {isAdmin && (
-        <ShieldCheck
-          size={12}
-          strokeWidth={1.7}
-        />
-      )}
+      {isAdmin && <ShieldCheck size={12} strokeWidth={1.7} />}
 
-      {isAdmin
-        ? "Admin"
-        : "Client"}
+      {isAdmin ? "Admin" : "Client"}
     </span>
   );
 };
@@ -1574,9 +1337,7 @@ const RoleBadge = ({
    EMPTY STATE
 ========================================================= */
 
-const EmptyUsers = ({
-  hasFilters,
-}) => {
+const EmptyUsers = ({ hasFilters }) => {
   return (
     <div
       className="
@@ -1620,10 +1381,7 @@ const EmptyUsers = ({
             text-zinc-400
           "
         >
-          <Users
-            size={22}
-            strokeWidth={1.6}
-          />
+          <Users size={22} strokeWidth={1.6} />
         </div>
 
         <h2
@@ -1634,9 +1392,7 @@ const EmptyUsers = ({
             text-zinc-900
           "
         >
-          {hasFilters
-            ? "No users found"
-            : "No users yet"}
+          {hasFilters ? "No users found" : "No users yet"}
         </h2>
 
         <p
@@ -1661,23 +1417,16 @@ const EmptyUsers = ({
    HELPERS
 ========================================================= */
 
-const formatDate = (
-  date
-) => {
+const formatDate = (date) => {
   if (!date) {
     return "—";
   }
 
-  return new Date(
-    date
-  ).toLocaleDateString(
-    "en-IN",
-    {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }
-  );
+  return new Date(date).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 };
 
 export default AdminUsers;

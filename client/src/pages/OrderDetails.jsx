@@ -237,26 +237,25 @@ const OrderDetails = () => {
   const serviceCategory = service.category || "";
   const serviceDescription = service.description || "";
 
-  const formData =
-    order.formData instanceof Map
-      ? Object.fromEntries(order.formData)
-      : order.formData || {};
+const formData =
+  order.formData instanceof Map
+    ? Object.fromEntries(order.formData)
+    : order.formData || {};
 
-  const selectedOption = service.selectedOption || null;
+const selectedOption = service.selectedOption || null;
 
-  const quantity = Number(order.quantity || 1);
+const quantity = Number(order.quantity || 1);
 
-  const quantityUnit = selectedOption?.unit || service.unit || "";
+const quantityUnit = selectedOption?.unit || service.unit || "";
 
-  // ---------------------------------------------------------
-  // Dynamic form fields
-  // ---------------------------------------------------------
+// ---------------------------------------------------------
+// Dynamic form fields
+// ---------------------------------------------------------
 
-  const dynamicFields = useMemo(() => {
-    return Object.entries(formData).filter(
-      ([, value]) => value !== null && value !== undefined && value !== "",
-    );
-  }, [formData]);
+const dynamicFields = Object.entries(formData).filter(
+  ([, value]) => value !== null && value !== undefined && value !== "",
+);
+
 
   // ---------------------------------------------------------
   // COD State

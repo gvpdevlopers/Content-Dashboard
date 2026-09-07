@@ -969,7 +969,12 @@ const AdminOrderDetails = () => {
               ORDER STATUS
           ================================================== */}
 
-          <InfoCard icon={Package} eyebrow="Management" title="Order Status">
+          <InfoCard
+            icon={Package}
+            eyebrow="Management"
+            title="Order Status"
+            allowOverflow
+          >
             <p
               className="
                 mb-4
@@ -1017,7 +1022,12 @@ const AdminOrderDetails = () => {
               PAYMENT
           ================================================== */}
 
-          <InfoCard icon={CreditCard} eyebrow="Payment" title="Payment Status">
+          <InfoCard
+            icon={CreditCard}
+            eyebrow="Payment"
+            title="Payment Status"
+            allowOverflow
+          >
             <div
               className="
                 mb-5
@@ -1589,25 +1599,31 @@ const SummaryCard = ({ icon: Icon, label, value }) => {
    INFO CARD
 ========================================================= */
 
-const InfoCard = ({ icon: Icon, eyebrow, title, children }) => {
+const InfoCard = ({
+  icon: Icon,
+  eyebrow,
+  title,
+  children,
+  allowOverflow = false,
+}) => {
   return (
     <section
-      className="
-        group
-        relative
-        overflow-hidden
-        rounded-[24px]
-        border
-        border-zinc-200
-        bg-white
-        p-6
-        shadow-[0_12px_45px_rgba(0,0,0,0.04)]
-        transition
-        duration-300
-        hover:border-zinc-300
-        hover:shadow-[0_18px_60px_rgba(0,0,0,0.06)]
-        sm:p-7
-      "
+      className={`
+    group
+    relative
+    ${allowOverflow ? "overflow-visible" : "overflow-hidden"}
+    rounded-[24px]
+    border
+    border-zinc-200
+    bg-white
+    p-6
+    shadow-[0_12px_45px_rgba(0,0,0,0.04)]
+    transition
+    duration-300
+    hover:border-zinc-300
+    hover:shadow-[0_18px_60px_rgba(0,0,0,0.06)]
+    sm:p-7
+  `}
     >
       <div
         className="
