@@ -2,6 +2,47 @@ const Service = require("../models/Service");
 
 /*
 |--------------------------------------------------------------------------
+| Public - Get Active Services
+|--------------------------------------------------------------------------
+*/
+
+const getPublicServices = async (req, res) => {
+  try {
+    const services = await Service.find(
+      {
+        isActive: true,
+      },
+      {
+        name: 1,
+        slug: 1,
+        category: 1,
+        description: 1,
+        pricingType: 1,
+        basePrice: 1,
+        unit: 1,
+        displayOrder: 1,
+      }
+    ).sort({
+      displayOrder: 1,
+      name: 1,
+    });
+
+    return res.status(200).json({
+      success: true,
+      services,
+    });
+  } catch (error) {
+    console.error("Get public services error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to fetch public services.",
+    });
+  }
+};
+
+/*
+|--------------------------------------------------------------------------
 | Client - Get Active Services
 |--------------------------------------------------------------------------
 */
@@ -481,6 +522,8 @@ const toggleServiceStatus = async (req, res) => {
 };
 
 module.exports = {
+  getPublicServices,
+
   getActiveServices,
   getServiceById,
 

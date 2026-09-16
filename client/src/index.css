@@ -202,6 +202,114 @@ html {
 }
 
 /* =========================================================
+   PUBLIC WEBSITE DESIGN TOKENS
+========================================================= */
+
+:root {
+  --public-max-width: 1400px;
+  --public-content-width: 1280px;
+
+  --public-radius-sm: 12px;
+  --public-radius-md: 18px;
+  --public-radius-lg: 24px;
+  --public-radius-xl: 32px;
+
+  --public-section-space: 7rem;
+
+  --public-motion-fast: 180ms;
+  --public-motion-base: 320ms;
+  --public-motion-slow: 600ms;
+
+  --public-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.public-container {
+  width: 100%;
+  max-width: var(--public-max-width);
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+@media (min-width: 640px) {
+  .public-container {
+    padding-inline: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .public-container {
+    padding-inline: 2rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  .public-container {
+    padding-inline: 2.5rem;
+  }
+}
+
+/* Premium ambient glow */
+
+.public-ambient-glow {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 9999px;
+  filter: blur(80px);
+  opacity: 0.18;
+  transform: translateZ(0);
+}
+
+/* Subtle glass surface */
+
+.public-glass {
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+/* Premium gradient border */
+
+.public-gradient-border {
+  position: relative;
+  isolation: isolate;
+}
+
+.public-gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg,
+      rgba(6, 182, 212, 0.3),
+      rgba(37, 99, 235, 0.2),
+      rgba(124, 58, 237, 0.25));
+
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+/* Prevent accidental horizontal overflow from effects */
+
+.public-page {
+  width: 100%;
+  overflow-x: clip;
+}
+
+@supports not (overflow: clip) {
+  .public-page {
+    overflow-x: hidden;
+  }
+}
+
+
+/* =========================================================
    SHARED LIGHT SURFACES
 ========================================================= */
 
@@ -338,3 +446,279 @@ select {
     height: 4px;
   }
 }
+
+/* =========================================================
+   PUBLIC HERO / DECORATIVE PERFORMANCE
+========================================================= */
+
+.public-page .will-change-transform {
+  will-change: transform;
+}
+
+.public-page img {
+  max-width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .public-page *,
+  .public-page *::before,
+  .public-page *::after {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* =========================================================
+   PUBLIC BUTTON SYSTEM
+========================================================= */
+
+.public-button {
+  --button-bg: #18181b;
+  --button-text: #ffffff;
+  --button-border: transparent;
+  --button-hover-bg: #27272a;
+  --button-hover-border: transparent;
+  --button-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.05),
+    0 8px 20px rgba(0, 0, 0, 0.08);
+  --button-hover-shadow:
+    0 4px 8px rgba(0, 0, 0, 0.06),
+    0 16px 34px rgba(0, 0, 0, 0.13);
+
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  overflow: hidden;
+  border: 1px solid var(--button-border);
+  border-radius: 9999px;
+  background: var(--button-bg);
+  color: var(--button-text);
+  padding: 0.75rem 1.375rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  box-shadow: var(--button-shadow);
+  transform: translate3d(0, 0, 0);
+  transition:
+    transform 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 550ms cubic-bezier(0.22, 1, 0.36, 1);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.public-button__content {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.public-button__label {
+  display: inline-block;
+}
+
+.public-button__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  transform: translate3d(0, 0, 0);
+  transition:
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Subtle internal light sweep */
+.public-button__shine {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: -120%;
+  width: 70%;
+  height: 100%;
+  pointer-events: none;
+  background: linear-gradient(105deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.05) 45%,
+      rgba(255, 255, 255, 0.18) 50%,
+      rgba(255, 255, 255, 0.05) 55%,
+      transparent 100%);
+  transform: skewX(-18deg);
+  transition:
+    left 2000ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* =========================================================
+   PRIMARY — DARK
+========================================================= */
+
+.public-button--primary {
+  --button-bg: #18181b;
+  --button-text: #ffffff;
+  --button-border: rgba(24, 24, 27, 0.9);
+  --button-hover-bg: #27272a;
+  --button-hover-border: rgba(39, 39, 42, 0.95);
+}
+
+/* =========================================================
+   SECONDARY — LIGHT
+========================================================= */
+
+.public-button--secondary {
+  --button-bg: #ffffff;
+  --button-text: #18181b;
+  --button-border: #d4d4d8;
+  --button-hover-bg: #f4f4f5;
+  --button-hover-border: #a1a1aa;
+}
+
+/* Light button needs a darker shine */
+.public-button--secondary .public-button__shine {
+  background: linear-gradient(105deg,
+      transparent 0%,
+      rgba(24, 24, 27, 0.02) 45%,
+      rgba(24, 24, 27, 0.07) 50%,
+      rgba(24, 24, 27, 0.02) 55%,
+      transparent 100%);
+}
+
+/* =========================================================
+   OUTLINE
+========================================================= */
+
+.public-button--outline {
+  --button-bg: transparent;
+  --button-text: #18181b;
+  --button-border: #d4d4d8;
+  --button-hover-bg: #18181b;
+  --button-hover-border: #18181b;
+}
+
+.public-button--outline:hover,
+.public-button--outline:focus-visible {
+  --button-text: #ffffff;
+}
+
+/* =========================================================
+   GHOST
+========================================================= */
+
+.public-button--ghost {
+  --button-bg: transparent;
+  --button-text: #18181b;
+  --button-border: transparent;
+  --button-hover-bg: #f4f4f5;
+  --button-hover-border: transparent;
+
+  box-shadow: none;
+}
+
+.public-button--ghost:hover,
+.public-button--ghost:focus-visible {
+  box-shadow: none;
+}
+
+/* =========================================================
+   HOVER
+========================================================= */
+
+@media (hover: hover) and (pointer: fine) {
+  .public-button:hover {
+    background: var(--button-hover-bg);
+    border-color: var(--button-hover-border);
+    box-shadow: var(--button-hover-shadow);
+    transform: translate3d(0, -2px, 0);
+  }
+
+  .public-button:hover .public-button__icon {
+    transform: translate3d(2px, -2px, 0);
+  }
+
+  .public-button:hover .public-button__shine {
+    left: 140%;
+  }
+}
+
+/* =========================================================
+   ACTIVE
+========================================================= */
+
+.public-button:active {
+  transform: translate3d(0, 0, 0);
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.08),
+    0 6px 14px rgba(0, 0, 0, 0.08);
+}
+
+.public-button:active .public-button__icon {
+  transform: translate3d(1px, -1px, 0);
+}
+
+/* =========================================================
+   FOCUS
+========================================================= */
+
+.public-button:focus-visible {
+  outline: 2px solid rgba(24, 24, 27, 0.22);
+  outline-offset: 3px;
+}
+
+/* =========================================================
+   DISABLED
+========================================================= */
+
+.public-button:disabled,
+.public-button[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+  transform: none;
+  box-shadow: none;
+}
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (min-width: 640px) {
+  .public-button {
+    min-height: 50px;
+    padding-inline: 1.5rem;
+  }
+}
+
+/* =========================================================
+   REDUCED MOTION
+========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+
+  .public-button,
+  .public-button__icon,
+  .public-button__shine {
+    transition: none;
+  }
+
+  .public-button:hover,
+  .public-button:active {
+    transform: none;
+  }
+
+  .public-button:hover .public-button__icon,
+  .public-button:active .public-button__icon {
+    transform: none;
+  }
+
+  .public-button__shine {
+    display: none;
+  }
+}
+

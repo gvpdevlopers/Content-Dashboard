@@ -1,6 +1,7 @@
 const express = require("express");
 
 const {
+  getPublicServices,
   getActiveServices,
   getServiceById,
   getAdminServices,
@@ -28,6 +29,17 @@ router.get(
   protect,
   adminOnly,
   getAdminServices
+);
+
+/*
+|--------------------------------------------------------------------------
+| Public Routes
+|--------------------------------------------------------------------------
+*/
+
+router.get(
+  "/public",
+  getPublicServices
 );
 
 router.get(
