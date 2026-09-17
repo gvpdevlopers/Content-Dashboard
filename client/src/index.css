@@ -84,13 +84,13 @@ a {
 ========================================================= */
 
 ::selection {
-  background: #18181b;
-  color: #ffffff;
+  background: #e4e4e7;
+  color: #18181b;
 }
 
 ::-moz-selection {
-  background: #18181b;
-  color: #ffffff;
+  background: #e4e4e7;
+  color: #18181b;
 }
 
 /* =========================================================
@@ -282,10 +282,13 @@ html {
   z-index: -1;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(135deg,
-      rgba(6, 182, 212, 0.3),
-      rgba(37, 99, 235, 0.2),
-      rgba(124, 58, 237, 0.25));
+
+  background: linear-gradient(
+    135deg,
+    rgba(63, 63, 70, 0.24),
+    rgba(161, 161, 170, 0.18),
+    rgba(39, 39, 42, 0.24)
+  );
 
   -webkit-mask:
     linear-gradient(#fff 0 0) content-box,
@@ -294,7 +297,6 @@ html {
   -webkit-mask-composite: xor;
   mask-composite: exclude;
 }
-
 /* Prevent accidental horizontal overflow from effects */
 
 .public-page {
@@ -719,6 +721,114 @@ select {
 
   .public-button__shine {
     display: none;
+  }
+}
+
+/* =========================================================
+   GRADIENT TEXT
+========================================================= */
+
+.gradient-text {
+  display: inline-block;
+  vertical-align: baseline;
+
+  /*
+    Give the gradient glyphs enough vertical room.
+    This prevents descenders from being visually clipped
+    when the parent heading uses tight line-height.
+  */
+  line-height: 1.3;
+
+  -webkit-background-clip: text;
+  background-clip: text;
+
+  -webkit-text-fill-color: transparent;
+
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+
+  position: relative;
+}
+
+/* =========================================================
+   GRADIENT TEXT SELECTION
+========================================================= */
+
+.gradient-text::selection {
+  background: #e4e4e7;
+  color: #18181b;
+
+  /*
+    Restore a real text color while selected.
+    This prevents the transparent gradient text from
+    looking broken during selection.
+  */
+  -webkit-text-fill-color: #18181b;
+
+  -webkit-background-clip: initial;
+  background-clip: initial;
+}
+
+.gradient-text::-moz-selection {
+  background: #e4e4e7;
+  color: #18181b;
+
+  -webkit-text-fill-color: #18181b;
+
+  -webkit-background-clip: initial;
+  background-clip: initial;
+}
+
+/* =========================================================
+   PUBLIC HERO TITLE SELECTION
+========================================================= */
+
+.public-page h1::selection {
+  background: #e4e4e7;
+  color: #18181b;
+}
+
+.public-page h1::-moz-selection {
+  background: #e4e4e7;
+  color: #18181b;
+}
+
+.public-page h1 span::selection {
+  background: #e4e4e7;
+  color: #18181b;
+  -webkit-text-fill-color: #18181b;
+}
+
+.public-page h1 span::-moz-selection {
+  background: #e4e4e7;
+  color: #18181b;
+  -webkit-text-fill-color: #18181b;
+}
+/* =========================================================
+   PUBLIC HERO HEADING
+========================================================= */
+
+.public-page h1 {
+  text-wrap: balance;
+}
+
+/*
+  Keep hero title lines visually separated on smaller
+  screens without creating excessive vertical spacing.
+*/
+@media (max-width: 639px) {
+  .public-page h1 {
+    letter-spacing: -0.045em;
+  }
+}
+
+/* =========================================================
+   REDUCED MOTION
+========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .gradient-text {
+    transition: none;
   }
 }
 

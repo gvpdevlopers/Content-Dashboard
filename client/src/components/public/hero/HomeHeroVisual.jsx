@@ -1,40 +1,75 @@
-import { Sparkles } from "lucide-react";
+import {
+  Check,
+  ClipboardList,
+  CreditCard,
+  FileText,
+  Settings2,
+  Sparkles,
+} from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
+
+const workflowSteps = [
+  {
+    number: "01",
+    icon: ClipboardList,
+    title: "Choose a service",
+    description: "Select the service you would like to order.",
+    status: "active",
+  },
+  {
+    number: "02",
+    icon: Settings2,
+    title: "Quantity",
+    description: "Select how many units you need.",
+    status: "complete",
+  },
+  {
+    number: "03",
+    icon: FileText,
+    title: "Project configuration",
+    description: "Configure options and project requirements.",
+    status: "complete",
+  },
+  {
+    number: "04",
+    icon: CreditCard,
+    title: "Payment method",
+    description: "Choose how you would like to complete payment.",
+    status: "complete",
+  },
+];
 
 const HomeHeroVisual = () => {
   const shouldReduceMotion = useReducedMotion();
 
   return (
-    <div className="relative mx-auto w-full max-w-[620px]">
+    <div className="relative mx-auto w-full max-w-[520px]">
       {/* =========================================
-          OUTER GLOW
+          SUBTLE AMBIENT GLOW
       ========================================= */}
       <div
         aria-hidden="true"
         className="
           pointer-events-none
           absolute
-          -inset-10
+          -inset-8
           rounded-[3rem]
-          bg-gradient-to-br
-          from-cyan-400/10
-          via-blue-500/10
-          to-violet-500/10
+          bg-zinc-900/[0.025]
           blur-3xl
         "
       />
 
       {/* =========================================
-          MAIN PLATFORM VISUAL
+          MAIN WORKFLOW WINDOW
       ========================================= */}
       <motion.div
         initial={
           shouldReduceMotion
-            ? { opacity: 1 }
+            ? { opacity: 1, y: 0 }
             : {
                 opacity: 0,
-                y: 30,
-                scale: 0.96,
+                y: 18,
+                scale: 0.985,
               }
         }
         animate={{
@@ -43,306 +78,494 @@ const HomeHeroVisual = () => {
           scale: 1,
         }}
         transition={{
-          duration: shouldReduceMotion ? 0 : 0.9,
-          delay: shouldReduceMotion ? 0 : 0.2,
+          duration: shouldReduceMotion ? 0 : 0.7,
+          delay: shouldReduceMotion ? 0 : 0.1,
           ease: [0.22, 1, 0.36, 1],
         }}
         className="relative"
       >
+        {/* =========================================
+            OUTER FRAME
+        ========================================= */}
         <div
           className="
-            public-gradient-border
-            relative
-            overflow-hidden
-            rounded-[28px]
-            bg-white/80
-            p-2
-            shadow-[0_30px_100px_rgba(24,24,27,0.12)]
+            rounded-[25px]
+            border
+            border-zinc-200/90
+            bg-white/95
+            p-1.5
+            shadow-[0_22px_65px_rgba(24,24,27,0.09)]
             backdrop-blur-xl
-            sm:rounded-[36px]
-            sm:p-3
+            sm:rounded-[28px]
+            sm:p-2
           "
         >
+          {/* =========================================
+              PLATFORM WINDOW
+          ========================================= */}
           <div
             className="
               overflow-hidden
-              rounded-[22px]
+              rounded-[20px]
               border
-              border-[var(--color-border-soft)]
-              bg-[var(--color-surface-soft)]
-              sm:rounded-[28px]
+              border-zinc-200/80
+              bg-[#fafafa]
+              sm:rounded-[23px]
             "
           >
             {/* =========================================
-                BROWSER BAR
+                TOP BAR
             ========================================= */}
             <div
               className="
                 flex
-                h-12
+                h-11
                 items-center
                 justify-between
                 border-b
-                border-[var(--color-border-soft)]
+                border-zinc-200/80
                 bg-white
-                px-4
-                sm:h-14
-                sm:px-5
+                px-3.5
+                sm:h-12
+                sm:px-4
               "
             >
-              <div className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-zinc-300" />
-                <span className="h-2.5 w-2.5 rounded-full bg-zinc-300" />
-                <span className="h-2.5 w-2.5 rounded-full bg-zinc-300" />
+              <div className="flex items-center gap-2.5">
+                {/* Browser dots */}
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-zinc-300" />
+                  <span className="h-2 w-2 rounded-full bg-zinc-300" />
+                  <span className="h-2 w-2 rounded-full bg-zinc-300" />
+                </div>
+
+                <div className="hidden h-4 w-px bg-zinc-200 sm:block" />
+
+                <span className="hidden text-[9px] font-bold tracking-[0.12em] text-zinc-400 sm:block">
+                  GLOW VENTURES
+                </span>
               </div>
 
-              <div className="hidden h-7 w-40 rounded-lg bg-zinc-100 sm:block" />
+              <div className="flex items-center gap-2">
+                <span className="hidden text-[9px] font-medium text-zinc-400 sm:block">
+                  Client Platform
+                </span>
 
-              <div className="h-7 w-7 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600" />
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-900 text-white">
+                  <Sparkles size={11} strokeWidth={1.8} />
+                </div>
+              </div>
             </div>
 
             {/* =========================================
-                DASHBOARD
+                WORKFLOW CONTENT
             ========================================= */}
-            <div
-              className="
-                grid
-                min-h-[380px]
-                grid-cols-[76px_1fr]
-                sm:min-h-[460px]
-                sm:grid-cols-[104px_1fr]
-              "
-            >
-              {/* Sidebar */}
-              <div
-                className="
-                  border-r
-                  border-[var(--color-border-soft)]
-                  bg-white
-                  p-3
-                  sm:p-4
-                "
-              >
-                <div
-                  className="
-                    mb-8
-                    h-8
-                    w-8
-                    rounded-xl
-                    bg-[var(--color-text-primary)]
-                    sm:h-9
-                    sm:w-9
-                  "
-                />
+            <div className="p-3.5 sm:p-4">
+              {/* Header */}
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-zinc-400 sm:text-[9px]">
+                    New Order
+                  </p>
 
-                <div className="space-y-3">
-                  <div className="h-8 rounded-lg bg-zinc-100" />
-                  <div className="h-8 rounded-lg bg-zinc-50" />
-                  <div className="h-8 rounded-lg bg-zinc-50" />
-                  <div className="h-8 rounded-lg bg-zinc-50" />
+                  <h3 className="mt-1 text-base font-bold tracking-[-0.035em] text-zinc-950 sm:text-lg">
+                    Configure your order
+                  </h3>
+
+                  <p className="mt-1 text-[10px] leading-4 text-zinc-500 sm:text-[11px]">
+                    Everything you need, from service to payment.
+                  </p>
+                </div>
+
+                <div className="hidden rounded-full border border-zinc-200 bg-white px-2.5 py-1.5 text-[9px] font-semibold text-zinc-500 shadow-sm sm:block">
+                  4 steps
                 </div>
               </div>
 
-              {/* Dashboard content */}
-              <div className="p-4 sm:p-6">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="h-3 w-20 rounded-full bg-zinc-200" />
-
+              {/* =========================================
+                  PROGRESS LINE
+              ========================================= */}
+              <div className="mt-4 flex items-center">
+                {workflowSteps.map((step, index) => (
+                  <div
+                    key={step.number}
+                    className="flex min-w-0 flex-1 items-center"
+                  >
                     <div
-                      className="
-                        mt-3
-                        h-7
-                        w-40
-                        rounded-lg
-                        bg-zinc-900/90
-                        sm:w-52
-                      "
-                    />
-                  </div>
-
-                  <div className="h-9 w-20 rounded-full bg-zinc-900" />
-                </div>
-
-                {/* Service cards */}
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  {[
-                    "from-cyan-50 to-white",
-                    "from-blue-50 to-white",
-                    "from-violet-50 to-white",
-                  ].map((gradient) => (
-                    <div
-                      key={gradient}
                       className={`
-                        rounded-2xl
+                        flex
+                        h-6
+                        w-6
+                        shrink-0
+                        items-center
+                        justify-center
+                        rounded-full
                         border
-                        border-zinc-200
-                        bg-gradient-to-br
-                        ${gradient}
-                        p-4
+                        text-[8px]
+                        font-bold
+                        ${
+                          step.status === "active"
+                            ? "border-zinc-900 bg-zinc-900 text-white"
+                            : "border-zinc-300 bg-white text-zinc-500"
+                        }
                       `}
                     >
-                      <div className="h-7 w-7 rounded-lg bg-white shadow-sm" />
-
-                      <div className="mt-5 h-2.5 w-16 rounded-full bg-zinc-200" />
-
-                      <div className="mt-2 h-2 w-24 rounded-full bg-zinc-100" />
+                      {step.status === "complete" ? (
+                        <Check size={10} strokeWidth={2.5} />
+                      ) : (
+                        step.number
+                      )}
                     </div>
-                  ))}
+
+                    {index < workflowSteps.length - 1 && (
+                      <div className="mx-1.5 h-px flex-1 bg-zinc-200 sm:mx-2" />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* =========================================
+                  ACTIVE SERVICE CARD
+              ========================================= */}
+              <motion.div
+                initial={
+                  shouldReduceMotion
+                    ? { opacity: 1, y: 0 }
+                    : {
+                        opacity: 0,
+                        y: 8,
+                      }
+                }
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                }}
+                transition={{
+                  duration: shouldReduceMotion ? 0 : 0.45,
+                  delay: shouldReduceMotion ? 0 : 0.3,
+                  ease: [0.22, 1, 0.36, 1],
+                }}
+                className="
+                  mt-3
+                  rounded-2xl
+                  border
+                  border-zinc-300
+                  bg-white
+                  p-3
+                  shadow-[0_8px_25px_rgba(24,24,27,0.05)]
+                  sm:p-3.5
+                "
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[8px] font-bold uppercase tracking-[0.16em] text-zinc-400">
+                      Step 1 · Choose a service
+                    </p>
+
+                    <p className="mt-1 text-xs font-bold text-zinc-900 sm:text-sm">
+                      Select the service you would like to order.
+                    </p>
+                  </div>
+
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-white">
+                    <ClipboardList size={13} strokeWidth={1.8} />
+                  </div>
                 </div>
 
-                {/* Order panel */}
-                <div
+                {/* Selected service */}
+                <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-[11px] font-semibold text-zinc-900 sm:text-xs">
+                      Content Production
+                    </p>
+
+                    <p className="mt-0.5 text-[9px] text-zinc-500">
+                      Strategy · Production · Content
+                    </p>
+                  </div>
+
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-zinc-700 shadow-sm">
+                    <Check size={11} strokeWidth={2.4} />
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* =========================================
+                  WORKFLOW SUMMARY
+              ========================================= */}
+              <div className="mt-2.5 grid grid-cols-3 gap-2">
+                {/* Quantity */}
+                <motion.div
+                  initial={
+                    shouldReduceMotion
+                      ? { opacity: 1, y: 0 }
+                      : {
+                          opacity: 0,
+                          y: 8,
+                        }
+                  }
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                  }}
+                  transition={{
+                    duration: shouldReduceMotion ? 0 : 0.4,
+                    delay: shouldReduceMotion ? 0 : 0.42,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
                   className="
-                    mt-4
-                    rounded-2xl
+                    rounded-xl
                     border
                     border-zinc-200
                     bg-white
-                    p-4
-                    shadow-sm
-                    sm:p-5
+                    p-2.5
                   "
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="h-2.5 w-20 rounded-full bg-zinc-200" />
+                  <div className="flex items-center gap-1.5">
+                    <Settings2
+                      size={11}
+                      className="text-zinc-400"
+                      strokeWidth={1.8}
+                    />
 
-                      <div className="mt-2 h-4 w-32 rounded-md bg-zinc-800" />
-                    </div>
-
-                    <div className="rounded-full bg-emerald-50 px-3 py-1.5">
-                      <div className="h-2 w-12 rounded-full bg-emerald-400" />
-                    </div>
+                    <span className="text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-400">
+                      02
+                    </span>
                   </div>
 
-                  <div className="mt-5 space-y-3">
-                    <div className="h-2 rounded-full bg-zinc-100" />
+                  <p className="mt-1.5 text-[10px] font-bold text-zinc-900 sm:text-[11px]">
+                    Quantity
+                  </p>
 
-                    <div className="h-2 w-4/5 rounded-full bg-zinc-100" />
+                  <p className="mt-0.5 text-[9px] text-zinc-500">
+                    Select units
+                  </p>
+                </motion.div>
 
-                    <div className="h-2 w-3/5 rounded-full bg-zinc-100" />
+                {/* Configuration */}
+                <motion.div
+                  initial={
+                    shouldReduceMotion
+                      ? { opacity: 1, y: 0 }
+                      : {
+                          opacity: 0,
+                          y: 8,
+                        }
+                  }
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                  }}
+                  transition={{
+                    duration: shouldReduceMotion ? 0 : 0.4,
+                    delay: shouldReduceMotion ? 0 : 0.5,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
+                  className="
+                    rounded-xl
+                    border
+                    border-zinc-200
+                    bg-white
+                    p-2.5
+                  "
+                >
+                  <div className="flex items-center gap-1.5">
+                    <FileText
+                      size={11}
+                      className="text-zinc-400"
+                      strokeWidth={1.8}
+                    />
+
+                    <span className="text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-400">
+                      03
+                    </span>
                   </div>
-                </div>
 
-                {/* Small lower cards */}
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl border border-zinc-200 bg-white p-3">
-                    <div className="h-2 w-16 rounded-full bg-zinc-200" />
-                    <div className="mt-3 h-3 w-20 rounded-full bg-zinc-100" />
+                  <p className="mt-1.5 text-[10px] font-bold text-zinc-900 sm:text-[11px]">
+                    Configuration
+                  </p>
+
+                  <p className="mt-0.5 text-[9px] text-zinc-500">
+                    Project details
+                  </p>
+                </motion.div>
+
+                {/* Payment */}
+                <motion.div
+                  initial={
+                    shouldReduceMotion
+                      ? { opacity: 1, y: 0 }
+                      : {
+                          opacity: 0,
+                          y: 8,
+                        }
+                  }
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                  }}
+                  transition={{
+                    duration: shouldReduceMotion ? 0 : 0.4,
+                    delay: shouldReduceMotion ? 0 : 0.58,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
+                  className="
+                    rounded-xl
+                    border
+                    border-zinc-200
+                    bg-white
+                    p-2.5
+                  "
+                >
+                  <div className="flex items-center gap-1.5">
+                    <CreditCard
+                      size={11}
+                      className="text-zinc-400"
+                      strokeWidth={1.8}
+                    />
+
+                    <span className="text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-400">
+                      04
+                    </span>
                   </div>
 
-                  <div className="rounded-2xl border border-zinc-200 bg-white p-3">
-                    <div className="h-2 w-16 rounded-full bg-zinc-200" />
-                    <div className="mt-3 h-3 w-20 rounded-full bg-zinc-100" />
-                  </div>
-                </div>
+                  <p className="mt-1.5 text-[10px] font-bold text-zinc-900 sm:text-[11px]">
+                    Payment
+                  </p>
+
+                  <p className="mt-0.5 text-[9px] text-zinc-500">
+                    Choose method
+                  </p>
+                </motion.div>
               </div>
+
+              {/* =========================================
+                  FINAL STATUS
+              ========================================= */}
+              <motion.div
+                initial={
+                  shouldReduceMotion
+                    ? { opacity: 1, y: 0 }
+                    : {
+                        opacity: 0,
+                        y: 8,
+                      }
+                }
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                }}
+                transition={{
+                  duration: shouldReduceMotion ? 0 : 0.45,
+                  delay: shouldReduceMotion ? 0 : 0.68,
+                  ease: [0.22, 1, 0.36, 1],
+                }}
+                className="
+                  mt-2.5
+                  flex
+                  items-center
+                  justify-between
+                  gap-3
+                  rounded-xl
+                  border
+                  border-zinc-200
+                  bg-zinc-50
+                  px-3
+                  py-2.5
+                "
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-zinc-900 text-white">
+                    <Check size={12} strokeWidth={2.5} />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold text-zinc-900">
+                      Ready to place your order
+                    </p>
+
+                    <p className="mt-0.5 truncate text-[9px] text-zinc-500">
+                      Review your requirements and continue.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="hidden shrink-0 items-center gap-1 text-[9px] font-semibold text-zinc-700 sm:flex">
+                  Continue
+                  <span aria-hidden="true">→</span>
+                </div>
+              </motion.div>
             </div>
           </div>
         </div>
 
         {/* =========================================
-            FLOATING STATUS CARD
-        ========================================= */}
-        <motion.div
-          animate={
-            shouldReduceMotion
-              ? undefined
-              : {
-                  y: [0, -8, 0],
-                }
-          }
-          transition={{
-            duration: 4,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
+            STATIC FLOATING MESSAGE
+            No movement
+        =========================================
+         <div
           className="
             absolute
-            -bottom-5
-            -left-3
+            -bottom-4
+            -left-2
             rounded-2xl
             border
-            border-white/80
-            bg-white/90
-            p-3
-            shadow-[0_20px_50px_rgba(24,24,27,0.12)]
+            border-zinc-200/90
+            bg-white/95
+            px-3
+            py-2.5
+            shadow-[0_14px_35px_rgba(24,24,27,0.09)]
             backdrop-blur-xl
-            sm:-left-8
-            sm:p-4
+            sm:-left-5
+            sm:px-3.5
+            sm:py-3
           "
         >
-          <div className="flex items-center gap-3">
-            <div
-              className="
-                flex
-                h-9
-                w-9
-                items-center
-                justify-center
-                rounded-xl
-                bg-emerald-50
-                text-emerald-600
-              "
-            >
-              <Sparkles size={17} />
+           <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900 text-white">
+              <Check size={14} strokeWidth={2.2} />
             </div>
 
             <div>
-              <p className="text-xs font-semibold text-zinc-900">
-                Order workflow
+              <p className="text-[10px] font-bold text-zinc-900 sm:text-[11px]">
+                Simple ordering
               </p>
 
-              <p className="mt-0.5 text-[11px] text-zinc-500">
-                Simple. Clear. Centralized.
+              <p className="mt-0.5 text-[9px] text-zinc-500 sm:text-[10px]">
+                Clear from start to finish
               </p>
             </div>
-          </div>
-        </motion.div>
+          </div> 
+        </div> */}
 
         {/* =========================================
-            SMALL FLOATING INDICATOR
+            STATIC PLATFORM BADGE
+            No movement
         ========================================= */}
-        <motion.div
-          animate={
-            shouldReduceMotion
-              ? undefined
-              : {
-                  y: [0, -5, 0],
-                }
-          }
-          transition={{
-            duration: 4.5,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 0.5,
-          }}
+        {/* <div
           className="
             absolute
-            -right-2
-            top-[16%]
+            -right-1
+            top-[10%]
             hidden
             items-center
             gap-2
             rounded-full
             border
             border-zinc-200
-            bg-white/90
+            bg-white/95
             px-3
             py-2
-            text-[10px]
+            text-[9px]
             font-semibold
             text-zinc-500
-            shadow-[0_15px_40px_rgba(24,24,27,0.08)]
+            shadow-[0_12px_30px_rgba(24,24,27,0.07)]
             backdrop-blur-xl
             sm:flex
           "
         >
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          Platform ready
-        </motion.div>
+          Client platform
+        </div> */}
       </motion.div>
     </div>
   );

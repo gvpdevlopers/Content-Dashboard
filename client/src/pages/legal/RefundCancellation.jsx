@@ -6,15 +6,26 @@ import LegalSection from "../../components/public/legal/LegalSection";
 const RefundCancellation = () => {
   return (
     <>
+      {/* =====================================================
+          HERO
+      ====================================================== */}
       <LegalHero
         eyebrow="Refund & Cancellation"
         title="A clear approach to"
         description="This policy explains the general process for cancellations and refunds relating to services ordered through the Glow Ventures platform."
+        lastUpdated="September 2026"
+        policyType="Services & Orders"
       />
 
+      {/* =====================================================
+          LEGAL CONTENT
+      ====================================================== */}
       <LegalLayout>
-        <LegalLastUpdated />
+        <LegalLastUpdated date="September 2026" />
 
+        {/* =================================================
+            01 — OVERVIEW
+        ================================================== */}
         <LegalSection
           number="01"
           title="Overview"
@@ -28,6 +39,9 @@ const RefundCancellation = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            02 — CANCELLATION REQUESTS
+        ================================================== */}
         <LegalSection
           number="02"
           title="Cancellation Requests"
@@ -50,6 +64,9 @@ const RefundCancellation = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            03 — REFUND ELIGIBILITY
+        ================================================== */}
         <LegalSection
           number="03"
           title="Refund Eligibility"
@@ -67,6 +84,9 @@ const RefundCancellation = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            04 — ONLINE PAYMENTS
+        ================================================== */}
         <LegalSection
           number="04"
           title="Online Payments"
@@ -84,6 +104,9 @@ const RefundCancellation = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            05 — COD ORDERS
+        ================================================== */}
         <LegalSection
           number="05"
           title="COD Orders"
@@ -100,6 +123,9 @@ const RefundCancellation = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            06 — NON-REFUNDABLE WORK
+        ================================================== */}
         <LegalSection
           number="06"
           title="Non-Refundable Work"
@@ -113,6 +139,9 @@ const RefundCancellation = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            07 — DUPLICATE OR INCORRECT PAYMENTS
+        ================================================== */}
         <LegalSection
           number="07"
           title="Duplicate or Incorrect Payments"
@@ -126,6 +155,9 @@ const RefundCancellation = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            08 — REFUND OR CANCELLATION REQUEST
+        ================================================== */}
         <LegalSection
           number="08"
           title="How to Request a Refund or Cancellation"
@@ -142,6 +174,9 @@ const RefundCancellation = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            09 — POLICY UPDATES
+        ================================================== */}
         <LegalSection
           number="09"
           title="Policy Updates"
@@ -157,6 +192,9 @@ const RefundCancellation = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            10 — CONTACT
+        ================================================== */}
         <LegalSection
           number="10"
           title="Contact"

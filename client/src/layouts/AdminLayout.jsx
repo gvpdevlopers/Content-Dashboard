@@ -18,6 +18,7 @@ const AdminLayout = () => {
 
   const handleLogout = () => {
     logout();
+    window.location.replace("/");
   };
 
   const closeSidebar = () => {

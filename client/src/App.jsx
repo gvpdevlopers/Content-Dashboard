@@ -1,5 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
+import ScrollToTop from "./components/ScrollToTop";
+
 // Authentication
 import Login from "./pages/Login";
 
@@ -36,132 +38,119 @@ import AdminRoute from "./components/AdminRoute";
 import DashboardLayout from "./layouts/DashboardLayout";
 import AdminLayout from "./layouts/AdminLayout";
 
-const PublicPlaceholder = ({ title }) => {
-  return (
-    <section className="flex min-h-[60vh] items-center justify-center px-4 py-20">
-      <div className="text-center">
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">
-          Glow Ventures
-        </p>
-
-        <h1 className="mt-3 text-4xl font-bold tracking-tight text-[var(--color-text-primary)] sm:text-5xl">
-          {title}
-        </h1>
-
-        <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-[var(--color-text-muted)]">
-          This page is currently being developed.
-        </p>
-      </div>
-    </section>
-  );
-};
-
 const App = () => {
   return (
-    <Routes>
-      {/* =====================================================
-          PUBLIC WEBSITE
-      ====================================================== */}
+    <>
+      <ScrollToTop />
 
-      <Route element={<PublicLayout />}>
-        <Route path="/" element={<Home />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/services" element={<Services />} />
-        <Route path="/contact" element={<Contact />} />
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        <Route path="/terms-conditions" element={<TermsConditions />} />
-        <Route
-          path="/refund-cancellation"
-          element={<RefundCancellation />}
-        />
-      </Route>
+      <Routes>
+        {/* =====================================================
+            PUBLIC WEBSITE
+        ====================================================== */}
 
-      {/* =====================================================
-          AUTHENTICATION
-      ====================================================== */}
+        <Route element={<PublicLayout />}>
+          <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/services" element={<Services />} />
+          <Route path="/contact" element={<Contact />} />
 
-      <Route path="/login" element={<Login />} />
+          <Route
+            path="/privacy-policy"
+            element={<PrivacyPolicy />}
+          />
 
-      {/* =====================================================
-          CLIENT AREA
-      ====================================================== */}
+          <Route
+            path="/terms-conditions"
+            element={<TermsConditions />}
+          />
 
-      <Route
-        element={
-          <ProtectedRoute>
-            <DashboardLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route path="/dashboard" element={<Dashboard />} />
+          <Route
+            path="/refund-cancellation"
+            element={<RefundCancellation />}
+          />
+        </Route>
 
-        <Route
-          path="/dashboard/new-order"
-          element={<NewOrder />}
-        />
+        {/* AUTHENTICATION */}
+
+        <Route path="/login" element={<Login />} />
+
+        {/* CLIENT AREA */}
 
         <Route
-          path="/dashboard/orders"
-          element={<OrderHistory />}
-        />
+          element={
+            <ProtectedRoute>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/dashboard" element={<Dashboard />} />
+
+          <Route
+            path="/dashboard/new-order"
+            element={<NewOrder />}
+          />
+
+          <Route
+            path="/dashboard/orders"
+            element={<OrderHistory />}
+          />
+
+          <Route
+            path="/dashboard/orders/:id"
+            element={<OrderDetails />}
+          />
+        </Route>
+
+        {/* ADMIN AREA */}
 
         <Route
-          path="/dashboard/orders/:id"
-          element={<OrderDetails />}
-        />
-      </Route>
+          element={
+            <AdminRoute>
+              <AdminLayout />
+            </AdminRoute>
+          }
+        >
+          <Route path="/admin" element={<AdminDashboard />} />
 
-      {/* =====================================================
-          ADMIN AREA
-      ====================================================== */}
+          <Route
+            path="/admin/orders"
+            element={<AdminOrders />}
+          />
 
-      <Route
-        element={
-          <AdminRoute>
-            <AdminLayout />
-          </AdminRoute>
-        }
-      >
-        <Route path="/admin" element={<AdminDashboard />} />
+          <Route
+            path="/admin/orders/:id"
+            element={<AdminOrderDetails />}
+          />
 
-        <Route
-          path="/admin/orders"
-          element={<AdminOrders />}
-        />
+          <Route
+            path="/admin/users"
+            element={<AdminUsers />}
+          />
 
-        <Route
-          path="/admin/orders/:id"
-          element={<AdminOrderDetails />}
-        />
+          <Route
+            path="/admin/users/new"
+            element={<AdminCreateUser />}
+          />
 
-        <Route
-          path="/admin/users"
-          element={<AdminUsers />}
-        />
+          <Route
+            path="/admin/users/:id"
+            element={<AdminUserDetails />}
+          />
 
-        <Route
-          path="/admin/users/new"
-          element={<AdminCreateUser />}
-        />
+          <Route
+            path="/admin/cod"
+            element={<CodManagement />}
+          />
+        </Route>
 
-        <Route
-          path="/admin/users/:id"
-          element={<AdminUserDetails />}
-        />
+        {/* FALLBACK */}
 
         <Route
-          path="/admin/cod"
-          element={<CodManagement />}
+          path="*"
+          element={<Navigate to="/" replace />}
         />
-      </Route>
-
-      {/* =====================================================
-          FALLBACK
-      ====================================================== */}
-
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 };
-
 export default App;

@@ -15,7 +15,7 @@ const disciplines = [
     description: "Create visibility",
     icon: Megaphone,
     position:
-      "left-0 top-[18%] lg:left-[2%] lg:top-[18%]",
+      "left-0 top-[17%] lg:left-[2%] lg:top-[17%]",
   },
   {
     number: "02",
@@ -23,7 +23,7 @@ const disciplines = [
     description: "Build reputation",
     icon: PenTool,
     position:
-      "right-0 top-[18%] lg:right-[2%] lg:top-[18%]",
+      "right-0 top-[17%] lg:right-[2%] lg:top-[17%]",
   },
   {
     number: "03",
@@ -31,7 +31,7 @@ const disciplines = [
     description: "Shape the story",
     icon: Video,
     position:
-      "bottom-[5%] left-1/2 -translate-x-1/2 lg:bottom-[4%]",
+      "bottom-[7%] left-1/2 -translate-x-1/2 lg:bottom-[6%]",
   },
 ];
 
@@ -39,7 +39,15 @@ const AboutHeroVisual = () => {
   const shouldReduceMotion = useReducedMotion();
 
   return (
-    <div className="relative mx-auto aspect-square w-full max-w-[580px]">
+    <div
+      className="
+        relative
+        mx-auto
+        aspect-[1.12/1]
+        w-full
+        max-w-[580px]
+      "
+    >
       {/* =====================================================
           AMBIENT GLOW
       ===================================================== */}
@@ -49,8 +57,8 @@ const AboutHeroVisual = () => {
           absolute
           left-1/2
           top-1/2
+          aspect-square
           h-[62%]
-          w-[62%]
           -translate-x-1/2
           -translate-y-1/2
           rounded-full
@@ -81,8 +89,8 @@ const AboutHeroVisual = () => {
           absolute
           left-1/2
           top-1/2
+          aspect-square
           h-[84%]
-          w-[84%]
           -translate-x-1/2
           -translate-y-1/2
           rounded-full
@@ -91,9 +99,31 @@ const AboutHeroVisual = () => {
         "
       >
         {/* Orbit markers */}
-        <span className="absolute left-[13%] top-[13%] h-2 w-2 rounded-full bg-zinc-300 shadow-[0_0_12px_rgba(161,161,170,0.3)]" />
+        <span
+          className="
+            absolute
+            left-[14%]
+            top-[14%]
+            h-1.5
+            w-1.5
+            rounded-full
+            bg-zinc-300
+            shadow-[0_0_12px_rgba(161,161,170,0.3)]
+          "
+        />
 
-        <span className="absolute bottom-[14%] right-[12%] h-1.5 w-1.5 rounded-full bg-zinc-400 shadow-[0_0_10px_rgba(113,113,122,0.25)]" />
+        <span
+          className="
+            absolute
+            bottom-[14%]
+            right-[14%]
+            h-1.5
+            w-1.5
+            rounded-full
+            bg-zinc-300
+            shadow-[0_0_12px_rgba(161,161,170,0.3)]
+          "
+        />
       </motion.div>
 
       {/* =====================================================
@@ -118,8 +148,8 @@ const AboutHeroVisual = () => {
           absolute
           left-1/2
           top-1/2
+          aspect-square
           h-[62%]
-          w-[62%]
           -translate-x-1/2
           -translate-y-1/2
           rounded-full
@@ -206,20 +236,20 @@ const AboutHeroVisual = () => {
           className="
             relative
             flex
-            h-[150px]
-            w-[150px]
+            h-[145px]
+            w-[145px]
             flex-col
             items-center
             justify-center
-            rounded-[34px]
+            rounded-[32px]
             border
             border-zinc-200
             bg-white/95
             text-center
             shadow-[0_25px_70px_rgba(24,24,27,0.11)]
             backdrop-blur-xl
-            sm:h-[176px]
-            sm:w-[176px]
+            sm:h-[170px]
+            sm:w-[170px]
           "
         >
           {/* Inner border */}
@@ -228,7 +258,7 @@ const AboutHeroVisual = () => {
             className="
               absolute
               inset-2
-              rounded-[28px]
+              rounded-[26px]
               border
               border-zinc-100
             "
@@ -239,18 +269,20 @@ const AboutHeroVisual = () => {
             className="
               relative
               flex
-              h-11
-              w-11
+              h-10
+              w-10
               items-center
               justify-center
               rounded-2xl
               bg-zinc-950
               text-white
               shadow-[0_8px_20px_rgba(24,24,27,0.15)]
+              sm:h-11
+              sm:w-11
             "
           >
             <Sparkles
-              size={20}
+              size={19}
               strokeWidth={1.8}
             />
           </div>
@@ -259,7 +291,7 @@ const AboutHeroVisual = () => {
           <p
             className="
               relative
-              mt-4
+              mt-3.5
               text-[9px]
               font-bold
               uppercase
@@ -286,7 +318,7 @@ const AboutHeroVisual = () => {
           </p>
 
           {/* Progress indicator */}
-          <div className="relative mt-3 flex items-center gap-1.5">
+          <div className="relative mt-2.5 flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-zinc-900" />
             <span className="h-px w-5 bg-zinc-200" />
             <TrendingUp
@@ -330,9 +362,10 @@ const AboutHeroVisual = () => {
           className="
             absolute
             left-[20%]
-            top-[38%]
+            top-1/2
             h-px
             w-[30%]
+            -translate-y-1/2
             bg-gradient-to-r
             from-zinc-200
             to-zinc-400
@@ -359,9 +392,10 @@ const AboutHeroVisual = () => {
           className="
             absolute
             right-[20%]
-            top-[38%]
+            top-1/2
             h-px
             w-[30%]
+            -translate-y-1/2
             bg-gradient-to-r
             from-zinc-400
             to-zinc-200
@@ -388,8 +422,8 @@ const AboutHeroVisual = () => {
           className="
             absolute
             left-1/2
-            top-[50%]
-            h-[27%]
+            top-1/2
+            h-[24%]
             w-px
             -translate-x-1/2
             bg-gradient-to-b
@@ -567,7 +601,7 @@ const AboutHeroVisual = () => {
         }}
         className="
           absolute
-          bottom-[1%]
+          bottom-[2%]
           right-[2%]
           z-40
           hidden

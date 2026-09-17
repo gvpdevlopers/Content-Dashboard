@@ -6,15 +6,26 @@ import LegalSection from "../../components/public/legal/LegalSection";
 const PrivacyPolicy = () => {
   return (
     <>
+      {/* =====================================================
+          HERO
+      ====================================================== */}
       <LegalHero
         eyebrow="Privacy Policy"
-        title="Your information matters."
+        title="Privacy matters."
         description="This policy explains how information may be collected and used when you visit the Glow Ventures website or use the client platform."
+        lastUpdated="September 2026"
+        policyType="Website & Client Platform"
       />
 
+      {/* =====================================================
+          LEGAL CONTENT
+      ====================================================== */}
       <LegalLayout>
-        <LegalLastUpdated />
+        <LegalLastUpdated date="September 2026" />
 
+        {/* =================================================
+            01 — INTRODUCTION
+        ================================================== */}
         <LegalSection
           number="01"
           title="Introduction"
@@ -34,6 +45,9 @@ const PrivacyPolicy = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            02 — INFORMATION WE COLLECT
+        ================================================== */}
         <LegalSection
           number="02"
           title="Information We Collect"
@@ -53,6 +67,9 @@ const PrivacyPolicy = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            03 — HOW WE USE INFORMATION
+        ================================================== */}
         <LegalSection
           number="03"
           title="How We Use Information"
@@ -71,6 +88,9 @@ const PrivacyPolicy = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            04 — PAYMENTS
+        ================================================== */}
         <LegalSection
           number="04"
           title="Payments"
@@ -90,6 +110,9 @@ const PrivacyPolicy = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            05 — COOKIES
+        ================================================== */}
         <LegalSection
           number="05"
           title="Cookies and Similar Technologies"
@@ -107,6 +130,9 @@ const PrivacyPolicy = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            06 — DATA SECURITY
+        ================================================== */}
         <LegalSection
           number="06"
           title="Data Security"
@@ -124,6 +150,9 @@ const PrivacyPolicy = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            07 — DATA RETENTION
+        ================================================== */}
         <LegalSection
           number="07"
           title="Data Retention"
@@ -136,14 +165,17 @@ const PrivacyPolicy = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            08 — THIRD-PARTY SERVICES
+        ================================================== */}
         <LegalSection
           number="08"
           title="Third-Party Services"
         >
           <p>
             The website or platform may use third-party services for
-            functions such as payment processing, hosting,
-            analytics, communication, or other infrastructure.
+            functions such as payment processing, hosting, analytics,
+            communication, or other infrastructure.
           </p>
 
           <p>
@@ -152,6 +184,9 @@ const PrivacyPolicy = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            09 — USER RESPONSIBILITIES
+        ================================================== */}
         <LegalSection
           number="09"
           title="Your Responsibilities"
@@ -164,6 +199,9 @@ const PrivacyPolicy = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            10 — POLICY UPDATES
+        ================================================== */}
         <LegalSection
           number="10"
           title="Policy Updates"
@@ -180,6 +218,9 @@ const PrivacyPolicy = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            11 — CONTACT
+        ================================================== */}
         <LegalSection
           number="11"
           title="Contact"

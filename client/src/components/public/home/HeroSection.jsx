@@ -10,8 +10,8 @@ const HeroSection = () => {
       className="bg-white"
       eyebrow="Glow Ventures Client Platform"
       eyebrowIcon={Sparkles}
-      title="Turn ideas into"
-      highlight="content that moves."
+      title="Like Steroids for"
+      highlight="Your Business."
       description="Discover content services, configure exactly what you need, place orders, and manage everything from one streamlined client platform."
       visual={<HomeHeroVisual />}
       actions={
@@ -20,9 +20,14 @@ const HeroSection = () => {
             Explore Services
           </PublicButton>
 
-          <PublicButton to="/about" variant="secondary">
-            Discover Glow Ventures
-          </PublicButton>
+          <PublicButton
+  href="https://www.glowventures.org/"
+  variant="secondary"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  Discover Glow Ventures
+</PublicButton>
         </>
       }
       meta={

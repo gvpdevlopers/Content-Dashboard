@@ -6,15 +6,26 @@ import LegalSection from "../../components/public/legal/LegalSection";
 const TermsConditions = () => {
   return (
     <>
+      {/* =====================================================
+          HERO
+      ====================================================== */}
       <LegalHero
         eyebrow="Terms & Conditions"
         title="Clear terms for"
         description="These terms describe the general conditions for accessing and using the Glow Ventures website and client platform."
+        lastUpdated="September 2026"
+        policyType="Website & Services"
       />
 
+      {/* =====================================================
+          LEGAL CONTENT
+      ====================================================== */}
       <LegalLayout>
-        <LegalLastUpdated />
+        <LegalLastUpdated date="September 2026" />
 
+        {/* =================================================
+            01 — ACCEPTANCE OF TERMS
+        ================================================== */}
         <LegalSection
           number="01"
           title="Acceptance of Terms"
@@ -32,6 +43,9 @@ const TermsConditions = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            02 — CLIENT ACCOUNTS
+        ================================================== */}
         <LegalSection
           number="02"
           title="Client Accounts"
@@ -49,6 +63,9 @@ const TermsConditions = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            03 — SERVICES AND ORDERS
+        ================================================== */}
         <LegalSection
           number="03"
           title="Services and Orders"
@@ -66,6 +83,9 @@ const TermsConditions = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            04 — PRICING AND PAYMENT
+        ================================================== */}
         <LegalSection
           number="04"
           title="Pricing and Payment"
@@ -84,6 +104,9 @@ const TermsConditions = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            05 — CLIENT-PROVIDED INFORMATION
+        ================================================== */}
         <LegalSection
           number="05"
           title="Client-Provided Information"
@@ -100,6 +123,9 @@ const TermsConditions = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            06 — ACCEPTABLE USE
+        ================================================== */}
         <LegalSection
           number="06"
           title="Acceptable Use"
@@ -116,6 +142,9 @@ const TermsConditions = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            07 — INTELLECTUAL PROPERTY
+        ================================================== */}
         <LegalSection
           number="07"
           title="Intellectual Property"
@@ -134,6 +163,9 @@ const TermsConditions = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            08 — THIRD-PARTY SERVICES
+        ================================================== */}
         <LegalSection
           number="08"
           title="Third-Party Services"
@@ -150,6 +182,9 @@ const TermsConditions = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            09 — SERVICE AVAILABILITY
+        ================================================== */}
         <LegalSection
           number="09"
           title="Service Availability"
@@ -162,6 +197,9 @@ const TermsConditions = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            10 — LIMITATION OF RESPONSIBILITY
+        ================================================== */}
         <LegalSection
           number="10"
           title="Limitation of Responsibility"
@@ -180,6 +218,9 @@ const TermsConditions = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            11 — CHANGES TO THESE TERMS
+        ================================================== */}
         <LegalSection
           number="11"
           title="Changes to These Terms"
@@ -191,6 +232,9 @@ const TermsConditions = () => {
           </p>
         </LegalSection>
 
+        {/* =================================================
+            12 — CONTACT
+        ================================================== */}
         <LegalSection
           number="12"
           title="Contact"

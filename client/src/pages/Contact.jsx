@@ -3,17 +3,38 @@ import ContactInfo from "../components/public/contact/ContactInfo";
 import ContactForm from "../components/public/contact/ContactForm";
 import ContactCTA from "../components/public/contact/ContactCTA";
 
+import Section from "../components/public/Section";
+
 const Contact = () => {
   return (
     <>
       <ContactHero />
 
-      <section className="bg-white">
-        <div className="mx-auto grid w-full max-w-[1400px] gap-10 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-[0.7fr_1.3fr] lg:gap-20 lg:px-8 lg:py-28">
-          <ContactInfo />
-          <ContactForm />
+      {/* =====================================================
+          CONTACT CONTENT
+      ====================================================== */}
+      <Section className="bg-white !py-14 sm:!py-16 lg:!py-20">
+        <div
+          className="
+            grid
+            items-start
+            gap-8
+            lg:grid-cols-2
+            lg:gap-10
+            xl:gap-12
+          "
+        >
+          {/* Sticky contact information */}
+          <div className="lg:sticky lg:top-32 lg:self-start">
+            <ContactInfo />
+          </div>
+
+          {/* Scrolling form */}
+          <div className="min-w-0">
+            <ContactForm />
+          </div>
         </div>
-      </section>
+      </Section>
 
       <ContactCTA />
     </>

@@ -19,6 +19,7 @@ const DashboardLayout = () => {
 
   const handleLogout = () => {
     logout();
+    window.location.replace("/");
   };
 
   const closeSidebar = () => {
@@ -137,10 +138,10 @@ const DashboardLayout = () => {
           "
         >
           <div className="group flex items-center">
-  <img
-    src="/Logo.png"
-    alt="Glow Ventures"
-    className="
+            <img
+              src="/Logo.png"
+              alt="Glow Ventures"
+              className="
       h-auto
       w-[150px]
       object-contain
@@ -150,8 +151,8 @@ const DashboardLayout = () => {
       group-hover:scale-[1.03]
       group-hover:opacity-90
     "
-  />
-</div>
+            />
+          </div>
 
           {/* Mobile Close */}
           <button
