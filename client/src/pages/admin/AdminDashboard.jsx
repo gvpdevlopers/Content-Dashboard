@@ -280,6 +280,7 @@ const AdminDashboard = () => {
               shadow-sm
               transition-all
               duration-200
+              cursor-pointer
               hover:border-zinc-300
               hover:bg-zinc-50
               hover:text-zinc-900

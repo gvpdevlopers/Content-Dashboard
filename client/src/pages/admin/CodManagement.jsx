@@ -20,17 +20,13 @@ import CustomSelect from "../../components/CustomSelect";
 const CodManagement = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] =
-    useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
   const [search, setSearch] = useState("");
-  const [filter, setFilter] =
-    useState("all");
+  const [filter, setFilter] = useState("all");
 
-  const loadOrders = async (
-    isRefresh = false
-  ) => {
+  const loadOrders = async (isRefresh = false) => {
     try {
       if (isRefresh) {
         setRefreshing(true);
@@ -40,22 +36,13 @@ const CodManagement = () => {
 
       setError("");
 
-      const response =
-        await codService.getAdminCodOrders();
+      const response = await codService.getAdminCodOrders();
 
-      setOrders(
-        response.orders || []
-      );
+      setOrders(response.orders || []);
     } catch (error) {
-      console.error(
-        "Load COD orders error:",
-        error
-      );
+      console.error("Load COD orders error:", error);
 
-      setError(
-        error.response?.data?.message ||
-          "Unable to load COD orders."
-      );
+      setError(error.response?.data?.message || "Unable to load COD orders.");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -67,25 +54,16 @@ const CodManagement = () => {
   }, []);
 
   const filteredOrders = useMemo(() => {
-    const query =
-      search.trim().toLowerCase();
+    const query = search.trim().toLowerCase();
 
     return orders.filter((order) => {
-      const clientName =
-        order.client?.name?.toLowerCase() ||
-        "";
+      const clientName = order.client?.name?.toLowerCase() || "";
 
-      const clientEmail =
-        order.client?.email?.toLowerCase() ||
-        "";
+      const clientEmail = order.client?.email?.toLowerCase() || "";
 
-      const username =
-        order.client?.username?.toLowerCase() ||
-        "";
+      const username = order.client?.username?.toLowerCase() || "";
 
-      const orderNumber =
-        order.orderNumber?.toLowerCase() ||
-        "";
+      const orderNumber = order.orderNumber?.toLowerCase() || "";
 
       const matchesSearch =
         !query ||
@@ -98,59 +76,36 @@ const CodManagement = () => {
 
       switch (filter) {
         case "pending":
-          matchesFilter =
-            order.paymentStatus !==
-            "collected";
+          matchesFilter = order.paymentStatus !== "collected";
           break;
 
         case "active":
-          matchesFilter =
-            order.codPinStatus ===
-            "active";
+          matchesFilter = order.codPinStatus === "active";
           break;
 
         case "collected":
-          matchesFilter =
-            order.paymentStatus ===
-            "collected";
+          matchesFilter = order.paymentStatus === "collected";
           break;
 
         default:
           matchesFilter = true;
       }
 
-      return (
-        matchesSearch &&
-        matchesFilter
-      );
+      return matchesSearch && matchesFilter;
     });
-  }, [
-    orders,
-    search,
-    filter,
-  ]);
+  }, [orders, search, filter]);
 
   const stats = useMemo(() => {
     return {
       total: orders.length,
 
-      pending: orders.filter(
-        (order) =>
-          order.paymentStatus !==
-          "collected"
-      ).length,
+      pending: orders.filter((order) => order.paymentStatus !== "collected")
+        .length,
 
-      active: orders.filter(
-        (order) =>
-          order.codPinStatus ===
-          "active"
-      ).length,
+      active: orders.filter((order) => order.codPinStatus === "active").length,
 
-      collected: orders.filter(
-        (order) =>
-          order.paymentStatus ===
-          "collected"
-      ).length,
+      collected: orders.filter((order) => order.paymentStatus === "collected")
+        .length,
     };
   }, [orders]);
 
@@ -183,10 +138,7 @@ const CodManagement = () => {
               shadow-sm
             "
           >
-            <Loader2
-              size={19}
-              className="animate-spin text-zinc-400"
-            />
+            <Loader2 size={19} className="animate-spin text-zinc-400" />
           </div>
 
           <div>
@@ -307,10 +259,7 @@ const CodManagement = () => {
                   group-hover:text-zinc-800
                 "
               >
-                <KeyRound
-                  size={18}
-                  strokeWidth={1.6}
-                />
+                <KeyRound size={18} strokeWidth={1.6} />
               </div>
 
               <p
@@ -349,18 +298,14 @@ const CodManagement = () => {
                 sm:text-base
               "
             >
-              Generate COD payment PINs,
-              monitor verification status
-              and track completed cash
-              payments.
+              Generate COD payment PINs, monitor verification status and track
+              completed cash payments.
             </p>
           </div>
 
           <button
             type="button"
-            onClick={() =>
-              loadOrders(true)
-            }
+            onClick={() => loadOrders(true)}
             disabled={refreshing}
             className="
               group/refresh
@@ -395,13 +340,10 @@ const CodManagement = () => {
                 transition-transform
                 duration-500
                 ${
-                  refreshing
-                    ? "animate-spin"
-                    : "group-hover/refresh:rotate-180"
+                  refreshing ? "animate-spin" : "group-hover/refresh:rotate-180"
                 }
               `}
             />
-
             Refresh
           </button>
         </div>
@@ -428,15 +370,11 @@ const CodManagement = () => {
             sm:justify-between
           "
         >
-          <p className="text-sm text-red-600">
-            {error}
-          </p>
+          <p className="text-sm text-red-600">{error}</p>
 
           <button
             type="button"
-            onClick={() =>
-              loadOrders(true)
-            }
+            onClick={() => loadOrders(true)}
             className="
               self-start
               text-sm
@@ -473,17 +411,9 @@ const CodManagement = () => {
           value={stats.total}
         />
 
-        <StatCard
-          icon={Clock3}
-          label="Payment Pending"
-          value={stats.pending}
-        />
+        <StatCard icon={Clock3} label="Payment Pending" value={stats.pending} />
 
-        <StatCard
-          icon={ShieldCheck}
-          label="PIN Active"
-          value={stats.active}
-        />
+        <StatCard icon={ShieldCheck} label="PIN Active" value={stats.active} />
 
         <StatCard
           icon={CheckCircle2}
@@ -536,11 +466,7 @@ const CodManagement = () => {
             <input
               type="text"
               value={search}
-              onChange={(event) =>
-                setSearch(
-                  event.target.value
-                )
-              }
+              onChange={(event) => setSearch(event.target.value)}
               placeholder="Search order, name, email or username..."
               className="
                 h-[50px]
@@ -617,14 +543,11 @@ const CodManagement = () => {
               {filteredOrders.length}
             </span>{" "}
             of{" "}
-            <span className="font-medium text-zinc-700">
-              {orders.length}
-            </span>{" "}
+            <span className="font-medium text-zinc-700">{orders.length}</span>{" "}
             COD orders
           </p>
 
-          {(search ||
-            filter !== "all") && (
+          {(search || filter !== "all") && (
             <button
               type="button"
               onClick={() => {
@@ -649,8 +572,7 @@ const CodManagement = () => {
           ORDERS
       ====================================================== */}
 
-      {filteredOrders.length ===
-      0 ? (
+      {filteredOrders.length === 0 ? (
         <div
           className="
             relative
@@ -689,10 +611,7 @@ const CodManagement = () => {
                 text-zinc-400
               "
             >
-              <KeyRound
-                size={22}
-                strokeWidth={1.6}
-              />
+              <KeyRound size={22} strokeWidth={1.6} />
             </div>
 
             <h2
@@ -716,8 +635,7 @@ const CodManagement = () => {
                 text-zinc-500
               "
             >
-              {search ||
-              filter !== "all"
+              {search || filter !== "all"
                 ? "Try changing your search or filter."
                 : "COD orders will appear here."}
             </p>
@@ -725,20 +643,9 @@ const CodManagement = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredOrders.map(
-            (order) => (
-              <CodOrderCard
-                key={
-                  order._id ||
-                  order.id
-                }
-                order={order}
-                onUpdated={
-                  loadOrders
-                }
-              />
-            )
-          )}
+          {filteredOrders.map((order) => (
+            <CodOrderCard key={order._id || order.id} order={order} />
+          ))}
         </div>
       )}
     </div>
@@ -749,99 +656,70 @@ const CodManagement = () => {
    COD ORDER CARD
 ========================================================= */
 
-const CodOrderCard = ({
-  order,
-  onUpdated,
-}) => {
-  const [pin, setPin] =
-    useState(
-      order.codPin || ""
-    );
+const CodOrderCard = ({ order }) => {
+  const [pin, setPin] = useState(order.codPin || "");
 
-  const [loading, setLoading] =
-    useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const [message, setMessage] =
-    useState("");
+  const [message, setMessage] = useState("");
 
-  const [error, setError] =
-    useState("");
+  const [error, setError] = useState("");
 
-  const [copied, setCopied] =
-    useState(false);
+  const [copied, setCopied] = useState(false);
 
-  const isCollected =
-    order.paymentStatus ===
-    "collected";
+  const isCollected = order.paymentStatus === "collected";
 
-  const isPinActive =
-    order.codPinStatus ===
-    "active";
+  const isPinActive = order.codPinStatus === "active";
 
-  const canGenerate =
-    !isCollected &&
-    !isPinActive;
+  const canGenerate = !isCollected && !isPinActive;
 
-  const generatePin =
-    async () => {
-      try {
-        setLoading(true);
-        setError("");
-        setMessage("");
+  const generatePin = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      setMessage("");
 
-        const response =
-          await codService.generateCodPin(
-            order._id ||
-              order.id
-          );
+      const response = await codService.generateCodPin(order._id || order.id);
 
-        setPin(
-          response.codPin
-        );
-
-        setMessage(
-          "COD PIN generated successfully. Share this PIN with the payment collector."
-        );
-
-        if (onUpdated) {
-          setTimeout(() => {
-            onUpdated();
-          }, 500);
-        }
-      } catch (error) {
-        setError(
-          error.response?.data
-            ?.message ||
-            "Unable to generate PIN."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-  const copyPin =
-    async () => {
-      if (!pin) {
-        return;
+      if (!response?.codPin) {
+        throw new Error("COD PIN was not returned by the server.");
       }
 
-      try {
-        await navigator.clipboard.writeText(
-          pin
-        );
+      setPin(String(response.codPin));
 
-        setCopied(true);
+      setMessage(
+        "COD PIN generated successfully. Share this PIN with the payment collector.",
+      );
+    } catch (error) {
+      console.error("Generate COD PIN error:", error);
 
-        setTimeout(() => {
-          setCopied(false);
-        }, 1500);
-      } catch (error) {
-        console.error(
-          "Copy PIN error:",
-          error
-        );
-      }
-    };
+      setError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to generate PIN.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyPin = async () => {
+    if (!pin) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(pin);
+
+      setCopied(true);
+
+      setTimeout(() => {
+        setCopied(false);
+      }, 1500);
+    } catch (error) {
+      console.error("Copy PIN error:", error);
+    }
+  };
 
   return (
     <section
@@ -919,17 +797,9 @@ const CodOrderCard = ({
               Order
             </p>
 
-            <PaymentBadge
-              status={
-                order.paymentStatus
-              }
-            />
+            <PaymentBadge status={order.paymentStatus} />
 
-            <PinStatusBadge
-              status={
-                order.codPinStatus
-              }
-            />
+            <PinStatusBadge status={order.codPinStatus} />
           </div>
 
           <p
@@ -955,20 +825,10 @@ const CodOrderCard = ({
             "
           >
             <span>
-              Amount: ₹
-              {Number(
-                order.amount || 0
-              ).toLocaleString(
-                "en-IN"
-              )}
+              Amount: ₹{Number(order.amount || 0).toLocaleString("en-IN")}
             </span>
 
-            <span>
-              Created:{" "}
-              {formatDateTime(
-                order.createdAt
-              )}
-            </span>
+            <span>Created: {formatDateTime(order.createdAt)}</span>
           </div>
         </div>
 
@@ -991,18 +851,11 @@ const CodOrderCard = ({
                 text-emerald-700
               "
             >
-              <CheckCircle2
-                size={17}
-              />
-
+              <CheckCircle2 size={17} />
               Payment Done
             </div>
           ) : pin ? (
-            <PinDisplay
-              pin={pin}
-              copied={copied}
-              onCopy={copyPin}
-            />
+            <PinDisplay pin={pin} copied={copied} onCopy={copyPin} />
           ) : isPinActive ? (
             <div
               className="
@@ -1021,9 +874,7 @@ const CodOrderCard = ({
           ) : canGenerate ? (
             <button
               type="button"
-              onClick={
-                generatePin
-              }
+              onClick={generatePin}
               disabled={loading}
               className="
                 inline-flex
@@ -1048,13 +899,9 @@ const CodOrderCard = ({
                 xl:w-auto
               "
             >
-              <KeyRound
-                size={17}
-              />
+              <KeyRound size={17} />
 
-              {loading
-                ? "Generating..."
-                : "Generate PIN"}
+              {loading ? "Generating..." : "Generate PIN"}
             </button>
           ) : null}
         </div>
@@ -1091,16 +938,11 @@ const CodOrderCard = ({
                 bg-zinc-50
               "
             >
-              <UserRound
-                size={16}
-                className="text-zinc-400"
-              />
+              <UserRound size={16} className="text-zinc-400" />
             </div>
 
             <div className="min-w-0">
-              <p className="text-xs text-zinc-400">
-                Client
-              </p>
+              <p className="text-xs text-zinc-400">Client</p>
 
               <p
                 className="
@@ -1111,9 +953,7 @@ const CodOrderCard = ({
                   text-zinc-800
                 "
               >
-                {order.client.name ||
-                  order.client.username ||
-                  "Unknown Client"}
+                {order.client.name || order.client.username || "Unknown Client"}
               </p>
             </div>
 
@@ -1154,12 +994,8 @@ const CodOrderCard = ({
         <InfoItem
           label="PIN Generated"
           value={
-            order.codPinStatus !==
-              "not_generated" &&
-            order.codPinStatus
-              ? formatDateTime(
-                  order.updatedAt
-                )
+            order.codPinStatus !== "not_generated" && order.codPinStatus
+              ? formatDateTime(order.updatedAt)
               : "Not generated"
           }
         />
@@ -1168,9 +1004,7 @@ const CodOrderCard = ({
           label="PIN Verified"
           value={
             order.codPinVerifiedAt
-              ? formatDateTime(
-                  order.codPinVerifiedAt
-                )
+              ? formatDateTime(order.codPinVerifiedAt)
               : "Not verified"
           }
         />
@@ -1179,9 +1013,7 @@ const CodOrderCard = ({
           label="Payment Collected"
           value={
             order.codCollectedAt
-              ? formatDateTime(
-                  order.codCollectedAt
-                )
+              ? formatDateTime(order.codCollectedAt)
               : "Not collected"
           }
         />
@@ -1212,9 +1044,7 @@ const CodOrderCard = ({
           "
         >
           <div>
-            <p className="text-xs text-zinc-400">
-              COD Payment Status
-            </p>
+            <p className="text-xs text-zinc-400">COD Payment Status</p>
 
             <p
               className="
@@ -1224,16 +1054,12 @@ const CodOrderCard = ({
                 text-zinc-800
               "
             >
-              {isCollected
-                ? "Payment Done"
-                : "Payment Pending"}
+              {isCollected ? "Payment Done" : "Payment Pending"}
             </p>
           </div>
 
           <div className="text-left sm:text-right">
-            <p className="text-xs text-zinc-400">
-              PIN Status
-            </p>
+            <p className="text-xs text-zinc-400">PIN Status</p>
 
             <p
               className="
@@ -1243,9 +1069,7 @@ const CodOrderCard = ({
                 text-zinc-800
               "
             >
-              {formatPinStatus(
-                order.codPinStatus
-              )}
+              {formatPinStatus(order.codPinStatus)}
             </p>
           </div>
         </div>
@@ -1298,11 +1122,7 @@ const CodOrderCard = ({
    PIN DISPLAY
 ========================================================= */
 
-const PinDisplay = ({
-  pin,
-  copied,
-  onCopy,
-}) => {
+const PinDisplay = ({ pin, copied, onCopy }) => {
   return (
     <div>
       <p
@@ -1355,11 +1175,7 @@ const PinDisplay = ({
           title="Copy PIN"
           aria-label="Copy COD PIN"
         >
-          {copied ? (
-            <Check size={17} />
-          ) : (
-            <Copy size={17} />
-          )}
+          {copied ? <Check size={17} /> : <Copy size={17} />}
         </button>
       </div>
     </div>
@@ -1370,11 +1186,7 @@ const PinDisplay = ({
    STAT CARD
 ========================================================= */
 
-const StatCard = ({
-  icon: Icon,
-  label,
-  value,
-}) => {
+const StatCard = ({ icon: Icon, label, value }) => {
   return (
     <div
       className="
@@ -1413,10 +1225,7 @@ const StatCard = ({
             group-hover:text-zinc-800
           "
         >
-          <Icon
-            size={18}
-            strokeWidth={1.6}
-          />
+          <Icon size={18} strokeWidth={1.6} />
         </div>
 
         <span
@@ -1449,11 +1258,8 @@ const StatCard = ({
    PAYMENT BADGE
 ========================================================= */
 
-const PaymentBadge = ({
-  status,
-}) => {
-  const collected =
-    status === "collected";
+const PaymentBadge = ({ status }) => {
+  const collected = status === "collected";
 
   return (
     <span
@@ -1482,15 +1288,9 @@ const PaymentBadge = ({
         }
       `}
     >
-      {collected ? (
-        <CheckCircle2 size={11} />
-      ) : (
-        <Clock3 size={11} />
-      )}
+      {collected ? <CheckCircle2 size={11} /> : <Clock3 size={11} />}
 
-      {collected
-        ? "Payment Done"
-        : "Payment Pending"}
+      {collected ? "Payment Done" : "Payment Pending"}
     </span>
   );
 };
@@ -1499,52 +1299,42 @@ const PaymentBadge = ({
    PIN STATUS BADGE
 ========================================================= */
 
-const PinStatusBadge = ({
-  status,
-}) => {
+const PinStatusBadge = ({ status }) => {
   const config = {
     not_generated: {
       label: "PIN Not Generated",
-      className:
-        "border-zinc-200 bg-zinc-50 text-zinc-400",
+      className: "border-zinc-200 bg-zinc-50 text-zinc-400",
       icon: XCircle,
     },
 
     active: {
       label: "PIN Active",
-      className:
-        "border-amber-200 bg-amber-50 text-amber-700",
+      className: "border-amber-200 bg-amber-50 text-amber-700",
       icon: KeyRound,
     },
 
     verified: {
       label: "PIN Verified",
-      className:
-        "border-blue-200 bg-blue-50 text-blue-700",
+      className: "border-blue-200 bg-blue-50 text-blue-700",
       icon: ShieldCheck,
     },
 
     used: {
       label: "PIN Used",
-      className:
-        "border-emerald-200 bg-emerald-50 text-emerald-700",
+      className: "border-emerald-200 bg-emerald-50 text-emerald-700",
       icon: CheckCircle2,
     },
 
     expired: {
       label: "PIN Expired",
-      className:
-        "border-red-200 bg-red-50 text-red-600",
+      className: "border-red-200 bg-red-50 text-red-600",
       icon: XCircle,
     },
   };
 
-  const current =
-    config[status] ||
-    config.not_generated;
+  const current = config[status] || config.not_generated;
 
-  const Icon =
-    current.icon;
+  const Icon = current.icon;
 
   return (
     <span
@@ -1572,10 +1362,7 @@ const PinStatusBadge = ({
    INFO ITEM
 ========================================================= */
 
-const InfoItem = ({
-  label,
-  value,
-}) => {
+const InfoItem = ({ label, value }) => {
   return (
     <div
       className="
@@ -1618,9 +1405,7 @@ const InfoItem = ({
    HELPERS
 ========================================================= */
 
-const formatPinStatus = (
-  status
-) => {
+const formatPinStatus = (status) => {
   switch (status) {
     case "not_generated":
       return "Not Generated";
@@ -1642,34 +1427,24 @@ const formatPinStatus = (
   }
 };
 
-const formatDateTime = (
-  date
-) => {
+const formatDateTime = (date) => {
   if (!date) {
     return "—";
   }
 
-  const parsedDate =
-    new Date(date);
+  const parsedDate = new Date(date);
 
-  if (
-    Number.isNaN(
-      parsedDate.getTime()
-    )
-  ) {
+  if (Number.isNaN(parsedDate.getTime())) {
     return "—";
   }
 
-  return parsedDate.toLocaleString(
-    "en-IN",
-    {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }
-  );
+  return parsedDate.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 
 export default CodManagement;

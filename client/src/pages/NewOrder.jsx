@@ -1,6 +1,5 @@
 import {
   ArrowRight,
-  ArrowUpRight,
   Banknote,
   Check,
   CreditCard,
@@ -275,6 +274,7 @@ const SelectionField = ({ field, value, onChange }) => {
       {field.helpText && (
         <div className="mt-2.5 flex items-start gap-1.5 text-xs leading-5 text-zinc-400">
           <Info size={13} className="mt-0.5 shrink-0" />
+
           <span>{field.helpText}</span>
         </div>
       )}
@@ -318,6 +318,7 @@ const DynamicField = ({ field, value, onChange }) => {
         {field.helpText && (
           <div className="mt-2.5 flex items-start gap-1.5 text-xs leading-5 text-zinc-400">
             <Info size={13} className="mt-0.5 shrink-0" />
+
             <span>{field.helpText}</span>
           </div>
         )}
@@ -359,6 +360,7 @@ const DynamicField = ({ field, value, onChange }) => {
   const helpText = field.helpText ? (
     <div className="mt-2.5 flex items-start gap-1.5 text-xs leading-5 text-zinc-400">
       <Info size={13} className="mt-0.5 shrink-0" />
+
       <span>{field.helpText}</span>
     </div>
   ) : null;
@@ -646,37 +648,52 @@ const PaymentOption = ({
 
 const NewOrder = () => {
   const [services, setServices] = useState([]);
+
   const [selectedService, setSelectedService] = useState(null);
 
   /*
-   * Used by normal services that have one pricing option.
+   * Normal services with one pricing option.
    */
   const [selectedPricingOption, setSelectedPricingOption] = useState(null);
 
   /*
-   * Used by grouped services such as Visual Content / Reels.
+   * Grouped pricing.
    *
    * Example:
+   *
    * {
-   *   shoot: optionObject,
-   *   drone: optionObject,
-   *   host: optionObject
+   *   shoot: cameraOption,
+   *   drone: droneOption,
+   *   host: localOption
    * }
    */
   const [selectedPricingOptions, setSelectedPricingOptions] = useState({});
 
-  /* Per-option quantities for grouped pricing services. */
+  /*
+   * Per-group quantities.
+   *
+   * Example:
+   *
+   * {
+   *   shoot: 2,
+   *   drone: 1,
+   *   host: 1
+   * }
+   */
   const [pricingQuantities, setPricingQuantities] = useState({});
 
   const [formData, setFormData] = useState({});
+
   const [additionalRequirements, setAdditionalRequirements] = useState("");
 
   const [paymentMethod, setPaymentMethod] = useState("cod");
 
   const [loadingServices, setLoadingServices] = useState(true);
+
   const [loadingService, setLoadingService] = useState(false);
 
   const [error, setError] = useState("");
+
   const [submitting, setSubmitting] = useState(false);
 
   const [orderSuccess, setOrderSuccess] = useState(null);
@@ -685,9 +702,6 @@ const NewOrder = () => {
   |--------------------------------------------------------------------------
   | Is Grouped Pricing
   |--------------------------------------------------------------------------
-  |
-  | Visual Content/Reels uses pricingOptions[].group.
-  |
   */
 
   const isGroupedPricing = useMemo(() => {
@@ -726,8 +740,11 @@ const NewOrder = () => {
           const firstService = sortedServices[0];
 
           setSelectedService(firstService);
+
           setSelectedPricingOption(null);
+
           setSelectedPricingOptions({});
+
           setPricingQuantities({});
 
           const rules = getQuantityRules(firstService, null);
@@ -776,8 +793,11 @@ const NewOrder = () => {
       }
 
       setSelectedService(service);
+
       setSelectedPricingOption(null);
+
       setSelectedPricingOptions({});
+
       setPricingQuantities({});
 
       const rules = getQuantityRules(service, null);
@@ -840,33 +860,70 @@ const NewOrder = () => {
 
     const nextSelected = isDeselecting ? null : option;
 
+    /*
+     * Update selected option.
+     */
     setSelectedPricingOptions((current) => ({
       ...current,
       [group]: nextSelected,
     }));
 
-    if (group) {
-      setFormData((current) => ({
+    /*
+     * Update pricing quantity.
+     *
+     * If selected:
+     *   initialize to minimum.
+     *
+     * If deselected:
+     *   completely remove the quantity.
+     */
+    setPricingQuantities((current) => {
+      const next = {
         ...current,
-        [group]:
-          group === "drone"
-            ? Boolean(nextSelected)
-            : nextSelected?.value || nextSelected?.name || "",
-      }));
-    }
+      };
 
-    const quantityOption =
-      group === "shoot" ? nextSelected : selectedPricingOptions.shoot || null;
+      if (nextSelected) {
+        const rules = getQuantityRules(selectedService, nextSelected);
 
-    const rules = getQuantityRules(selectedService, quantityOption);
+        next[group] = rules.minQuantity;
+      } else {
+        delete next[group];
+      }
 
-    setFormData((current) => ({
-      ...current,
-      quantity: rules.minQuantity,
-    }));
+      return next;
+    });
+
+    /*
+     * Store the selected pricing option ID
+     * in formData.
+     *
+     * This is much safer than converting names
+     * like "Founder Faced" into "founder_faced".
+     *
+     * Backend supports matching by option _id.
+     */
+    setFormData((current) => {
+      const next = {
+        ...current,
+      };
+
+      if (nextSelected) {
+        next[group] = String(nextSelected._id);
+      } else {
+        delete next[group];
+      }
+
+      return next;
+    });
 
     setError("");
   };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Grouped Quantity
+  |--------------------------------------------------------------------------
+  */
 
   const handleGroupedQuantityChange = (group, nextQuantity) => {
     const option = selectedPricingOptions[group];
@@ -876,6 +933,7 @@ const NewOrder = () => {
     }
 
     const rules = getQuantityRules(selectedService, option);
+
     let normalized = Number(nextQuantity);
 
     if (!Number.isFinite(normalized)) {
@@ -883,6 +941,7 @@ const NewOrder = () => {
     }
 
     normalized = Math.floor(normalized);
+
     normalized = Math.max(rules.minQuantity, normalized);
 
     if (rules.maxQuantity !== undefined) {
@@ -914,7 +973,7 @@ const NewOrder = () => {
 
   /*
   |--------------------------------------------------------------------------
-  | Selected Pricing Option For Quantity
+  | Quantity Pricing Option
   |--------------------------------------------------------------------------
   */
 
@@ -949,7 +1008,7 @@ const NewOrder = () => {
 
   /*
   |--------------------------------------------------------------------------
-  | Quantity
+  | Normal Service Quantity
   |--------------------------------------------------------------------------
   */
 
@@ -973,49 +1032,6 @@ const NewOrder = () => {
 
   /*
   |--------------------------------------------------------------------------
-  | Active Fields
-  |--------------------------------------------------------------------------
-  */
-
-  const activeFields = useMemo(() => {
-    if (!selectedService) {
-      return [];
-    }
-
-    const serviceFields = Array.isArray(selectedService.fields)
-      ? selectedService.fields
-      : [];
-
-    /*
-     * For normal services, fields from the selected
-     * pricing option remain supported.
-     */
-    const optionFields =
-      !isGroupedPricing &&
-      selectedPricingOption &&
-      Array.isArray(selectedPricingOption.fields)
-        ? selectedPricingOption.fields
-        : [];
-
-    const fieldMap = new Map();
-
-    for (const field of serviceFields) {
-      if (field?.name) {
-        fieldMap.set(field.name, field);
-      }
-    }
-
-    for (const field of optionFields) {
-      if (field?.name) {
-        fieldMap.set(field.name, field);
-      }
-    }
-
-    return getSortedItems(Array.from(fieldMap.values()));
-  }, [selectedService, selectedPricingOption, isGroupedPricing]);
-
-  /*
-  |--------------------------------------------------------------------------
   | Selected Grouped Pricing Options
   |--------------------------------------------------------------------------
   */
@@ -1030,7 +1046,196 @@ const NewOrder = () => {
 
   /*
   |--------------------------------------------------------------------------
-  | Pricing Options Total
+  | Active Fields
+  |--------------------------------------------------------------------------
+  |
+  | Field ownership:
+  |
+  | 1. Always include service-level fields.
+  |
+  | 2. Also include fields from the currently selected
+  |    pricing option(s).
+  |
+  | Normal pricing:
+  |    Service fields
+  |    +
+  |    Selected pricing option fields
+  |
+  | Grouped pricing:
+  |    Service fields
+  |    +
+  |    Fields from every selected pricing option
+  |
+  | Example:
+  |
+  |    Shoot   -> Cinematic
+  |    Drone   -> Yes
+  |    Host    -> Professional
+  |
+  | The active fields become:
+  |
+  |    Service fields
+  |    Cinematic-specific fields
+  |    Drone-specific fields
+  |    Professional-specific fields
+  |
+  | The field configuration itself is the source of truth.
+  | No group names such as "shoot", "drone" or "host" are
+  | used to determine which fields are displayed.
+  |
+  | If the same field name exists in multiple selected
+  | locations, the selected pricing-option field takes
+  | precedence over the service-level field.
+  */
+
+  const activeFields = useMemo(() => {
+    if (!selectedService) {
+      return [];
+    }
+
+    const serviceFields = Array.isArray(selectedService.fields)
+      ? selectedService.fields
+      : [];
+
+    const selectedOptions = isGroupedPricing
+      ? selectedGroupedPricingOptions
+      : selectedPricingOption
+        ? [selectedPricingOption]
+        : [];
+
+    const fieldMap = new Map();
+
+    /*
+     * Always include service-level fields first.
+     */
+    for (const field of serviceFields) {
+      if (!field?.name) {
+        continue;
+      }
+
+      const fieldName = String(field.name).trim();
+
+      if (!fieldName) {
+        continue;
+      }
+
+      fieldMap.set(fieldName, field);
+    }
+
+    /*
+     * Add fields from selected pricing option(s).
+     *
+     * For normal pricing there can be one selected option.
+     *
+     * For grouped pricing there can be multiple selected
+     * options, such as Shoot + Drone + Host.
+     *
+     * Unselected pricing options are never included here.
+     */
+    for (const pricingOption of selectedOptions) {
+      if (!pricingOption || !Array.isArray(pricingOption.fields)) {
+        continue;
+      }
+
+      for (const field of pricingOption.fields) {
+        if (!field?.name) {
+          continue;
+        }
+
+        const fieldName = String(field.name).trim();
+
+        if (!fieldName) {
+          continue;
+        }
+
+        /*
+         * Pricing-option-specific fields take precedence over
+         * service-level fields with the same name.
+         */
+        fieldMap.set(fieldName, field);
+      }
+    }
+
+    return getSortedItems(Array.from(fieldMap.values()));
+  }, [
+    selectedService,
+    selectedPricingOption,
+    selectedGroupedPricingOptions,
+    isGroupedPricing,
+  ]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Clean Inactive Dynamic Fields
+  |--------------------------------------------------------------------------
+  |
+  | When a pricing option is deselected, its dynamic fields
+  | should no longer remain in formData.
+  |
+  | Existing values for still-active fields are preserved.
+  */
+
+  useEffect(() => {
+    if (!selectedService) {
+      return;
+    }
+
+    const activeFieldNames = new Set(
+      activeFields
+        .map((field) => String(field?.name || "").trim())
+        .filter(Boolean),
+    );
+
+    const configuredDynamicFieldNames = new Set();
+
+    const collectFieldNames = (fields) => {
+      if (!Array.isArray(fields)) {
+        return;
+      }
+
+      for (const field of fields) {
+        const fieldName = String(field?.name || "").trim();
+
+        if (fieldName) {
+          configuredDynamicFieldNames.add(fieldName);
+        }
+      }
+    };
+
+    collectFieldNames(selectedService.fields);
+
+    for (const pricingOption of getPricingOptions(selectedService)) {
+      collectFieldNames(pricingOption?.fields);
+    }
+
+    setFormData((current) => {
+      let changed = false;
+
+      const next = {
+        ...current,
+      };
+
+      /*
+       * Only remove keys that are actually configured
+       * as dynamic fields.
+       *
+       * This prevents deleting unrelated order data such
+       * as quantity or pricingQuantities.
+       */
+      for (const fieldName of configuredDynamicFieldNames) {
+        if (!activeFieldNames.has(fieldName) && fieldName in next) {
+          delete next[fieldName];
+          changed = true;
+        }
+      }
+
+      return changed ? next : current;
+    });
+  }, [selectedService, activeFields]);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Grouped Pricing Total
   |--------------------------------------------------------------------------
   */
 
@@ -1040,14 +1245,22 @@ const NewOrder = () => {
     }
 
     return selectedGroupedPricingOptions.reduce((total, option) => {
-      const group = option?.group || "";
-      const rules = getQuantityRules(selectedService, option);
-      const optionQuantity = Math.max(
-        rules.minQuantity,
-        Number(pricingQuantities[group] || rules.minQuantity),
-      );
+      const group = String(option?.group || "").trim();
 
-      return total + Number(option?.price || 0) * optionQuantity;
+      const rules = getQuantityRules(selectedService, option);
+
+      const rawQuantity = pricingQuantities[group];
+
+      const optionQuantity =
+        rawQuantity !== undefined && rawQuantity !== null
+          ? Number(rawQuantity)
+          : rules.minQuantity;
+
+      const safeQuantity = Number.isFinite(optionQuantity)
+        ? Math.max(rules.minQuantity, Math.floor(optionQuantity))
+        : rules.minQuantity;
+
+      return total + Number(option?.price || 0) * safeQuantity;
     }, 0);
   }, [
     isGroupedPricing,
@@ -1059,7 +1272,7 @@ const NewOrder = () => {
 
   /*
   |--------------------------------------------------------------------------
-  | Option Add-ons Total
+  | Dynamic Field Add-on Total
   |--------------------------------------------------------------------------
   */
 
@@ -1083,7 +1296,7 @@ const NewOrder = () => {
 
       for (const selectedValue of selectedValues) {
         const selectedOption = (field.options || []).find(
-          (option) => option.value === selectedValue,
+          (option) => String(option.value) === String(selectedValue),
         );
 
         if (selectedOption) {
@@ -1107,40 +1320,41 @@ const NewOrder = () => {
     }
 
     /*
-     * Grouped pricing such as Visual Content.
-     *
-     * Each selected pricing option contributes
-     * independently.
+     * Grouped pricing.
      */
     if (isGroupedPricing) {
-      const selectedTotal = selectedPricingOptionsPrice;
-
-      if (selectedTotal <= 0) {
-        switch (selectedService.pricingType) {
-          case "fixed":
-            return Number(selectedService.basePrice || 0) + selectedFieldsPrice;
-
-          case "per_unit":
-          case "starting_from":
-            return (
-              Number(selectedService.basePrice || 0) * quantity +
-              selectedFieldsPrice
-            );
-
-          default:
-            return selectedFieldsPrice;
-        }
+      /*
+       * If at least one pricing option is selected,
+       * the selected options are the actual price.
+       *
+       * This also correctly supports a selected option
+       * whose price is 0.
+       */
+      if (selectedGroupedPricingOptions.length > 0) {
+        return selectedPricingOptionsPrice + selectedFieldsPrice;
       }
 
       /*
-       * Pricing options are the actual pricing
-       * components for grouped services.
+       * No grouped option selected.
        */
-      return selectedTotal + selectedFieldsPrice;
+      switch (selectedService.pricingType) {
+        case "fixed":
+          return Number(selectedService.basePrice || 0) + selectedFieldsPrice;
+
+        case "per_unit":
+        case "starting_from":
+          return (
+            Number(selectedService.basePrice || 0) * quantity +
+            selectedFieldsPrice
+          );
+
+        default:
+          return selectedFieldsPrice;
+      }
     }
 
     /*
-     * Existing normal service pricing.
+     * Normal service pricing.
      */
     let basePrice = 0;
 
@@ -1173,6 +1387,7 @@ const NewOrder = () => {
   }, [
     selectedService,
     selectedPricingOption,
+    selectedGroupedPricingOptions,
     selectedPricingOptionsPrice,
     selectedFieldsPrice,
     quantity,
@@ -1187,9 +1402,7 @@ const NewOrder = () => {
 
   const pricingLabel = useMemo(() => {
     if (isGroupedPricing) {
-      return quantityPricingOption?.unit
-        ? `per ${quantityPricingOption.unit}`
-        : "";
+      return "";
     }
 
     const unit = selectedPricingOption?.unit || selectedService?.unit;
@@ -1199,12 +1412,7 @@ const NewOrder = () => {
     }
 
     return `per ${unit}`;
-  }, [
-    isGroupedPricing,
-    quantityPricingOption,
-    selectedPricingOption,
-    selectedService,
-  ]);
+  }, [isGroupedPricing, selectedPricingOption, selectedService]);
 
   /*
   |--------------------------------------------------------------------------
@@ -1215,6 +1423,14 @@ const NewOrder = () => {
   const pricingDisplay = useMemo(() => {
     if (!selectedService) {
       return "Custom";
+    }
+
+    /*
+     * Grouped service with selected option,
+     * including a zero-price option.
+     */
+    if (isGroupedPricing && selectedGroupedPricingOptions.length > 0) {
+      return formatCurrency(estimatedPrice);
     }
 
     if (
@@ -1235,6 +1451,7 @@ const NewOrder = () => {
     selectedPricingOption,
     selectedGroupedPricingOptions,
     estimatedPrice,
+    isGroupedPricing,
   ]);
 
   /*
@@ -1248,27 +1465,37 @@ const NewOrder = () => {
 
     for (const field of activeFields) {
       const value = formData[field.name];
+
       const type = normalizeFieldType(field);
 
+      /*
+       * Required validation.
+       */
       if (field.required && isEmptyValue(value)) {
         validationErrors[field.name] = `${field.label} is required.`;
 
         continue;
       }
 
+      /*
+       * Optional empty field.
+       */
       if (isEmptyValue(value)) {
         continue;
       }
 
+      /*
+       * Checkbox.
+       */
       if (type === "checkbox") {
         const selectedValues = Array.isArray(value) ? value : [value];
 
-        const allowedValues = (field.options || []).map(
-          (option) => option.value,
+        const allowedValues = (field.options || []).map((option) =>
+          String(option.value),
         );
 
         const invalidValue = selectedValues.some(
-          (selectedValue) => !allowedValues.includes(selectedValue),
+          (selectedValue) => !allowedValues.includes(String(selectedValue)),
         );
 
         if (invalidValue) {
@@ -1279,12 +1506,15 @@ const NewOrder = () => {
         continue;
       }
 
+      /*
+       * Radio / select.
+       */
       if (type === "radio" || type === "select") {
-        const allowedValues = (field.options || []).map(
-          (option) => option.value,
+        const allowedValues = (field.options || []).map((option) =>
+          String(option.value),
         );
 
-        if (!allowedValues.includes(value)) {
+        if (!allowedValues.includes(String(value))) {
           validationErrors[field.name] =
             `${field.label} has an invalid selection.`;
         }
@@ -1292,6 +1522,9 @@ const NewOrder = () => {
         continue;
       }
 
+      /*
+       * Number.
+       */
       if (type === "number") {
         const numberValue = Number(value);
 
@@ -1311,13 +1544,45 @@ const NewOrder = () => {
           validationErrors[field.name] =
             `${field.label} must be at most ${field.max}.`;
         }
+
+        if (field.step !== undefined && Number(field.step) > 0) {
+          const remainder = numberValue % Number(field.step);
+
+          if (Math.abs(remainder) > 0.000001) {
+            validationErrors[field.name] =
+              `${field.label} must use increments of ${field.step}.`;
+          }
+        }
+
+        continue;
       }
 
+      /*
+       * URL.
+       */
       if (type === "url") {
         try {
-          new URL(value);
+          const url = new URL(String(value));
+
+          if (!["http:", "https:"].includes(url.protocol)) {
+            validationErrors[field.name] =
+              `${field.label} must be a valid URL.`;
+          }
         } catch {
           validationErrors[field.name] = `${field.label} must be a valid URL.`;
+        }
+
+        continue;
+      }
+
+      /*
+       * Date.
+       */
+      if (type === "date") {
+        const date = new Date(value);
+
+        if (Number.isNaN(date.getTime())) {
+          validationErrors[field.name] = `${field.label} must be a valid date.`;
         }
       }
     }
@@ -1339,51 +1604,38 @@ const NewOrder = () => {
     const groups = getPricingGroups(selectedService);
 
     for (const group of groups) {
-      /*
-       * The Visual Content configuration currently
-       * uses these groups:
-       *
-       * shoot -> required
-       * drone -> optional
-       * host  -> optional
-       */
+      const selectedOption = selectedPricingOptions[group.key];
 
-      if (group.key === "shoot") {
-        if (!selectedPricingOptions.shoot) {
-          return "Please select a Shoot option.";
-        }
-
-        const shootRules = getQuantityRules(
-          selectedService,
-          selectedPricingOptions.shoot,
-        );
-        const shootQuantity = Number(pricingQuantities.shoot);
-
-        if (shootQuantity < shootRules.minQuantity) {
-          return `Minimum Shoot quantity is ${shootRules.minQuantity}.`;
-        }
-
-        if (
-          shootRules.maxQuantity !== undefined &&
-          shootQuantity > shootRules.maxQuantity
-        ) {
-          return `Maximum Shoot quantity is ${shootRules.maxQuantity}.`;
-        }
-
+      // Groups are optional because the current Service schema
+      // does not have a group-level "required" property.
+      if (!selectedOption) {
         continue;
       }
 
-      /*
-       * Drone and Host are optional.
-       *
-       * No validation is required if they are
-       * not selected.
-       */
+      const rules = getQuantityRules(selectedService, selectedOption);
+
+      const rawQuantity = pricingQuantities[group.key];
+
+      const selectedQuantity = Number(rawQuantity ?? rules.minQuantity);
+
+      if (!Number.isInteger(selectedQuantity)) {
+        return `${group.name || "Option"} quantity must be a whole number.`;
+      }
+
+      if (selectedQuantity < rules.minQuantity) {
+        return `${selectedOption.name} requires a minimum quantity of ${rules.minQuantity}.`;
+      }
+
+      if (
+        rules.maxQuantity !== undefined &&
+        selectedQuantity > rules.maxQuantity
+      ) {
+        return `${selectedOption.name} allows a maximum quantity of ${rules.maxQuantity}.`;
+      }
     }
 
     return "";
   };
-
   /*
   |--------------------------------------------------------------------------
   | Submit Order
@@ -1397,37 +1649,44 @@ const NewOrder = () => {
 
     if (!selectedService) {
       setError("Please select a service.");
+
       return;
     }
 
     /*
-     * Grouped pricing validation
+     * Grouped pricing validation.
      */
     if (isGroupedPricing) {
       const groupedPricingError = validateGroupedPricing();
 
       if (groupedPricingError) {
         setError(groupedPricingError);
+
         return;
       }
     } else {
       /*
-       * Existing normal pricing validation
+       * Normal pricing validation.
        */
       const pricingOptions = getPricingOptions(selectedService);
 
       if (pricingOptions.length > 0 && !selectedPricingOption) {
         setError("Please select a service option.");
+
         return;
       }
     }
 
     /*
-     * Quantity validation
+     * Normal service quantity validation.
+     *
+     * Grouped services use their own per-group
+     * quantities.
      */
     if (hasQuantity) {
       if (quantity < quantityRules.minQuantity) {
         setError(`Minimum quantity is ${quantityRules.minQuantity}.`);
+
         return;
       }
 
@@ -1436,17 +1695,19 @@ const NewOrder = () => {
         quantity > quantityRules.maxQuantity
       ) {
         setError(`Maximum quantity is ${quantityRules.maxQuantity}.`);
+
         return;
       }
     }
 
     /*
-     * Dynamic field validation
+     * Dynamic field validation.
      */
     const validationErrors = validateFields();
 
     if (Object.keys(validationErrors).length > 0) {
       setError(Object.values(validationErrors)[0]);
+
       return;
     }
 
@@ -1454,7 +1715,16 @@ const NewOrder = () => {
       setSubmitting(true);
 
       /*
-       * Only send active fields.
+       * Only send currently active configured fields.
+       *
+       * For normal pricing, this includes service-level
+       * fields and fields from the selected pricing option.
+       *
+       * For grouped pricing, this includes service-level
+       * fields and fields from all currently selected
+       * pricing options.
+       *
+       * Inactive/deselected option fields are excluded.
        */
       const cleanFormData = {};
 
@@ -1467,76 +1737,111 @@ const NewOrder = () => {
       }
 
       /*
-       * Visual Content / grouped pricing:
-       *
-       * The backend expects:
-       *
-       * shoot: "iphone"
-       * drone: true
-       * host: "local"
-       *
-       * Ensure the grouped selections are
-       * included even when they are not regular
-       * service fields.
-       */
+      |--------------------------------------------------------------------------
+      | Grouped pricing payload
+      |--------------------------------------------------------------------------
+      |
+      | IMPORTANT:
+      |
+      | We send the actual MongoDB pricing option _id
+      | for each selected group.
+      |
+      | Example:
+      |
+      | shoot: "6a9c0c15c5c693b1f9ec32ec"
+      |
+      | instead of:
+      |
+      | shoot: "camera"
+      |
+      | This avoids problems with names such as:
+      |
+      | "Founder Faced"
+      |
+      */
+
       if (isGroupedPricing) {
+        const groupedFormData = {
+          ...cleanFormData,
+        };
+
+        /*
+         * Add selected pricing option IDs.
+         */
         for (const [group, option] of Object.entries(selectedPricingOptions)) {
           if (!option) {
             continue;
           }
 
-          if (group === "drone") {
-            cleanFormData.drone = true;
-          } else if (group === "shoot") {
-            cleanFormData.shoot = option.name
-              ?.toLowerCase()
-              .replace(/\s+/g, "_");
-          } else if (group === "host") {
-            cleanFormData.host = option.name
-              ?.toLowerCase()
-              .replace(/\s+/g, "_");
+          groupedFormData[group] = String(option._id);
+        }
+
+        /*
+         * Optional groups are omitted when not selected.
+         */
+
+        /*
+         * Send only quantities for currently
+         * selected groups.
+         */
+        const selectedQuantities = {};
+
+        for (const [group, option] of Object.entries(selectedPricingOptions)) {
+          if (!option) {
+            continue;
           }
-        }
-        /*
-         * An unselected Drone should explicitly be
-         * false when the backend supports the
-         * Visual Content configuration.
-         */
-        const pricingGroups = getPricingGroups(selectedService);
 
-        const hasDroneGroup = pricingGroups.some(
-          (group) => group.key === "drone",
-        );
+          const rules = getQuantityRules(selectedService, option);
 
-        if (hasDroneGroup && !selectedPricingOptions.drone) {
-          cleanFormData.drone = false;
+          const rawQuantity = pricingQuantities[group];
+
+          selectedQuantities[group] =
+            rawQuantity !== undefined && rawQuantity !== null
+              ? Number(rawQuantity)
+              : rules.minQuantity;
         }
 
+        groupedFormData.pricingQuantities = selectedQuantities;
+
         /*
-         * Send each selected grouped option quantity separately.
-         * The backend can use these values when resolving grouped pricing.
+         * Replace the normal clean form data
+         * with grouped form data.
          */
-        cleanFormData.pricingQuantities = {
-          ...pricingQuantities,
-        };
+        Object.keys(cleanFormData).forEach((key) => {
+          delete cleanFormData[key];
+        });
+
+        Object.assign(cleanFormData, groupedFormData);
       }
 
       /*
-       * Create internal order.
-       *
-       * Keep pricingOptionId for normal services.
-       *
-       * Grouped Visual Content pricing is sent
-       * through formData and resolved by the
-       * backend controller.
-       */
+      |--------------------------------------------------------------------------
+      | Create order
+      |--------------------------------------------------------------------------
+      */
+
       const orderResponse = await orderService.createOrder({
         serviceId: selectedService._id,
 
+        /*
+         * Normal services continue using
+         * pricingOptionId.
+         *
+         * Grouped services resolve their pricing
+         * options from formData.
+         */
         pricingOptionId: !isGroupedPricing
           ? selectedPricingOption?._id || undefined
           : undefined,
 
+        /*
+         * Grouped services always use top-level
+         * quantity = 1.
+         *
+         * Their actual quantities are sent through:
+         *
+         * formData.pricingQuantities
+         */
         quantity: isGroupedPricing ? 1 : hasQuantity ? quantity : 1,
 
         formData: cleanFormData,
@@ -1555,16 +1860,23 @@ const NewOrder = () => {
       }
 
       /*
-       * COD
-       */
+      |--------------------------------------------------------------------------
+      | COD
+      |--------------------------------------------------------------------------
+      */
+
       if (paymentMethod === "cod") {
         setOrderSuccess(createdOrder);
+
         return;
       }
 
       /*
-       * Online payment
-       */
+      |--------------------------------------------------------------------------
+      | Online Payment
+      |--------------------------------------------------------------------------
+      */
+
       if (paymentMethod === "online") {
         const razorpayResponse = await paymentService.createRazorpayOrder(
           createdOrder._id || createdOrder.id,
@@ -1759,16 +2071,16 @@ const NewOrder = () => {
 
             <section
               className="
-    relative
-    z-20
-    rounded-[24px]
-    border
-    border-zinc-200
-    bg-white
-    p-5
-    shadow-[0_10px_35px_rgba(0,0,0,0.04)]
-    sm:p-7
-  "
+                relative
+                z-20
+                rounded-[24px]
+                border
+                border-zinc-200
+                bg-white
+                p-5
+                shadow-[0_10px_35px_rgba(0,0,0,0.04)]
+                sm:p-7
+              "
             >
               <div>
                 <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
@@ -1845,30 +2157,22 @@ const NewOrder = () => {
                   <div className="mt-7 space-y-8">
                     {pricingGroups.map((group, groupIndex) => {
                       const groupKey = group.key;
+
                       const selectedOption = selectedPricingOptions[groupKey];
-                      const isShoot = groupKey === "shoot";
-                      const isDrone = groupKey === "drone";
-                      const isHost = groupKey === "host";
 
-                      let title = group.name || "Options";
-                      let helper = "Select an option";
+                      /*
+                       * Existing UI behavior is
+                       * preserved here.
+                       *
+                       * These values only control
+                       * display labels.
+                       */
+                      const title = group.name
+                        ? group.name.charAt(0).toUpperCase() +
+                          group.name.slice(1)
+                        : "Options";
 
-                      if (isShoot) {
-                        title = "Shoot";
-                        helper = "Required · Select ONE";
-                      } else if (isDrone) {
-                        title = "Drone";
-                        helper = "Optional · Select / deselect";
-                      } else if (isHost) {
-                        title = "Host";
-                        helper = "Optional · Select ONE";
-                      } else if (group.name) {
-                        title =
-                          group.name.charAt(0).toUpperCase() +
-                          group.name.slice(1);
-                        helper = "Select ONE";
-                      }
-
+                      const helper = "Optional · Select ONE";
                       return (
                         <div
                           key={group.key}
@@ -1885,7 +2189,7 @@ const NewOrder = () => {
                               </p>
 
                               <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
-                                {isShoot ? "Required" : "Optional"}
+                                "Optional"
                               </span>
                             </div>
 
@@ -1898,13 +2202,15 @@ const NewOrder = () => {
                             {group.options.map((option) => {
                               const selected =
                                 selectedOption?._id === option._id;
+
                               const rules = getQuantityRules(
                                 selectedService,
                                 option,
                               );
+
                               const optionQuantity = selected
                                 ? Number(
-                                    pricingQuantities[groupKey] ||
+                                    pricingQuantities[groupKey] ??
                                       rules.minQuantity,
                                   )
                                 : rules.minQuantity;
@@ -1913,18 +2219,18 @@ const NewOrder = () => {
                                 <div
                                   key={option._id}
                                   className={`
-                                    relative
-                                    rounded-2xl
-                                    border
-                                    p-4
-                                    transition-all
-                                    duration-200
-                                    ${
-                                      selected
-                                        ? "border-zinc-900 bg-zinc-900 shadow-[0_12px_30px_rgba(0,0,0,0.08)]"
-                                        : "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50"
-                                    }
-                                  `}
+                                        relative
+                                        rounded-2xl
+                                        border
+                                        p-4
+                                        transition-all
+                                        duration-200
+                                        ${
+                                          selected
+                                            ? "border-zinc-900 bg-zinc-900 shadow-[0_12px_30px_rgba(0,0,0,0.08)]"
+                                            : "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50"
+                                        }
+                                      `}
                                 >
                                   <button
                                     type="button"
@@ -1994,10 +2300,17 @@ const NewOrder = () => {
                                           <p className="text-[11px] font-medium text-white/50">
                                             Quantity
                                           </p>
+
                                           <p className="mt-0.5 text-[11px] text-white/35">
                                             Minimum: {rules.minQuantity}{" "}
                                             {option.unit || "units"}
                                           </p>
+
+                                          {rules.maxQuantity !== undefined && (
+                                            <p className="mt-0.5 text-[11px] text-white/35">
+                                              Maximum: {rules.maxQuantity}
+                                            </p>
+                                          )}
                                         </div>
 
                                         <div className="flex items-center rounded-xl border border-white/10 bg-white/5 p-1">
@@ -2165,15 +2478,15 @@ const NewOrder = () => {
             {hasQuantity && !isGroupedPricing && (
               <section
                 className="
-                  rounded-[24px]
-                  border
-                  border-zinc-200
-                  bg-white
-                  p-5
-                  shadow-[0_10px_35px_rgba(0,0,0,0.04)]
-                  animate-fade-up
-                  sm:p-7
-                "
+                    rounded-[24px]
+                    border
+                    border-zinc-200
+                    bg-white
+                    p-5
+                    shadow-[0_10px_35px_rgba(0,0,0,0.04)]
+                    animate-fade-up
+                    sm:p-7
+                  "
               >
                 <div>
                   <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
@@ -2412,46 +2725,51 @@ const NewOrder = () => {
                     {isGroupedPricing &&
                       selectedGroupedPricingOptions.length > 0 && (
                         <div className="space-y-2 border-t border-white/10 pt-4">
-                          {selectedGroupedPricingOptions.map((option) => (
-                            <div
-                              key={option._id}
-                              className="flex items-start justify-between gap-4"
-                            >
-                              <div className="min-w-0">
-                                <p className="text-xs text-white/40">
-                                  {option.group
-                                    ? option.group.charAt(0).toUpperCase() +
-                                      option.group.slice(1)
-                                    : "Option"}
-                                </p>
+                          {selectedGroupedPricingOptions.map((option) => {
+                            const rules = getQuantityRules(
+                              selectedService,
+                              option,
+                            );
 
-                                <p className="mt-0.5 text-sm text-white/80">
-                                  {option.name}
-                                </p>
-                              </div>
+                            const optionQuantity = Number(
+                              pricingQuantities[option.group] ??
+                                rules.minQuantity,
+                            );
 
-                              <div className="shrink-0 text-right">
-                                <p className="text-sm font-medium text-white">
-                                  {formatCurrency(
-                                    Number(option.price || 0) *
-                                      Number(
-                                        pricingQuantities[option.group] ||
-                                          getQuantityRules(
-                                            selectedService,
-                                            option,
-                                          ).minQuantity,
-                                      ),
-                                  )}
-                                </p>
-                                <p className="mt-0.5 text-[10px] text-white/35">
-                                  {pricingQuantities[option.group] ||
-                                    getQuantityRules(selectedService, option)
-                                      .minQuantity}{" "}
-                                  × {formatCurrency(option.price)}
-                                </p>
+                            const optionTotal =
+                              Number(option.price || 0) * optionQuantity;
+
+                            return (
+                              <div
+                                key={option._id}
+                                className="flex items-start justify-between gap-4"
+                              >
+                                <div className="min-w-0">
+                                  <p className="text-xs text-white/40">
+                                    {option.group
+                                      ? option.group.charAt(0).toUpperCase() +
+                                        option.group.slice(1)
+                                      : "Option"}
+                                  </p>
+
+                                  <p className="mt-0.5 text-sm text-white/80">
+                                    {option.name}
+                                  </p>
+                                </div>
+
+                                <div className="shrink-0 text-right">
+                                  <p className="text-sm font-medium text-white">
+                                    {formatCurrency(optionTotal)}
+                                  </p>
+
+                                  <p className="mt-0.5 text-[10px] text-white/35">
+                                    {optionQuantity} ×{" "}
+                                    {formatCurrency(option.price)}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
 
@@ -2468,7 +2786,10 @@ const NewOrder = () => {
                           </div>
 
                           <p className="shrink-0 text-sm font-medium text-white">
-                            {formatCurrency(selectedPricingOption.price)}
+                            {formatCurrency(
+                              Number(selectedPricingOption.price || 0) *
+                                quantity,
+                            )}
                           </p>
                         </div>
                       </div>
@@ -2546,7 +2867,7 @@ const NewOrder = () => {
                       loadingService ||
                       !selectedService ||
                       (isGroupedPricing
-                        ? !selectedPricingOptions.shoot
+                        ? false
                         : pricingOptions.length > 0 && !selectedPricingOption)
                     }
                     className="
@@ -2568,10 +2889,9 @@ const NewOrder = () => {
                       text-zinc-900
                       shadow-[0_8px_25px_rgba(255,255,255,0.08)]
                       transition-[transform,background-color,box-shadow]
-                      
-duration-300
-ease-out
-hover:cursor-pointer
+                      duration-300
+                      ease-out
+                      hover:cursor-pointer
                       hover:bg-zinc-100
                       active:translate-y-0
                       disabled:cursor-not-allowed

@@ -20,14 +20,51 @@ const isEmptyValue = (value) => {
 };
 
 /**
+ * Convert a value to a string safely.
+ */
+const normalizeString = (value) => {
+  if (value === undefined || value === null) {
+    return "";
+  }
+
+  return String(value).trim();
+};
+
+/**
  * Validate one dynamic service field.
  */
 const validateFieldValue = (field, value) => {
   /*
    * Checkbox fields can legitimately be false.
-   * Therefore false must NOT be treated as empty.
    */
   if (field.type === "checkbox") {
+    /*
+     * Support both:
+     *
+     * true / false
+     *
+     * and arrays for future multi-select checkbox fields.
+     */
+    if (Array.isArray(value)) {
+      if (field.required && value.length === 0) {
+        return `${field.label} is required.`;
+      }
+
+      const allowedValues = (field.options || []).map((option) =>
+        String(option.value),
+      );
+
+      const invalidValue = value.some(
+        (item) => !allowedValues.includes(String(item)),
+      );
+
+      if (invalidValue) {
+        return `${field.label} has an invalid selection.`;
+      }
+
+      return null;
+    }
+
     if (field.required && value !== true) {
       return `${field.label} is required.`;
     }
@@ -43,7 +80,9 @@ const validateFieldValue = (field, value) => {
     return `${field.label} is required.`;
   }
 
-  // Optional empty field is valid.
+  /*
+   * Optional empty field is valid.
+   */
   if (isEmptyValue(value)) {
     return null;
   }
@@ -72,11 +111,7 @@ const validateFieldValue = (field, value) => {
         return `${field.label} must not exceed ${field.max}.`;
       }
 
-      if (
-        field.step !== undefined &&
-        field.step !== null &&
-        field.step > 0
-      ) {
+      if (field.step !== undefined && field.step !== null && field.step > 0) {
         const remainder = numberValue % field.step;
 
         if (Math.abs(remainder) > 0.000001) {
@@ -89,8 +124,8 @@ const validateFieldValue = (field, value) => {
 
     case "select":
     case "radio": {
-      const allowedValues = (field.options || []).map(
-        (option) => option.value
+      const allowedValues = (field.options || []).map((option) =>
+        String(option.value),
       );
 
       if (!allowedValues.includes(String(value))) {
@@ -151,16 +186,13 @@ const validateFormData = (serviceFields = [], formData = {}) => {
 };
 
 /**
- * Keep only fields configured by the service/pricing option.
+ * Keep only fields configured by the service.
  */
 const cleanFormData = (serviceFields = [], formData = {}) => {
   const cleaned = {};
 
   for (const field of serviceFields) {
-    if (
-      formData[field.name] !== undefined &&
-      formData[field.name] !== null
-    ) {
+    if (formData[field.name] !== undefined && formData[field.name] !== null) {
       cleaned[field.name] = formData[field.name];
     }
   }
@@ -169,24 +201,118 @@ const cleanFormData = (serviceFields = [], formData = {}) => {
 };
 
 /**
- * Merge service fields + pricing-option fields.
+ * Merge fields from:
  *
- * If the same field name exists in both places,
- * the pricing-option field takes precedence.
+ * 1. Service
+ * 2. All selected pricing options
+ *
+ * If the same field name exists in multiple places,
+ * the later pricing-option field takes precedence.
  */
-const getApplicableFields = (service, pricingOption = null) => {
+/**
+ * Merge fields from:
+ *
+ * 1. Service
+ * 2. Selected pricing options
+ *
+ * Pricing-option fields are included only for the pricing options
+ * that were actually selected for the order.
+ *
+ * This works for both:
+ *
+ * - Normal pricing:
+ *     Service
+ *       └── Selected Pricing Option
+ *             └── Option-specific fields
+ *
+ * - Grouped pricing:
+ *     Service
+ *       ├── Shoot
+ *       │     └── Selected Shoot Option
+ *       │           └── Option-specific fields
+ *       ├── Drone
+ *       │     └── Selected Drone Option
+ *       │           └── Option-specific fields
+ *       └── Host
+ *             └── Selected Host Option
+ *                   └── Option-specific fields
+ *
+ * Only fields belonging to selected pricing options are included.
+ *
+ * If the same field name exists in multiple places, the selected
+ * pricing-option field takes precedence over the service-level field.
+ */
+const getApplicableFields = (
+  service,
+  pricingOptions = [],
+  isGroupedPricing = false,
+) => {
   const fields = new Map();
 
+  // ---------------------------------------------------------
+  // SERVICE-LEVEL FIELDS
+  // ---------------------------------------------------------
+  //
+  // These are common fields for the entire service and should
+  // always be available.
+  //
+  // Example:
+  // - Shoot Location
+  // - Preferred Shoot Date
+  // - Reference / Inspiration Link
+  //
   for (const field of service.fields || []) {
-    fields.set(field.name, field);
+    if (!field?.name) continue;
+
+    const fieldName = String(field.name).trim();
+
+    if (!fieldName) continue;
+
+    fields.set(fieldName, field);
   }
 
-  for (const field of pricingOption?.fields || []) {
-    fields.set(field.name, field);
+  // ---------------------------------------------------------
+  // SELECTED PRICING-OPTION FIELDS
+  // ---------------------------------------------------------
+  //
+  // pricingOptions contains ONLY the pricing options that were
+  // selected for this order.
+  //
+  // For normal pricing this is normally one selected option.
+  //
+  // For grouped pricing this can contain multiple selected
+  // options, for example:
+  //
+  // - Shoot
+  // - Drone
+  // - Host
+  //
+  // Therefore grouped pricing must also include fields from
+  // each selected option.
+  //
+  // The isGroupedPricing argument is intentionally retained for
+  // compatibility with the existing callers. It no longer
+  // changes field resolution because selected pricing options
+  // should work consistently in both pricing modes.
+  //
+  for (const pricingOption of pricingOptions || []) {
+    if (!pricingOption) continue;
+
+    for (const field of pricingOption.fields || []) {
+      if (!field?.name) continue;
+
+      const fieldName = String(field.name).trim();
+
+      if (!fieldName) continue;
+
+      // Pricing-option-specific fields override a service-level
+      // field with the same name.
+      fields.set(fieldName, field);
+    }
   }
 
   return Array.from(fields.values()).sort(
-    (a, b) => (a.order || 0) - (b.order || 0)
+    (a, b) => Number(a.order || 0) - Number(b.order || 0),
   );
 };
 
@@ -209,214 +335,14 @@ const validateQuantity = (quantity) => {
 
 /*
 |--------------------------------------------------------------------------
-| Visual Content Pricing
+| Pricing Option Helpers
 |--------------------------------------------------------------------------
 */
 
 /**
- * Find Visual Content pricing option by group/value.
- *
- * The seed file will define pricing options using groups such as:
- *
- * group: "shoot"
- * group: "drone"
- * group: "host"
- *
- * and names/values that correspond to the selected formData.
+ * Find an active pricing option by ID.
  */
-const findVisualContentOption = (
-  service,
-  group,
-  value
-) => {
-  if (!value) {
-    return null;
-  }
-
-  if (!Array.isArray(service.pricingOptions)) {
-    return null;
-  }
-
-  return (
-    service.pricingOptions.find(
-      (option) =>
-        option.isActive &&
-        option.group === group &&
-        (
-          option.value === value ||
-          option.name.toLowerCase() ===
-            String(value).toLowerCase()
-        )
-    ) || null
-  );
-};
-
-/**
- * Find a Visual Content pricing option by group.
- *
- * Used for boolean selections such as Drone.
- */
-const findVisualContentBooleanOption = (
-  service,
-  group
-) => {
-  if (!Array.isArray(service.pricingOptions)) {
-    return null;
-  }
-
-  return (
-    service.pricingOptions.find(
-      (option) =>
-        option.isActive &&
-        option.group === group
-    ) || null
-  );
-};
-
-/**
- * Resolve all selected Visual Content pricing options.
- *
- * Expected formData:
- *
- * {
- *   shoot: "iphone",
- *   drone: true,
- *   host: "exclusive"
- * }
- */
-const getVisualContentSelections = (
-  service,
-  formData
-) => {
-  const errors = [];
-  const selectedOptions = [];
-
-  /*
-   * ------------------------------------------------------
-   * Shoot - REQUIRED - exactly ONE
-   * ------------------------------------------------------
-   */
-
-  const shoot = formData.shoot;
-
-  if (isEmptyValue(shoot)) {
-    errors.push("Shoot selection is required.");
-  } else {
-    const shootOption = findVisualContentOption(
-      service,
-      "shoot",
-      shoot
-    );
-
-    if (!shootOption) {
-      errors.push("Invalid shoot selection.");
-    } else {
-      selectedOptions.push(shootOption);
-    }
-  }
-
-  /*
-   * ------------------------------------------------------
-   * Drone - OPTIONAL
-   * ------------------------------------------------------
-   */
-
-  const drone = formData.drone;
-
-  if (drone !== undefined && drone !== null) {
-    if (typeof drone !== "boolean") {
-      errors.push(
-        "Drone selection must be true or false."
-      );
-    } else if (drone === true) {
-      const droneOption =
-        findVisualContentBooleanOption(
-          service,
-          "drone"
-        );
-
-      if (!droneOption) {
-        errors.push(
-          "Drone pricing option is not available."
-        );
-      } else {
-        selectedOptions.push(droneOption);
-      }
-    }
-  }
-
-  /*
-   * ------------------------------------------------------
-   * Host - OPTIONAL - exactly ONE if selected
-   * ------------------------------------------------------
-   */
-
-  const host = formData.host;
-
-  if (!isEmptyValue(host)) {
-    const hostOption = findVisualContentOption(
-      service,
-      "host",
-      host
-    );
-
-    if (!hostOption) {
-      errors.push("Invalid host selection.");
-    } else {
-      selectedOptions.push(hostOption);
-    }
-  }
-
-  return {
-    errors,
-    selectedOptions,
-  };
-};
-
-/**
- * Calculate Visual Content amount.
- *
- * Each selected component contributes its own price.
- *
- * Example:
- *
- * Camera     = 3000
- * Drone      = 3500
- * Local Host = 2800
- *
- * Total per reel = 9300
- *
- * 5 reels = 46500
- */
-const calculateVisualContentAmount = ({
-  selectedOptions,
-  quantity,
-}) => {
-  const pricePerUnit = selectedOptions.reduce(
-    (total, option) => {
-      return total + Number(option.price || 0);
-    },
-    0
-  );
-
-  return pricePerUnit * quantity;
-};
-
-/*
-|--------------------------------------------------------------------------
-| Existing Pricing Helpers
-|--------------------------------------------------------------------------
-*/
-
-/**
- * Find an active pricing option.
- *
- * Kept for existing/non-Visual-Content services.
- */
-const findPricingOption = (
-  service,
-  pricingOptionId
-) => {
+const findPricingOption = (service, pricingOptionId) => {
   if (!pricingOptionId) {
     return null;
   }
@@ -428,165 +354,627 @@ const findPricingOption = (
   return (
     service.pricingOptions.find(
       (option) =>
-        option._id.toString() ===
-          pricingOptionId.toString() &&
-        option.isActive
+        option._id &&
+        option._id.toString() === pricingOptionId.toString() &&
+        option.isActive,
     ) || null
   );
 };
 
 /**
+ * Find an active pricing option by group and submitted value.
+ *
+ * Pricing options currently have:
+ *
+ * - name
+ * - group
+ *
+ * They do not have a separate "value" property.
+ *
+ * Therefore the submitted value can match:
+ *
+ * - option name
+ * - option _id
+ */
+const findPricingOptionByGroupValue = (service, group, value) => {
+  if (isEmptyValue(group) || isEmptyValue(value)) {
+    return null;
+  }
+
+  if (!Array.isArray(service.pricingOptions)) {
+    return null;
+  }
+
+  const normalizedGroup = normalizeString(group).toLowerCase();
+  const normalizedValue = normalizeString(value).toLowerCase();
+
+  return (
+    service.pricingOptions.find((option) => {
+      if (!option.isActive) {
+        return false;
+      }
+
+      if (normalizeString(option.group).toLowerCase() !== normalizedGroup) {
+        return false;
+      }
+
+      const optionName = normalizeString(option.name).toLowerCase();
+
+      const optionId = option._id?.toString().toLowerCase();
+
+      return optionName === normalizedValue || optionId === normalizedValue;
+    }) || null
+  );
+};
+
+/**
+ * Get all active pricing groups.
+ */
+const getPricingGroups = (service) => {
+  const groups = new Map();
+
+  for (const option of service.pricingOptions || []) {
+    if (!option.isActive) {
+      continue;
+    }
+
+    const group = normalizeString(option.group);
+
+    if (!group) {
+      continue;
+    }
+
+    if (!groups.has(group)) {
+      groups.set(group, []);
+    }
+
+    groups.get(group).push(option);
+  }
+
+  return groups;
+};
+
+/**
+ * Resolve grouped pricing selections from formData.
+ *
+ * Generic supported examples:
+ *
+ * {
+ *   shoot: "iPhone Shoot",
+ *   drone: true,
+ *   host: "Exclusive Host"
+ * }
+ *
+ * or:
+ *
+ * {
+ *   camera: "Professional",
+ *   extras: ["Drone", "Lighting"]
+ * }
+ *
+ * Boolean groups:
+ *
+ * true  -> first active option in that group
+ * false -> no option selected
+ *
+ * String groups:
+ *
+ * value is matched against pricing option name or id.
+ *
+ * Array groups:
+ *
+ * every value is resolved to an active pricing option.
+ */
+
+const getPricingOptions = (service) => {
+  return Array.isArray(service.pricingOptions)
+    ? service.pricingOptions.filter((option) => option.isActive)
+    : [];
+};
+
+const resolveGroupedPricingOptions = (service, formData = {}) => {
+  const activeOptions = getPricingOptions(service);
+
+  const groupedOptions = activeOptions.reduce((groups, option) => {
+    const group = normalizeString(option.group);
+
+    if (!group) {
+      return groups;
+    }
+
+    if (!groups[group]) {
+      groups[group] = [];
+    }
+
+    groups[group].push(option);
+
+    return groups;
+  }, {});
+
+  const selectedOptions = [];
+
+  Object.entries(groupedOptions).forEach(([group, options]) => {
+    const selectedValue = formData[group];
+
+    // Optional group not selected.
+    if (
+      selectedValue === undefined ||
+      selectedValue === null ||
+      selectedValue === "" ||
+      selectedValue === false
+    ) {
+      return;
+    }
+
+    // Multiple selections are supported for checkbox-style payloads.
+    const values = Array.isArray(selectedValue)
+      ? selectedValue
+      : [selectedValue];
+
+    values.forEach((value) => {
+      if (value === undefined || value === null || value === "") {
+        return;
+      }
+
+      const normalizedValue = normalizeString(value).toLowerCase();
+
+      const matchedOption = options.find((option) => {
+        const optionName = normalizeString(option.name).toLowerCase();
+
+        const optionId = String(option._id);
+
+        return optionName === normalizedValue || optionId === String(value);
+      });
+
+      if (!matchedOption) {
+        throw new Error(
+          `Invalid pricing option selected for group "${group}".`,
+        );
+      }
+
+      const alreadySelected = selectedOptions.some(
+        (option) => String(option._id) === String(matchedOption._id),
+      );
+
+      if (!alreadySelected) {
+        selectedOptions.push(matchedOption);
+      }
+    });
+  });
+
+  return selectedOptions;
+};
+
+const resolveGroupedPricingQuantities = (selectedOptions, formData = {}) => {
+  const pricingQuantities = formData.pricingQuantities || {};
+
+  if (pricingQuantities !== null && typeof pricingQuantities !== "object") {
+    throw new Error("Pricing quantities must be an object.");
+  }
+
+  const resolved = {};
+
+  selectedOptions.forEach((option) => {
+    const group = normalizeString(option.group);
+
+    if (!group) {
+      return;
+    }
+
+    const rawQuantity = pricingQuantities[group];
+
+    // If no quantity was supplied, use the option's minimum quantity.
+    const quantity =
+      rawQuantity === undefined || rawQuantity === null || rawQuantity === ""
+        ? Number(option.minQuantity || 1)
+        : Number(rawQuantity);
+
+    if (!Number.isInteger(quantity)) {
+      throw new Error(`Quantity for "${option.name}" must be a whole number.`);
+    }
+
+    const minQuantity = Number(option.minQuantity || 1);
+
+    const maxQuantity =
+      option.maxQuantity !== undefined && option.maxQuantity !== null
+        ? Number(option.maxQuantity)
+        : undefined;
+
+    if (quantity < minQuantity) {
+      throw new Error(
+        `"${option.name}" requires a minimum quantity of ${minQuantity}.`,
+      );
+    }
+
+    if (maxQuantity !== undefined && quantity > maxQuantity) {
+      throw new Error(
+        `"${option.name}" allows a maximum quantity of ${maxQuantity}.`,
+      );
+    }
+
+    resolved[group] = quantity;
+  });
+
+  return resolved;
+};
+
+/**
+ * Resolve all pricing selections.
+ *
+ * There are two supported modes:
+ *
+ * 1. Explicit pricingOptionId
+ *    - Existing single pricing-option flow.
+ *
+ * 2. Grouped pricing
+ *    - Pricing options have group values.
+ *    - Selections come from formData.
+ */
+const resolvePricingSelections = ({ service, pricingOptionId, formData }) => {
+  const errors = [];
+
+  /*
+  |--------------------------------------------------------------------------
+  | Explicit single pricing option
+  |--------------------------------------------------------------------------
+  */
+
+  if (pricingOptionId) {
+    const pricingOption = findPricingOption(service, pricingOptionId);
+
+    if (!pricingOption) {
+      errors.push("Selected pricing option is not available.");
+
+      return {
+        errors,
+        pricingOption: null,
+        selectedOptions: [],
+      };
+    }
+
+    return {
+      errors,
+      pricingOption,
+      selectedOptions: [pricingOption],
+    };
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Grouped pricing
+  |--------------------------------------------------------------------------
+  */
+
+  const hasGroupedPricing =
+    Array.isArray(service.pricingOptions) &&
+    service.pricingOptions.some(
+      (option) => option.isActive && normalizeString(option.group) !== "",
+    );
+
+  if (hasGroupedPricing) {
+    try {
+      const selectedOptions = resolveGroupedPricingOptions(service, formData);
+
+      return {
+        errors,
+        pricingOption: null,
+        selectedOptions,
+      };
+    } catch (error) {
+      return {
+        errors: [error.message],
+        pricingOption: null,
+        selectedOptions: [],
+      };
+    }
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | No pricing option
+  |--------------------------------------------------------------------------
+  */
+
+  return {
+    errors,
+    pricingOption: null,
+    selectedOptions: [],
+  };
+};
+
+/*
+|--------------------------------------------------------------------------
+| Quantity Rules
+|--------------------------------------------------------------------------
+*/
+
+/**
  * Validate service/pricing option quantity rules.
+ *
+ * For multiple pricing options, every selected option's
+ * quantity rules are checked.
  */
 const validateQuantityRules = ({
   service,
-  pricingOption,
+  pricingOptions,
   quantity,
+  groupedQuantities = {},
+  isGroupedPricing = false,
 }) => {
-  const errors = [];
+  if (isGroupedPricing) {
+    for (const option of pricingOptions) {
+      const group = normalizeString(option.group);
 
-  const serviceMinQuantity =
-    service.minQuantity || 1;
+      if (!group) {
+        continue;
+      }
 
-  if (quantity < serviceMinQuantity) {
-    errors.push(
-      `Minimum quantity for this service is ${serviceMinQuantity}.`
-    );
+      const optionQuantity = groupedQuantities[group];
+
+      // Selected options should always have a resolved quantity.
+      if (optionQuantity === undefined) {
+        throw new Error(
+          `Quantity is missing for pricing option "${option.name}".`,
+        );
+      }
+
+      const minQuantity = Number(option.minQuantity || 1);
+
+      const maxQuantity =
+        option.maxQuantity !== undefined && option.maxQuantity !== null
+          ? Number(option.maxQuantity)
+          : undefined;
+
+      if (!Number.isInteger(optionQuantity)) {
+        throw new Error(
+          `Quantity for "${option.name}" must be a whole number.`,
+        );
+      }
+
+      if (optionQuantity < minQuantity) {
+        throw new Error(
+          `"${option.name}" requires a minimum quantity of ${minQuantity}.`,
+        );
+      }
+
+      if (maxQuantity !== undefined && optionQuantity > maxQuantity) {
+        throw new Error(
+          `"${option.name}" allows a maximum quantity of ${maxQuantity}.`,
+        );
+      }
+    }
+
+    return;
   }
 
-  if (
-    service.maxQuantity !== undefined &&
-    service.maxQuantity !== null &&
-    quantity > service.maxQuantity
-  ) {
-    errors.push(
-      `Maximum quantity for this service is ${service.maxQuantity}.`
-    );
+  // Existing normal-service quantity validation.
+  const parsedQuantity = Number(quantity);
+
+  if (!Number.isInteger(parsedQuantity) || parsedQuantity < 1) {
+    throw new Error("Quantity must be a whole number greater than 0.");
   }
 
-  if (pricingOption) {
-    const optionMinQuantity =
-      pricingOption.minQuantity || 1;
+  const serviceMin = Number(service.minQuantity || 1);
 
-    if (quantity < optionMinQuantity) {
-      errors.push(
-        `Minimum quantity for ${pricingOption.name} is ${optionMinQuantity}.`
+  const serviceMax =
+    service.maxQuantity !== undefined && service.maxQuantity !== null
+      ? Number(service.maxQuantity)
+      : undefined;
+
+  if (parsedQuantity < serviceMin) {
+    throw new Error(`Minimum quantity for this service is ${serviceMin}.`);
+  }
+
+  if (serviceMax !== undefined && parsedQuantity > serviceMax) {
+    throw new Error(`Maximum quantity for this service is ${serviceMax}.`);
+  }
+
+  for (const option of pricingOptions) {
+    const minQuantity = Number(option.minQuantity || 1);
+
+    const maxQuantity =
+      option.maxQuantity !== undefined && option.maxQuantity !== null
+        ? Number(option.maxQuantity)
+        : undefined;
+
+    if (parsedQuantity < minQuantity) {
+      throw new Error(
+        `"${option.name}" requires a minimum quantity of ${minQuantity}.`,
       );
     }
 
-    if (
-      pricingOption.maxQuantity !== undefined &&
-      pricingOption.maxQuantity !== null &&
-      quantity > pricingOption.maxQuantity
-    ) {
-      errors.push(
-        `Maximum quantity for ${pricingOption.name} is ${pricingOption.maxQuantity}.`
+    if (maxQuantity !== undefined && parsedQuantity > maxQuantity) {
+      throw new Error(
+        `"${option.name}" allows a maximum quantity of ${maxQuantity}.`,
       );
     }
   }
-
-  return errors;
 };
+
+/*
+|--------------------------------------------------------------------------
+| Dynamic Field Pricing
+|--------------------------------------------------------------------------
+*/
+
+/**
+ * Get the price contributed by one field value.
+ *
+ * Pricing is configured on:
+ *
+ * field.options[].price
+ */
+const calculateFieldOptionPrice = (field, value) => {
+  if (!field || !Array.isArray(field.options)) {
+    return 0;
+  }
+
+  if (isEmptyValue(value)) {
+    return 0;
+  }
+
+  /*
+   * Checkbox multiple selection.
+   */
+  if (Array.isArray(value)) {
+    return value.reduce((total, selectedValue) => {
+      const option = field.options.find(
+        (item) => String(item.value) === String(selectedValue),
+      );
+
+      return total + Number(option?.price || 0);
+    }, 0);
+  }
+
+  /*
+   * Boolean checkbox.
+   *
+   * If true, use the matching true option when
+   * one exists.
+   */
+  if (field.type === "checkbox" && typeof value === "boolean") {
+    if (!value) {
+      return 0;
+    }
+
+    const trueOption = field.options.find(
+      (option) => String(option.value).toLowerCase() === "true",
+    );
+
+    return Number(trueOption?.price || 0);
+  }
+
+  /*
+   * Select / radio / other single selection.
+   */
+  const option = field.options.find(
+    (item) => String(item.value) === String(value),
+  );
+
+  return Number(option?.price || 0);
+};
+
+/**
+ * Calculate all dynamic field option pricing.
+ */
+const calculateFieldOptionsAmount = (applicableFields, formData) => {
+  return applicableFields.reduce((total, field) => {
+    return total + calculateFieldOptionPrice(field, formData[field.name]);
+  }, 0);
+};
+
+/*
+|--------------------------------------------------------------------------
+| Order Amount
+|--------------------------------------------------------------------------
+*/
 
 /**
  * Calculate the order amount on the SERVER.
  *
  * The frontend amount must never be trusted.
+ *
+ * Pricing calculation:
+ *
+ * 1. Multiple selected pricing options
+ * 2. Single selected pricing option
+ * 3. Service pricing type
+ * 4. Dynamic field option prices
  */
 const calculateOrderAmount = ({
   service,
-  pricingOption,
+  selectedOptions,
   quantity,
+  fieldAmount = 0,
+  groupedQuantities = {},
+  isGroupedPricing = false,
 }) => {
-  /*
-   * Visual Content uses multiple independent
-   * pricing components.
-   */
-  if (
-    service.slug === "visual-content-reels"
-  ) {
-    return service.basePrice;
+  let amount = 0;
+
+  if (isGroupedPricing) {
+    for (const option of selectedOptions) {
+      const group = normalizeString(option.group);
+
+      const optionQuantity =
+        groupedQuantities[group] ?? Number(option.minQuantity || 1);
+
+      amount += Number(option.price || 0) * optionQuantity;
+    }
+  } else if (selectedOptions.length > 0) {
+    const option = selectedOptions[0];
+
+    amount = Number(option.price || 0) * Number(quantity);
+  } else {
+    const pricingType = service.pricingType;
+
+    if (pricingType === "per_unit") {
+      amount = Number(service.basePrice || 0) * Number(quantity);
+    } else {
+      amount = Number(service.basePrice || 0);
+    }
   }
 
-  /*
-   * Existing pricing-option behaviour.
-   */
-  if (pricingOption) {
-    return pricingOption.price * quantity;
-  }
+  amount += Number(fieldAmount || 0);
 
-  switch (service.pricingType) {
-    case "fixed":
-      return service.basePrice;
-
-    case "per_unit":
-      return service.basePrice * quantity;
-
-    case "starting_from":
-      return service.basePrice * quantity;
-
-    case "custom":
-      return service.basePrice;
-
-    default:
-      return service.basePrice;
-  }
+  return amount;
 };
+
+/*
+|--------------------------------------------------------------------------
+| Service Snapshot
+|--------------------------------------------------------------------------
+*/
 
 /**
  * Create immutable service snapshot.
+ *
+ * The snapshot stores the configuration actually used
+ * when the order was created.
  */
 const createServiceSnapshot = ({
   service,
-  pricingOption,
   selectedOptions = [],
+  groupedQuantities = {},
 }) => {
-  const snapshot = {
+  const selectedOptionSnapshots = selectedOptions.map((option) => {
+    const group = normalizeString(option.group);
+
+    const selectedQuantity =
+      groupedQuantities[group] ?? Number(option.minQuantity || 1);
+
+    return {
+      id: option._id,
+      name: option.name,
+      description: option.description,
+      price: option.price,
+      unit: option.unit,
+      group: option.group,
+      quantity: selectedQuantity,
+      minQuantity: option.minQuantity,
+      maxQuantity: option.maxQuantity,
+      isActive: option.isActive,
+    };
+  });
+
+  return {
+    serviceId: service._id,
     name: service.name,
+    slug: service.slug,
     category: service.category,
-    description: service.description || "",
+    description: service.description,
     pricingType: service.pricingType,
     basePrice: service.basePrice,
-    unit: service.unit || "",
+    unit: service.unit,
+    minQuantity: service.minQuantity,
+    maxQuantity: service.maxQuantity,
+
+    // Keep existing backwards-compatible field.
+    selectedOption:
+      selectedOptionSnapshots.length === 1 ? selectedOptionSnapshots[0] : null,
+
+    // New complete selection snapshot.
+    selectedOptions: selectedOptionSnapshots,
   };
-
-  /*
-   * Existing single pricing-option snapshot.
-   */
-  if (pricingOption) {
-    snapshot.selectedOption = {
-      id: pricingOption._id,
-      name: pricingOption.name,
-      description:
-        pricingOption.description || "",
-      price: pricingOption.price,
-      unit: pricingOption.unit,
-      minQuantity:
-        pricingOption.minQuantity || 1,
-    };
-  }
-
-  /*
-   * New Visual Content snapshot.
-   *
-   * We intentionally keep the selected component
-   * details inside the snapshot so historical orders
-   * remain accurate even if admin pricing changes later.
-   */
-  if (selectedOptions.length > 0) {
-    snapshot.selectedOptions =
-      selectedOptions.map((option) => ({
-        id: option._id,
-        name: option.name,
-        description:
-          option.description || "",
-        price: option.price,
-        unit: option.unit,
-        group: option.group || "",
-      }));
-  }
-
-  return snapshot;
 };
 
 /*
@@ -622,14 +1010,11 @@ const createOrder = async (req, res) => {
     if (!paymentMethod) {
       return res.status(400).json({
         success: false,
-        message:
-          "Payment method is required.",
+        message: "Payment method is required.",
       });
     }
 
-    if (
-      !["cod", "online"].includes(paymentMethod)
-    ) {
+    if (!["cod", "online"].includes(paymentMethod)) {
       return res.status(400).json({
         success: false,
         message: "Invalid payment method.",
@@ -650,36 +1035,17 @@ const createOrder = async (req, res) => {
     if (
       additionalRequirements !== undefined &&
       additionalRequirements !== null &&
-      typeof additionalRequirements !==
-        "string"
+      typeof additionalRequirements !== "string"
     ) {
       return res.status(400).json({
         success: false,
-        message:
-          "Additional requirements must be a string.",
+        message: "Additional requirements must be a string.",
       });
     }
 
     /*
     |--------------------------------------------------------------------------
-    | 2. Validate quantity
-    |--------------------------------------------------------------------------
-    */
-
-    const parsedQuantity =
-      validateQuantity(quantity);
-
-    if (!parsedQuantity) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Quantity must be a valid positive whole number.",
-      });
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | 3. Find active service
+    | 2. Find active service
     |--------------------------------------------------------------------------
     */
 
@@ -691,224 +1057,232 @@ const createOrder = async (req, res) => {
     if (!service) {
       return res.status(404).json({
         success: false,
-        message:
-          "Selected service is not available.",
+        message: "Selected service is not available.",
       });
     }
 
     /*
     |--------------------------------------------------------------------------
-    | 4. Visual Content handling
+    | 3. Determine whether this is grouped pricing
     |--------------------------------------------------------------------------
     */
 
-    const isVisualContent =
-      service.slug ===
-      "visual-content-reels";
+    const isGroupedPricing =
+      Array.isArray(service.pricingOptions) &&
+      service.pricingOptions.some(
+        (option) => option.isActive && normalizeString(option.group) !== "",
+      );
 
-    let pricingOption = null;
-    let selectedOptions = [];
+    /*
+    |--------------------------------------------------------------------------
+    | 4. Prepare form data
+    |--------------------------------------------------------------------------
+    |
+    | pricingQuantities is internal pricing information.
+    | It should be used for calculation/validation but should NOT
+    | be treated as a dynamic service field.
+    |
+    */
 
-    if (isVisualContent) {
+    const submittedFormData = {
+      ...formData,
+    };
+
+    let pricingQuantities = {};
+
+    if (isGroupedPricing) {
+      pricingQuantities = submittedFormData.pricingQuantities || {};
+
+      if (
+        pricingQuantities === null ||
+        typeof pricingQuantities !== "object" ||
+        Array.isArray(pricingQuantities)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Pricing quantities must be an object.",
+        });
+      }
+
       /*
-       * New Visual Content pricing model:
-       *
-       * Shoot  -> required, one selection
-       * Drone  -> optional
-       * Host   -> optional, one selection
+       * Remove pricingQuantities before dynamic-field validation.
        */
+      delete submittedFormData.pricingQuantities;
+    }
 
-      const {
-        errors,
-        selectedOptions:
-          resolvedOptions,
-      } = getVisualContentSelections(
+    /*
+    |--------------------------------------------------------------------------
+    | 5. Validate normal-service quantity
+    |--------------------------------------------------------------------------
+    |
+    | Grouped services use per-group quantities instead.
+    |
+    */
+
+    let parsedQuantity = 1;
+
+    if (!isGroupedPricing) {
+      parsedQuantity = validateQuantity(quantity);
+
+      if (!parsedQuantity) {
+        return res.status(400).json({
+          success: false,
+          message: "Quantity must be a valid positive whole number.",
+        });
+      }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | 6. Resolve pricing selections
+    |--------------------------------------------------------------------------
+    */
+
+    const {
+      errors: pricingErrors,
+      pricingOption,
+      selectedOptions,
+    } = resolvePricingSelections({
+      service,
+      pricingOptionId,
+      formData: submittedFormData,
+    });
+
+    if (pricingErrors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please correct the pricing selections.",
+        errors: pricingErrors,
+      });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | 7. Resolve per-group quantities
+    |--------------------------------------------------------------------------
+    */
+
+    let groupedQuantities = {};
+
+    if (isGroupedPricing) {
+      try {
+        groupedQuantities = resolveGroupedPricingQuantities(
+          selectedOptions,
+          pricingQuantities,
+        );
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          message: error.message,
+        });
+      }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | 8. Validate quantity rules
+    |--------------------------------------------------------------------------
+    */
+
+    try {
+      validateQuantityRules({
         service,
-        formData
-      );
-
-      if (errors.length > 0) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Please correct the visual content selections.",
-          errors,
-        });
-      }
-
-      selectedOptions = resolvedOptions;
-
-      if (selectedOptions.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "At least one visual content option is required.",
-        });
-      }
-    } else {
-      /*
-       * Existing pricing-option flow for all
-       * other services.
-       */
-
-      if (pricingOptionId) {
-        pricingOption =
-          findPricingOption(
-            service,
-            pricingOptionId
-          );
-
-        if (!pricingOption) {
-          return res.status(400).json({
-            success: false,
-            message:
-              "Selected pricing option is not available.",
-          });
-        }
-      }
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | 5. Validate quantity rules
-    |--------------------------------------------------------------------------
-    */
-
-    let quantityErrors = [];
-
-    if (isVisualContent) {
-      /*
-       * Visual Content component prices are all
-       * calculated per reel.
-       *
-       * The service itself controls the minimum.
-       */
-      quantityErrors =
-        validateQuantityRules({
-          service,
-          pricingOption: null,
-          quantity: parsedQuantity,
-        });
-    } else {
-      quantityErrors =
-        validateQuantityRules({
-          service,
-          pricingOption,
-          quantity: parsedQuantity,
-        });
-    }
-
-    if (quantityErrors.length > 0) {
+        pricingOptions: selectedOptions,
+        quantity: parsedQuantity,
+        groupedQuantities,
+        isGroupedPricing,
+      });
+    } catch (error) {
       return res.status(400).json({
         success: false,
-        message: quantityErrors[0],
+        message: error.message,
       });
     }
 
     /*
     |--------------------------------------------------------------------------
-    | 6. Determine applicable fields
+    | 9. Determine applicable dynamic fields
+    |--------------------------------------------------------------------------
+    |
+    | This includes:
+    |
+    | - service.fields
+    | - selected pricing option fields
+    |
+    | For Reels, selecting Camera will therefore include:
+    |
+    | - shootLocation
+    | - preferredShootDate
+    | - referenceLink
+    | - requirements
+    |
+    */
+
+    const applicableFields = getApplicableFields(
+      service,
+      selectedOptions,
+      isGroupedPricing,
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | 10. Validate dynamic fields
     |--------------------------------------------------------------------------
     */
 
-    /*
-     * For Visual Content, the fields are defined
-     * directly on the service.
-     */
-    const serviceFields =
-      service.fields || [];
+    const validationErrors = validateFormData(
+      applicableFields,
+      submittedFormData,
+    );
 
-    const optionFields =
-      pricingOption?.fields || [];
-
-    /*
-     * For Visual Content we do not merge fields from
-     * selected pricing components because the new
-     * pricing components are selections, not separate
-     * form configurations.
-     */
-    const applicableFields =
-      isVisualContent
-        ? serviceFields
-        : getApplicableFields(
-            service,
-            pricingOption
-          );
-
-    /*
-    |--------------------------------------------------------------------------
-    | 7. Validate dynamic fields
-    |--------------------------------------------------------------------------
-    */
-
-    const validationErrors =
-      validateFormData(
-        applicableFields,
-        formData
-      );
-
-    if (
-      Object.keys(validationErrors).length > 0
-    ) {
+    if (Object.keys(validationErrors).length > 0) {
       return res.status(400).json({
         success: false,
-        message:
-          "Please correct the form fields.",
+        message: "Please correct the form fields.",
         errors: validationErrors,
       });
     }
 
     /*
     |--------------------------------------------------------------------------
-    | 8. Clean form data
+    | 11. Clean dynamic form data
     |--------------------------------------------------------------------------
     */
 
-    const cleanServiceFormData =
-      cleanFormData(
-        serviceFields,
-        formData
-      );
-
-    const cleanOptionFormData =
-      isVisualContent
-        ? {}
-        : cleanFormData(
-            optionFields,
-            formData
-          );
-
-    const cleanFormDataResult = {
-      ...cleanServiceFormData,
-      ...cleanOptionFormData,
-    };
+    const cleanFormDataResult = cleanFormData(
+      applicableFields,
+      submittedFormData,
+    );
 
     /*
     |--------------------------------------------------------------------------
-    | 9. Calculate amount server-side
+    | 12. Calculate dynamic field pricing
     |--------------------------------------------------------------------------
     */
 
-    let amount;
-
-    if (isVisualContent) {
-      amount =
-        calculateVisualContentAmount({
-          selectedOptions,
-          quantity: parsedQuantity,
-        });
-    } else {
-      amount =
-        calculateOrderAmount({
-          service,
-          pricingOption,
-          quantity: parsedQuantity,
-        });
-    }
+    const fieldAmount = calculateFieldOptionsAmount(
+      applicableFields,
+      cleanFormDataResult,
+    );
 
     /*
     |--------------------------------------------------------------------------
-    | 10. Generate unique order number
+    | 13. Calculate final amount server-side
+    |--------------------------------------------------------------------------
+    */
+
+    const amount = calculateOrderAmount({
+      service,
+      selectedOptions,
+      quantity: parsedQuantity,
+      fieldAmount,
+      groupedQuantities,
+      isGroupedPricing,
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | 14. Generate unique order number
     |--------------------------------------------------------------------------
     */
 
@@ -916,34 +1290,31 @@ const createOrder = async (req, res) => {
     let orderNumberExists = true;
 
     while (orderNumberExists) {
-      orderNumber =
-        generateOrderNumber();
+      orderNumber = generateOrderNumber();
 
-      const existingOrder =
-        await Order.findOne({
-          orderNumber,
-        });
+      const existingOrder = await Order.findOne({
+        orderNumber,
+      });
 
-      orderNumberExists =
-        !!existingOrder;
+      orderNumberExists = !!existingOrder;
     }
 
     /*
     |--------------------------------------------------------------------------
-    | 11. Create service snapshot
+    | 15. Create immutable service snapshot
     |--------------------------------------------------------------------------
     */
 
-    const serviceSnapshot =
-      createServiceSnapshot({
-        service,
-        pricingOption,
-        selectedOptions,
-      });
+    const serviceSnapshot = createServiceSnapshot({
+      service,
+      pricingOption,
+      selectedOptions,
+      groupedQuantities,
+    });
 
     /*
     |--------------------------------------------------------------------------
-    | 12. Create order
+    | 16. Create order
     |--------------------------------------------------------------------------
     */
 
@@ -957,13 +1328,23 @@ const createOrder = async (req, res) => {
 
       serviceSnapshot,
 
-      quantity: parsedQuantity,
+      /*
+       * Normal services:
+       *
+       * quantity = selected quantity
+       *
+       * Grouped services:
+       *
+       * quantity = 1
+       * Actual quantities are stored inside
+       * serviceSnapshot.selectedOptions[].quantity
+       */
+      quantity: isGroupedPricing ? 1 : parsedQuantity,
 
       formData: cleanFormDataResult,
 
       additionalRequirements:
-        typeof additionalRequirements ===
-        "string"
+        typeof additionalRequirements === "string"
           ? additionalRequirements.trim()
           : "",
 
@@ -978,51 +1359,45 @@ const createOrder = async (req, res) => {
 
     /*
     |--------------------------------------------------------------------------
-    | 13. Response
+    | 17. Response
     |--------------------------------------------------------------------------
     */
 
     return res.status(201).json({
       success: true,
-      message:
-        "Order created successfully.",
+
+      message: "Order created successfully.",
 
       order: {
         id: order._id,
-        orderNumber:
-          order.orderNumber,
-        service:
-          order.serviceSnapshot,
-        quantity:
-          order.quantity,
-        amount:
-          order.amount,
-        paymentMethod:
-          order.paymentMethod,
-        paymentStatus:
-          order.paymentStatus,
-        orderStatus:
-          order.orderStatus,
-        formData:
-          Object.fromEntries(
-            order.formData
-          ),
-        additionalRequirements:
-          order.additionalRequirements,
-        createdAt:
-          order.createdAt,
+
+        orderNumber: order.orderNumber,
+
+        service: order.serviceSnapshot,
+
+        quantity: order.quantity,
+
+        amount: order.amount,
+
+        paymentMethod: order.paymentMethod,
+
+        paymentStatus: order.paymentStatus,
+
+        orderStatus: order.orderStatus,
+
+        formData: Object.fromEntries(order.formData),
+
+        additionalRequirements: order.additionalRequirements,
+
+        createdAt: order.createdAt,
       },
     });
   } catch (error) {
-    console.error(
-      "Create order error:",
-      error
-    );
+    console.error("Create order error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to create order.",
+      message: "Unable to create order.",
     });
   }
 };
@@ -1039,10 +1414,7 @@ const getMyOrders = async (req, res) => {
       client: req.user.userId,
     })
       .select("-codPin")
-      .populate(
-        "service",
-        "name category"
-      )
+      .populate("service", "name category")
       .sort({
         createdAt: -1,
       });
@@ -1052,15 +1424,11 @@ const getMyOrders = async (req, res) => {
       orders,
     });
   } catch (error) {
-    console.error(
-      "Get orders error:",
-      error
-    );
+    console.error("Get orders error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to fetch orders.",
+      message: "Unable to fetch orders.",
     });
   }
 };
@@ -1073,16 +1441,12 @@ const getMyOrders = async (req, res) => {
 
 const getOrderById = async (req, res) => {
   try {
-    const order =
-      await Order.findOne({
-        _id: req.params.id,
-        client: req.user.userId,
-      })
-        .select("-codPin")
-        .populate(
-          "service",
-          "name category"
-        );
+    const order = await Order.findOne({
+      _id: req.params.id,
+      client: req.user.userId,
+    })
+      .select("-codPin")
+      .populate("service", "name category");
 
     if (!order) {
       return res.status(404).json({
@@ -1096,15 +1460,11 @@ const getOrderById = async (req, res) => {
       order,
     });
   } catch (error) {
-    console.error(
-      "Get order error:",
-      error
-    );
+    console.error("Get order error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to fetch order.",
+      message: "Unable to fetch order.",
     });
   }
 };
@@ -1119,14 +1479,8 @@ const getAdminOrders = async (req, res) => {
   try {
     const orders = await Order.find({})
       .select("-codPin")
-      .populate(
-        "client",
-        "name email username"
-      )
-      .populate(
-        "service",
-        "name category"
-      )
+      .populate("client", "name email username")
+      .populate("service", "name category")
       .sort({
         createdAt: -1,
       });
@@ -1136,15 +1490,11 @@ const getAdminOrders = async (req, res) => {
       orders,
     });
   } catch (error) {
-    console.error(
-      "Get admin orders error:",
-      error
-    );
+    console.error("Get admin orders error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to fetch orders.",
+      message: "Unable to fetch orders.",
     });
   }
 };
@@ -1155,30 +1505,17 @@ const getAdminOrders = async (req, res) => {
 |--------------------------------------------------------------------------
 */
 
-const getAdminOrderById = async (
-  req,
-  res
-) => {
+const getAdminOrderById = async (req, res) => {
   try {
-    const order =
-      await Order.findById(
-        req.params.id
-      )
-        .select("-codPin")
-        .populate(
-          "client",
-          "name email username"
-        )
-        .populate(
-          "service",
-          "name category"
-        );
+    const order = await Order.findById(req.params.id)
+      .select("-codPin")
+      .populate("client", "name email username")
+      .populate("service", "name category");
 
     if (!order) {
       return res.status(404).json({
         success: false,
-        message:
-          "Order not found.",
+        message: "Order not found.",
       });
     }
 
@@ -1187,15 +1524,11 @@ const getAdminOrderById = async (
       order,
     });
   } catch (error) {
-    console.error(
-      "Get admin order error:",
-      error
-    );
+    console.error("Get admin order error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to fetch order.",
+      message: "Unable to fetch order.",
     });
   }
 };
@@ -1206,10 +1539,7 @@ const getAdminOrderById = async (
 |--------------------------------------------------------------------------
 */
 
-const updateOrderStatus = async (
-  req,
-  res
-) => {
+const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
 
@@ -1224,31 +1554,23 @@ const updateOrderStatus = async (
     if (!status) {
       return res.status(400).json({
         success: false,
-        message:
-          "Order status is required.",
+        message: "Order status is required.",
       });
     }
 
-    if (
-      !allowedStatuses.includes(status)
-    ) {
+    if (!allowedStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid order status.",
+        message: "Invalid order status.",
       });
     }
 
-    const order =
-      await Order.findById(
-        req.params.id
-      );
+    const order = await Order.findById(req.params.id);
 
     if (!order) {
       return res.status(404).json({
         success: false,
-        message:
-          "Order not found.",
+        message: "Order not found.",
       });
     }
 
@@ -1256,36 +1578,22 @@ const updateOrderStatus = async (
 
     await order.save();
 
-    const updatedOrder =
-      await Order.findById(
-        order._id
-      )
-        .select("-codPin")
-        .populate(
-          "client",
-          "name email username"
-        )
-        .populate(
-          "service",
-          "name category"
-        );
+    const updatedOrder = await Order.findById(order._id)
+      .select("-codPin")
+      .populate("client", "name email username")
+      .populate("service", "name category");
 
     return res.status(200).json({
       success: true,
-      message:
-        "Order status updated successfully.",
+      message: "Order status updated successfully.",
       order: updatedOrder,
     });
   } catch (error) {
-    console.error(
-      "Update order status error:",
-      error
-    );
+    console.error("Update order status error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to update order status.",
+      message: "Unable to update order status.",
     });
   }
 };
@@ -1296,13 +1604,9 @@ const updateOrderStatus = async (
 |--------------------------------------------------------------------------
 */
 
-const updatePaymentStatus = async (
-  req,
-  res
-) => {
+const updatePaymentStatus = async (req, res) => {
   try {
-    const { paymentStatus } =
-      req.body;
+    const { paymentStatus } = req.body;
 
     const allowedStatuses = [
       "pending",
@@ -1312,29 +1616,19 @@ const updatePaymentStatus = async (
       "collected",
     ];
 
-    if (
-      !paymentStatus ||
-      !allowedStatuses.includes(
-        paymentStatus
-      )
-    ) {
+    if (!paymentStatus || !allowedStatuses.includes(paymentStatus)) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid payment status.",
+        message: "Invalid payment status.",
       });
     }
 
-    const order =
-      await Order.findById(
-        req.params.id
-      );
+    const order = await Order.findById(req.params.id);
 
     if (!order) {
       return res.status(404).json({
         success: false,
-        message:
-          "Order not found.",
+        message: "Order not found.",
       });
     }
 
@@ -1342,14 +1636,10 @@ const updatePaymentStatus = async (
      * COD payment must go through
      * the COD verification flow.
      */
-    if (
-      order.paymentMethod === "cod" &&
-      paymentStatus === "collected"
-    ) {
+    if (order.paymentMethod === "cod" && paymentStatus === "collected") {
       return res.status(400).json({
         success: false,
-        message:
-          "COD payment must be completed through COD PIN verification.",
+        message: "COD payment must be completed through COD PIN verification.",
       });
     }
 
@@ -1357,49 +1647,34 @@ const updatePaymentStatus = async (
      * Prevent changing an already
      * collected COD payment.
      */
-    if (
-      order.paymentMethod === "cod" &&
-      order.paymentStatus ===
-        "collected"
-    ) {
+    if (order.paymentMethod === "cod" && order.paymentStatus === "collected") {
       return res.status(400).json({
         success: false,
-        message:
-          "COD payment has already been collected.",
+        message: "COD payment has already been collected.",
       });
     }
 
-    order.paymentStatus =
-      paymentStatus;
+    order.paymentStatus = paymentStatus;
 
     await order.save();
 
     return res.status(200).json({
       success: true,
-      message:
-        "Payment status updated successfully.",
+      message: "Payment status updated successfully.",
       order: {
         id: order._id,
-        orderNumber:
-          order.orderNumber,
-        paymentMethod:
-          order.paymentMethod,
-        paymentStatus:
-          order.paymentStatus,
-        orderStatus:
-          order.orderStatus,
+        orderNumber: order.orderNumber,
+        paymentMethod: order.paymentMethod,
+        paymentStatus: order.paymentStatus,
+        orderStatus: order.orderStatus,
       },
     });
   } catch (error) {
-    console.error(
-      "Update payment status error:",
-      error
-    );
+    console.error("Update payment status error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to update payment status.",
+      message: "Unable to update payment status.",
     });
   }
 };
@@ -1410,65 +1685,45 @@ const updatePaymentStatus = async (
 |--------------------------------------------------------------------------
 */
 
-const updateAdminNotes = async (
-  req,
-  res
-) => {
+const updateAdminNotes = async (req, res) => {
   try {
     const { notes } = req.body;
 
-    if (
-      notes !== undefined &&
-      typeof notes !== "string"
-    ) {
+    if (notes !== undefined && typeof notes !== "string") {
       return res.status(400).json({
         success: false,
-        message:
-          "Notes must be a string.",
+        message: "Notes must be a string.",
       });
     }
 
-    const order =
-      await Order.findById(
-        req.params.id
-      );
+    const order = await Order.findById(req.params.id);
 
     if (!order) {
       return res.status(404).json({
         success: false,
-        message:
-          "Order not found.",
+        message: "Order not found.",
       });
     }
 
-    order.notes =
-      typeof notes === "string"
-        ? notes.trim()
-        : "";
+    order.notes = typeof notes === "string" ? notes.trim() : "";
 
     await order.save();
 
     return res.status(200).json({
       success: true,
-      message:
-        "Admin notes updated successfully.",
+      message: "Admin notes updated successfully.",
       order: {
         id: order._id,
-        orderNumber:
-          order.orderNumber,
+        orderNumber: order.orderNumber,
         notes: order.notes,
       },
     });
   } catch (error) {
-    console.error(
-      "Update admin notes error:",
-      error
-    );
+    console.error("Update admin notes error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to update admin notes.",
+      message: "Unable to update admin notes.",
     });
   }
 };
@@ -1479,42 +1734,28 @@ const updateAdminNotes = async (
 |--------------------------------------------------------------------------
 */
 
-const getAdminCodOrders = async (
-  req,
-  res
-) => {
+const getAdminCodOrders = async (req, res) => {
   try {
-    const orders =
-      await Order.find({
-        paymentMethod: "cod",
-      })
-        .select("-codPin")
-        .populate(
-          "client",
-          "name email username"
-        )
-        .populate(
-          "service",
-          "name category"
-        )
-        .sort({
-          createdAt: -1,
-        });
+    const orders = await Order.find({
+      paymentMethod: "cod",
+    })
+      .select("-codPin")
+      .populate("client", "name email username")
+      .populate("service", "name category")
+      .sort({
+        createdAt: -1,
+      });
 
     return res.status(200).json({
       success: true,
       orders,
     });
   } catch (error) {
-    console.error(
-      "Get admin COD orders error:",
-      error
-    );
+    console.error("Get admin COD orders error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Unable to fetch COD orders.",
+      message: "Unable to fetch COD orders.",
     });
   }
 };

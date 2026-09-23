@@ -103,6 +103,7 @@ const OrderHistory = () => {
             shadow-sm
             transition-all
             duration-200
+            cursor-pointer
             hover:border-zinc-300
             hover:bg-zinc-50
             hover:text-zinc-900
@@ -737,7 +738,8 @@ const EmptyOrders = () => {
         justify-center
         overflow-hidden
         rounded-[28px]
-        border border-zinc-200
+        border
+        border-zinc-200
         bg-white
         px-6
         text-center
@@ -745,6 +747,7 @@ const EmptyOrders = () => {
       "
     >
       <div
+        aria-hidden="true"
         className="
           pointer-events-none
           absolute
@@ -762,10 +765,14 @@ const EmptyOrders = () => {
         <div
           className="
             mx-auto
-            flex h-14 w-14
-            items-center justify-center
+            flex
+            h-14
+            w-14
+            items-center
+            justify-center
             rounded-2xl
-            border border-zinc-200
+            border
+            border-zinc-200
             bg-zinc-50
           "
         >
@@ -820,19 +827,22 @@ const EmptyOrders = () => {
             py-3
             text-sm
             font-medium
-            text-white
+            !text-white
             shadow-sm
-            transition
+            transition-all
             duration-200
-            hover:-translate-y-0.5
             hover:bg-zinc-800
+            hover:!text-white
             hover:shadow-md
           "
         >
-          Create New Order
+          <span className="!text-white">Create New Order</span>
+
           <ArrowRight
             size={16}
+            strokeWidth={1.8}
             className="
+              !text-white
               transition-transform
               duration-200
               group-hover:translate-x-1

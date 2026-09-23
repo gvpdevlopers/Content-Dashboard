@@ -326,6 +326,7 @@ const AdminUsers = () => {
                 shadow-sm
                 transition-all
                 duration-200
+                cursor-pointer
                 hover:bg-zinc-800
                 hover:shadow-md
               "
@@ -356,6 +357,7 @@ const AdminUsers = () => {
                 shadow-sm
                 transition-all
                 duration-200
+                cursor-pointer
                 hover:border-zinc-300
                 hover:bg-zinc-50
                 hover:text-zinc-900
@@ -948,13 +950,16 @@ const UserTableRow = ({ user, onStatusChange }) => {
       {/* Action */}
 
       <Link
-        to={`/admin/users/${user._id}`}
-        className="
+  to={`/admin/users/${user._id}`}
+  className="
+    group/view
     flex h-9 w-9
-    items-center justify-center
+    items-center
+    justify-center
     justify-self-end
     rounded-lg
-    border border-zinc-200
+    border
+    border-zinc-200
     bg-white
     text-zinc-400
     shadow-sm
@@ -962,12 +967,20 @@ const UserTableRow = ({ user, onStatusChange }) => {
     duration-200
     hover:border-zinc-900
     hover:bg-zinc-900
-    !hover:text-white
   "
-        aria-label={`View ${user.name || "user"}`}
-      >
-        <ChevronRight size={16} />
-      </Link>
+  aria-label={`View ${user.name || "user"}`}
+>
+  <ChevronRight
+    size={16}
+    strokeWidth={1.8}
+    className="
+      text-zinc-400
+      transition-colors
+      duration-200
+      group-hover/view:text-white
+    "
+  />
+</Link>
     </div>
   );
 };

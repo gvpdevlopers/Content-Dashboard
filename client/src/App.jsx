@@ -29,6 +29,9 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import AdminUserDetails from "./pages/admin/AdminUserDetails";
 import AdminCreateUser from "./pages/admin/AdminCreateUser";
 import CodManagement from "./pages/admin/CodManagement";
+import AdminServices from "./pages/admin/AdminServices";
+import AdminCreateService from "./pages/admin/AdminCreateService";
+import AdminEditService from "./pages/admin/AdminEditService";
 
 // Route Guards
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -54,20 +57,11 @@ const App = () => {
           <Route path="/services" element={<Services />} />
           <Route path="/contact" element={<Contact />} />
 
-          <Route
-            path="/privacy-policy"
-            element={<PrivacyPolicy />}
-          />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
-          <Route
-            path="/terms-conditions"
-            element={<TermsConditions />}
-          />
+          <Route path="/terms-conditions" element={<TermsConditions />} />
 
-          <Route
-            path="/refund-cancellation"
-            element={<RefundCancellation />}
-          />
+          <Route path="/refund-cancellation" element={<RefundCancellation />} />
         </Route>
 
         {/* AUTHENTICATION */}
@@ -85,20 +79,11 @@ const App = () => {
         >
           <Route path="/dashboard" element={<Dashboard />} />
 
-          <Route
-            path="/dashboard/new-order"
-            element={<NewOrder />}
-          />
+          <Route path="/dashboard/new-order" element={<NewOrder />} />
 
-          <Route
-            path="/dashboard/orders"
-            element={<OrderHistory />}
-          />
+          <Route path="/dashboard/orders" element={<OrderHistory />} />
 
-          <Route
-            path="/dashboard/orders/:id"
-            element={<OrderDetails />}
-          />
+          <Route path="/dashboard/orders/:id" element={<OrderDetails />} />
         </Route>
 
         {/* ADMIN AREA */}
@@ -112,43 +97,28 @@ const App = () => {
         >
           <Route path="/admin" element={<AdminDashboard />} />
 
-          <Route
-            path="/admin/orders"
-            element={<AdminOrders />}
-          />
+          <Route path="/admin/services" element={<AdminServices />} />
 
-          <Route
-            path="/admin/orders/:id"
-            element={<AdminOrderDetails />}
-          />
+          <Route path="/admin/services/new" element={<AdminCreateService />} />
 
-          <Route
-            path="/admin/users"
-            element={<AdminUsers />}
-          />
+          <Route path="/admin/services/:id/edit" element={<AdminEditService />} />
 
-          <Route
-            path="/admin/users/new"
-            element={<AdminCreateUser />}
-          />
+          <Route path="/admin/orders" element={<AdminOrders />} />
 
-          <Route
-            path="/admin/users/:id"
-            element={<AdminUserDetails />}
-          />
+          <Route path="/admin/orders/:id" element={<AdminOrderDetails />} />
 
-          <Route
-            path="/admin/cod"
-            element={<CodManagement />}
-          />
+          <Route path="/admin/users" element={<AdminUsers />} />
+
+          <Route path="/admin/users/new" element={<AdminCreateUser />} />
+
+          <Route path="/admin/users/:id" element={<AdminUserDetails />} />
+
+          <Route path="/admin/cod" element={<CodManagement />} />
         </Route>
 
         {/* FALLBACK */}
 
-        <Route
-          path="*"
-          element={<Navigate to="/" replace />}
-        />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
   );

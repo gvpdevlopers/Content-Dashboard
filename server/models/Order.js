@@ -21,9 +21,12 @@ const orderSchema = new mongoose.Schema(
       required: true,
     },
 
-    // Snapshot of the service at the time the order was created.
-    // This prevents future admin price/service changes from
-    // affecting historical orders.
+    /*
+     * Snapshot of the service at the time the order was created.
+     *
+     * This prevents future admin service/price changes
+     * from affecting historical orders.
+     */
     serviceSnapshot: {
       name: {
         type: String,
@@ -61,75 +64,171 @@ const orderSchema = new mongoose.Schema(
         trim: true,
       },
 
-      // If a service has a selected pricing option,
-      // store the option details as part of the snapshot.
-      selectedOption: {
-        id: {
-          type: mongoose.Schema.Types.ObjectId,
-          default: null,
-        },
+      /*
+       * Pricing option snapshot.
+       *
+       * This supports both:
+       *
+       * 1. Normal services with one selected pricing option.
+       * 2. Grouped services with multiple independently
+       *    selected pricing options.
+       *
+       * Example:
+       *
+       * [
+       *   {
+       *     id: "...",
+       *     name: "iPhone Shoot",
+       *     price: 3000,
+       *     unit: "per reel",
+       *     group: "shoot",
+       *     quantity: 2
+       *   },
+       *   {
+       *     id: "...",
+       *     name: "Drone",
+       *     price: 3500,
+       *     unit: "per reel",
+       *     group: "drone",
+       *     quantity: 1
+       *   }
+       * ]
+       *
+       * Keeping this as an array also preserves compatibility
+       * with existing orders that contain a single option.
+       */
+      selectedOptions: {
+        type: [
+          {
+            id: {
+              type: mongoose.Schema.Types.ObjectId,
+              default: null,
+            },
 
-        name: {
-          type: String,
-          default: "",
-          trim: true,
-        },
+            name: {
+              type: String,
+              required: true,
+              trim: true,
+            },
 
-        description: {
-          type: String,
-          default: "",
-          trim: true,
-        },
+            description: {
+              type: String,
+              default: "",
+              trim: true,
+            },
 
-        price: {
-          type: Number,
-          default: 0,
-          min: 0,
-        },
+            price: {
+              type: Number,
+              required: true,
+              min: 0,
+            },
 
-        unit: {
-          type: String,
-          default: "",
-          trim: true,
-        },
+            unit: {
+              type: String,
+              default: "",
+              trim: true,
+            },
 
-        minQuantity: {
-          type: Number,
-          default: 1,
-          min: 1,
-        },
+            group: {
+              type: String,
+              default: "",
+              trim: true,
+            },
+
+            quantity: {
+              type: Number,
+              required: true,
+              min: 1,
+            },
+
+            minQuantity: {
+              type: Number,
+              default: 1,
+              min: 1,
+            },
+
+            maxQuantity: {
+              type: Number,
+              default: undefined,
+              min: 1,
+            },
+
+            isActive: {
+              type: Boolean,
+              default: true,
+            },
+          },
+        ],
+
+        default: [],
       },
     },
 
-    // Quantity selected by the client.
+    /*
+     * Quantity selected by the client.
+     *
+     * For normal services this contains the actual
+     * requested quantity.
+     *
+     * For grouped pricing, the controller uses quantity = 1
+     * because each selected pricing option has its own quantity
+     * inside serviceSnapshot.selectedOptions.
+     */
     quantity: {
       type: Number,
       default: 1,
       min: 1,
     },
 
-    // Stores dynamic fields submitted by the client.
-    // The structure depends on the selected service.
+    /*
+     * Stores dynamic fields submitted by the client.
+     *
+     * The structure depends on the selected service and
+     * selected pricing options.
+     *
+     * Example:
+     *
+     * {
+     *   projectName: "ABC",
+     *   videoStyle: "cinematic",
+     *   voiceType: "professional",
+     *   pricingQuantities: {
+     *     shoot: 2,
+     *     drone: 1
+     *   }
+     * }
+     */
     formData: {
       type: Map,
       of: mongoose.Schema.Types.Mixed,
       default: {},
     },
 
-    // Optional information provided by the client.
+    /*
+     * Optional information provided by the client.
+     */
     additionalRequirements: {
       type: String,
       default: "",
       trim: true,
     },
 
+    /*
+     * Final server-calculated order amount.
+     *
+     * Never trust the amount sent by the frontend.
+     * The order controller calculates this from the
+     * current service configuration.
+     */
     amount: {
       type: Number,
       required: true,
       min: 0,
     },
 
-    // Payment information
+    /*
+     * Payment information
+     */
     paymentMethod: {
       type: String,
       enum: ["cod", "online"],
@@ -138,17 +237,13 @@ const orderSchema = new mongoose.Schema(
 
     paymentStatus: {
       type: String,
-      enum: [
-        "pending",
-        "processing",
-        "paid",
-        "failed",
-        "collected",
-      ],
+      enum: ["pending", "processing", "paid", "failed", "collected"],
       default: "pending",
     },
 
-    // Razorpay information
+    /*
+     * Razorpay information
+     */
     razorpayOrderId: {
       type: String,
       default: null,
@@ -164,7 +259,9 @@ const orderSchema = new mongoose.Schema(
       default: null,
     },
 
-    // COD information
+    /*
+     * COD information
+     */
     codPin: {
       type: String,
       default: null,
@@ -182,25 +279,33 @@ const orderSchema = new mongoose.Schema(
       default: "not_generated",
     },
 
-    // When the admin generated the COD PIN
+    /*
+     * When the admin generated the COD PIN
+     */
     codPinGeneratedAt: {
       type: Date,
       default: null,
     },
 
-    // When the client successfully verified the COD PIN
+    /*
+     * When the client successfully verified the COD PIN
+     */
     codPinVerifiedAt: {
       type: Date,
       default: null,
     },
 
-    // When COD payment was successfully collected
+    /*
+     * When COD payment was successfully collected
+     */
     codCollectedAt: {
       type: Date,
       default: null,
     },
 
-    // Order workflow status
+    /*
+     * Order workflow status
+     */
     orderStatus: {
       type: String,
       enum: [
@@ -213,7 +318,9 @@ const orderSchema = new mongoose.Schema(
       default: "pending",
     },
 
-    // Admin notes
+    /*
+     * Admin notes
+     */
     notes: {
       type: String,
       default: "",

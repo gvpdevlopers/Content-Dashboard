@@ -1,17 +1,716 @@
+const mongoose = require("mongoose");
 const Service = require("../models/Service");
 
-/*
-|--------------------------------------------------------------------------
-| Public - Get Active Services
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   Validation Constants
+========================================================= */
 
-const getPublicServices = async (req, res) => {
+const VALID_PRICING_TYPES = [
+  "fixed",
+  "per_unit",
+  "starting_from",
+  "custom",
+];
+
+const VALID_FIELD_TYPES = [
+  "text",
+  "textarea",
+  "number",
+  "select",
+  "radio",
+  "checkbox",
+  "date",
+  "url",
+];
+
+const OPTION_FIELD_TYPES = [
+  "select",
+  "radio",
+  "checkbox",
+];
+
+/* =========================================================
+   Validation Helpers
+========================================================= */
+
+const isValidNumber = (value) => {
+  return (
+    value !== null &&
+    value !== undefined &&
+    value !== "" &&
+    Number.isFinite(Number(value))
+  );
+};
+
+const isNonNegativeNumber = (value) => {
+  return (
+    isValidNumber(value) &&
+    Number(value) >= 0
+  );
+};
+
+const isPositiveInteger = (value) => {
+  return (
+    value !== null &&
+    value !== undefined &&
+    value !== "" &&
+    Number.isInteger(Number(value)) &&
+    Number(value) >= 1
+  );
+};
+
+const isNonNegativeInteger = (value) => {
+  return (
+    value !== null &&
+    value !== undefined &&
+    value !== "" &&
+    Number.isInteger(Number(value)) &&
+    Number(value) >= 0
+  );
+};
+
+const isBoolean = (value) => {
+  return typeof value === "boolean";
+};
+
+const cleanString = (value) => {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  return String(value).trim();
+};
+
+const normalizeName = (value) => {
+  return cleanString(value).toLowerCase();
+};
+
+/* =========================================================
+   Validate Quantity Range
+========================================================= */
+
+const validateQuantityRange = (
+  minQuantity,
+  maxQuantity,
+  label = "Quantity"
+) => {
+  if (!isPositiveInteger(minQuantity)) {
+    return `${label} minimum quantity must be a positive integer.`;
+  }
+
+  if (
+    maxQuantity !== undefined &&
+    maxQuantity !== null &&
+    maxQuantity !== ""
+  ) {
+    if (!isPositiveInteger(maxQuantity)) {
+      return `${label} maximum quantity must be a positive integer.`;
+    }
+
+    if (Number(minQuantity) > Number(maxQuantity)) {
+      return `${label} minimum quantity cannot be greater than maximum quantity.`;
+    }
+  }
+
+  return null;
+};
+
+/* =========================================================
+   Validate Field Options
+========================================================= */
+
+const validateFieldOptions = (field, fieldPath) => {
+  const type = field.type || "text";
+
+  /*
+   * Fields that support selectable options.
+   */
+  if (!OPTION_FIELD_TYPES.includes(type)) {
+    if (
+      field.options !== undefined &&
+      field.options !== null &&
+      !Array.isArray(field.options)
+    ) {
+      return `${fieldPath} options must be an array.`;
+    }
+
+    if (
+      Array.isArray(field.options) &&
+      field.options.length > 0
+    ) {
+      return `${fieldPath} of type "${type}" cannot contain options.`;
+    }
+
+    return null;
+  }
+
+  /*
+   * Select / radio / checkbox must have options.
+   */
+  if (!Array.isArray(field.options)) {
+    return `${fieldPath} options must be an array.`;
+  }
+
+  if (field.options.length === 0) {
+    return `${fieldPath} of type "${type}" must contain at least one option.`;
+  }
+
+  const optionValues = new Set();
+
+  for (
+    let index = 0;
+    index < field.options.length;
+    index += 1
+  ) {
+    const option = field.options[index];
+    const optionPath = `${fieldPath} option ${index + 1}`;
+
+    if (
+      !option ||
+      typeof option !== "object" ||
+      Array.isArray(option)
+    ) {
+      return `${optionPath} must be a valid object.`;
+    }
+
+    const label = cleanString(option.label);
+    const value = cleanString(option.value);
+
+    if (!label) {
+      return `${optionPath} label is required.`;
+    }
+
+    if (!value) {
+      return `${optionPath} value is required.`;
+    }
+
+    /*
+     * Option values must be unique.
+     * Comparison is case-insensitive.
+     */
+    const normalizedValue = normalizeName(value);
+
+    if (optionValues.has(normalizedValue)) {
+      return `${fieldPath} contains duplicate option value "${value}".`;
+    }
+
+    optionValues.add(normalizedValue);
+
+    /*
+     * Option price must be a valid non-negative number.
+     */
+    if (!isNonNegativeNumber(option.price)) {
+      return `${optionPath} price must be a valid non-negative number.`;
+    }
+  }
+
+  return null;
+};
+
+/* =========================================================
+   Validate Individual Field
+========================================================= */
+
+const validateField = (field, fieldPath) => {
+  if (
+    !field ||
+    typeof field !== "object" ||
+    Array.isArray(field)
+  ) {
+    return `${fieldPath} must be a valid object.`;
+  }
+
+  const name = cleanString(field.name);
+  const label = cleanString(field.label);
+
+  if (!name) {
+    return `${fieldPath} name is required.`;
+  }
+
+  if (!label) {
+    return `${fieldPath} label is required.`;
+  }
+
+  /*
+   * Validate field type.
+   */
+  if (
+    field.type !== undefined &&
+    !VALID_FIELD_TYPES.includes(field.type)
+  ) {
+    return `${fieldPath} has an invalid field type.`;
+  }
+
+  const type = field.type || "text";
+
+  /*
+   * Required must be boolean.
+   */
+  if (
+    field.required !== undefined &&
+    !isBoolean(field.required)
+  ) {
+    return `${fieldPath} required must be a boolean.`;
+  }
+
+  /*
+   * Placeholder.
+   */
+  if (
+    field.placeholder !== undefined &&
+    field.placeholder !== null
+  ) {
+    if (typeof field.placeholder !== "string") {
+      return `${fieldPath} placeholder must be a string.`;
+    }
+  }
+
+  /*
+   * Help text.
+   */
+  if (
+    field.helpText !== undefined &&
+    field.helpText !== null
+  ) {
+    if (typeof field.helpText !== "string") {
+      return `${fieldPath} helpText must be a string.`;
+    }
+  }
+
+  /*
+   * Display order.
+   */
+  if (
+    field.order !== undefined &&
+    !isNonNegativeInteger(field.order)
+  ) {
+    return `${fieldPath} order must be a non-negative integer.`;
+  }
+
+  /*
+   * Min value.
+   */
+  if (
+    field.min !== undefined &&
+    field.min !== null &&
+    field.min !== ""
+  ) {
+    if (!isValidNumber(field.min)) {
+      return `${fieldPath} min must be a valid number.`;
+    }
+  }
+
+  /*
+   * Max value.
+   */
+  if (
+    field.max !== undefined &&
+    field.max !== null &&
+    field.max !== ""
+  ) {
+    if (!isValidNumber(field.max)) {
+      return `${fieldPath} max must be a valid number.`;
+    }
+  }
+
+  /*
+   * Min cannot be greater than max.
+   */
+  if (
+    field.min !== undefined &&
+    field.max !== undefined &&
+    field.min !== null &&
+    field.max !== null &&
+    field.min !== "" &&
+    field.max !== ""
+  ) {
+    if (Number(field.min) > Number(field.max)) {
+      return `${fieldPath} min cannot be greater than max.`;
+    }
+  }
+
+  /*
+   * Step must be positive.
+   */
+  if (
+    field.step !== undefined &&
+    field.step !== null &&
+    field.step !== ""
+  ) {
+    if (
+      !isValidNumber(field.step) ||
+      Number(field.step) <= 0
+    ) {
+      return `${fieldPath} step must be a positive number.`;
+    }
+  }
+
+  /*
+   * Min / max / step only make practical sense
+   * for number fields.
+   *
+   * We don't reject them on other field types here
+   * because existing service configurations may contain
+   * them and the schema supports these properties generally.
+   */
+
+  const optionsError = validateFieldOptions(
+    field,
+    fieldPath
+  );
+
+  if (optionsError) {
+    return optionsError;
+  }
+
+  return null;
+};
+
+/* =========================================================
+   Validate Field Collection
+========================================================= */
+
+const validateFields = (
+  fields,
+  scopeName = "Service"
+) => {
+  if (!Array.isArray(fields)) {
+    return `${scopeName} fields must be an array.`;
+  }
+
+  const fieldNames = new Set();
+
+  for (
+    let index = 0;
+    index < fields.length;
+    index += 1
+  ) {
+    const field = fields[index];
+    const fieldPath = `${scopeName} field ${index + 1}`;
+
+    const fieldError = validateField(
+      field,
+      fieldPath
+    );
+
+    if (fieldError) {
+      return fieldError;
+    }
+
+    const fieldName = cleanString(field.name);
+    const normalizedFieldName =
+      normalizeName(fieldName);
+
+    if (fieldNames.has(normalizedFieldName)) {
+      return `${scopeName} contains duplicate field name "${fieldName}".`;
+    }
+
+    fieldNames.add(normalizedFieldName);
+  }
+
+  return null;
+};
+
+/* =========================================================
+   Validate Pricing Options
+========================================================= */
+
+const validatePricingOptions = (
+  pricingOptions
+) => {
+  if (!Array.isArray(pricingOptions)) {
+    return "Pricing options must be an array.";
+  }
+
+  const pricingOptionIds = new Set();
+  const pricingOptionNames = new Set();
+
+  for (
+    let index = 0;
+    index < pricingOptions.length;
+    index += 1
+  ) {
+    const option = pricingOptions[index];
+    const optionPath = `Pricing option ${index + 1}`;
+
+    if (
+      !option ||
+      typeof option !== "object" ||
+      Array.isArray(option)
+    ) {
+      return `${optionPath} must be a valid object.`;
+    }
+
+    const name = cleanString(option.name);
+    const unit = cleanString(option.unit);
+
+    /*
+     * Name.
+     */
+    if (!name) {
+      return `${optionPath} name is required.`;
+    }
+
+    /*
+     * Prevent duplicate pricing option names.
+     *
+     * Comparison is case-insensitive.
+     */
+    const normalizedName = normalizeName(name);
+
+    if (pricingOptionNames.has(normalizedName)) {
+      return `Pricing options contain duplicate name "${name}".`;
+    }
+
+    pricingOptionNames.add(normalizedName);
+
+    /*
+     * Unit.
+     */
+    if (!unit) {
+      return `${optionPath} unit is required.`;
+    }
+
+    /*
+     * Price.
+     */
+    if (!isNonNegativeNumber(option.price)) {
+      return `${optionPath} price must be a valid non-negative number.`;
+    }
+
+    /*
+     * Quantity.
+     */
+    const quantityError = validateQuantityRange(
+      option.minQuantity,
+      option.maxQuantity,
+      optionPath
+    );
+
+    if (quantityError) {
+      return quantityError;
+    }
+
+    /*
+     * Active state.
+     */
+    if (
+      option.isActive !== undefined &&
+      !isBoolean(option.isActive)
+    ) {
+      return `${optionPath} isActive must be a boolean.`;
+    }
+
+    /*
+     * Display order.
+     */
+    if (
+      option.order !== undefined &&
+      !isNonNegativeInteger(option.order)
+    ) {
+      return `${optionPath} order must be a non-negative integer.`;
+    }
+
+    /*
+     * Group.
+     */
+    if (
+      option.group !== undefined &&
+      option.group !== null
+    ) {
+      if (typeof option.group !== "string") {
+        return `${optionPath} group must be a string.`;
+      }
+
+      /*
+       * If group is supplied, it cannot only contain spaces.
+       */
+      if (
+        option.group.trim().length === 0
+      ) {
+        return `${optionPath} group cannot be empty.`;
+      }
+    }
+
+    /*
+     * Pricing option ID.
+     *
+     * New pricing options can omit _id.
+     * Existing options should contain valid ObjectIds.
+     */
+    if (option._id !== undefined && option._id !== null) {
+      const optionId = String(option._id);
+
+      if (
+        !mongoose.Types.ObjectId.isValid(optionId)
+      ) {
+        return `${optionPath} has an invalid ID.`;
+      }
+
+      if (pricingOptionIds.has(optionId)) {
+        return `${optionPath} contains a duplicate pricing option ID.`;
+      }
+
+      pricingOptionIds.add(optionId);
+    }
+
+    /*
+     * Pricing option fields.
+     */
+    if (option.fields !== undefined) {
+      const fieldsError = validateFields(
+        option.fields,
+        `${optionPath}`
+      );
+
+      if (fieldsError) {
+        return fieldsError;
+      }
+    }
+  }
+
+  return null;
+};
+
+/* =========================================================
+   Validate Complete Service Configuration
+========================================================= */
+
+const validateServiceConfiguration = (
+  data
+) => {
+  const {
+    name,
+    slug,
+    category,
+    pricingType,
+    basePrice,
+    minQuantity,
+    maxQuantity,
+    pricingOptions,
+    fields,
+    isActive,
+    displayOrder,
+  } = data;
+
+  /*
+   * Basic information.
+   */
+
+  if (!cleanString(name)) {
+    return "Name is required.";
+  }
+
+  if (!cleanString(slug)) {
+    return "Slug is required.";
+  }
+
+  if (!cleanString(category)) {
+    return "Category is required.";
+  }
+
+  /*
+   * Pricing type.
+   */
+
+  if (
+    pricingType !== undefined &&
+    !VALID_PRICING_TYPES.includes(
+      pricingType
+    )
+  ) {
+    return "Invalid pricing type.";
+  }
+
+  /*
+   * Base price.
+   */
+
+  if (!isNonNegativeNumber(basePrice)) {
+    return "Base price must be a valid non-negative number.";
+  }
+
+  /*
+   * Service quantity.
+   */
+
+  const quantityError =
+    validateQuantityRange(
+      minQuantity,
+      maxQuantity,
+      "Service"
+    );
+
+  if (quantityError) {
+    return quantityError;
+  }
+
+  /*
+   * Active state.
+   */
+
+  if (
+    isActive !== undefined &&
+    !isBoolean(isActive)
+  ) {
+    return "isActive must be a boolean.";
+  }
+
+  /*
+   * Display order.
+   */
+
+  if (
+    displayOrder !== undefined &&
+    !isNonNegativeInteger(displayOrder)
+  ) {
+    return "Display order must be a non-negative integer.";
+  }
+
+  /*
+   * Service fields.
+   */
+
+  if (fields !== undefined) {
+    const fieldsError = validateFields(
+      fields,
+      "Service"
+    );
+
+    if (fieldsError) {
+      return fieldsError;
+    }
+  }
+
+  /*
+   * Pricing options.
+   */
+
+  if (pricingOptions !== undefined) {
+    const pricingOptionsError =
+      validatePricingOptions(
+        pricingOptions
+      );
+
+    if (pricingOptionsError) {
+      return pricingOptionsError;
+    }
+  }
+
+  return null;
+};
+
+/* =========================================================
+   Public - Get Active Services
+========================================================= */
+
+const getPublicServices = async (
+  req,
+  res
+) => {
   try {
     const services = await Service.find(
-      {
-        isActive: true,
-      },
+      { isActive: true },
       {
         name: 1,
         slug: 1,
@@ -32,7 +731,10 @@ const getPublicServices = async (req, res) => {
       services,
     });
   } catch (error) {
-    console.error("Get public services error:", error);
+    console.error(
+      "Get public services error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -41,13 +743,14 @@ const getPublicServices = async (req, res) => {
   }
 };
 
-/*
-|--------------------------------------------------------------------------
-| Client - Get Active Services
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   Client - Get Active Services
+========================================================= */
 
-const getActiveServices = async (req, res) => {
+const getActiveServices = async (
+  req,
+  res
+) => {
   try {
     const services = await Service.find({
       isActive: true,
@@ -61,7 +764,10 @@ const getActiveServices = async (req, res) => {
       services,
     });
   } catch (error) {
-    console.error("Get services error:", error);
+    console.error(
+      "Get services error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -70,13 +776,14 @@ const getActiveServices = async (req, res) => {
   }
 };
 
-/*
-|--------------------------------------------------------------------------
-| Client - Get Active Service By ID
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   Client - Get Active Service By ID
+========================================================= */
 
-const getServiceById = async (req, res) => {
+const getServiceById = async (
+  req,
+  res
+) => {
   try {
     const service = await Service.findOne({
       _id: req.params.id,
@@ -95,7 +802,10 @@ const getServiceById = async (req, res) => {
       service,
     });
   } catch (error) {
-    console.error("Get service error:", error);
+    console.error(
+      "Get service error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -104,13 +814,14 @@ const getServiceById = async (req, res) => {
   }
 };
 
-/*
-|--------------------------------------------------------------------------
-| Admin - Get All Services
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   Admin - Get All Services
+========================================================= */
 
-const getAdminServices = async (req, res) => {
+const getAdminServices = async (
+  req,
+  res
+) => {
   try {
     const services = await Service.find({})
       .sort({
@@ -123,7 +834,10 @@ const getAdminServices = async (req, res) => {
       services,
     });
   } catch (error) {
-    console.error("Get admin services error:", error);
+    console.error(
+      "Get admin services error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -132,15 +846,18 @@ const getAdminServices = async (req, res) => {
   }
 };
 
-/*
-|--------------------------------------------------------------------------
-| Admin - Get Service By ID
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   Admin - Get Service By ID
+========================================================= */
 
-const getAdminServiceById = async (req, res) => {
+const getAdminServiceById = async (
+  req,
+  res
+) => {
   try {
-    const service = await Service.findById(req.params.id);
+    const service = await Service.findById(
+      req.params.id
+    );
 
     if (!service) {
       return res.status(404).json({
@@ -154,7 +871,10 @@ const getAdminServiceById = async (req, res) => {
       service,
     });
   } catch (error) {
-    console.error("Get admin service error:", error);
+    console.error(
+      "Get admin service error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -163,13 +883,14 @@ const getAdminServiceById = async (req, res) => {
   }
 };
 
-/*
-|--------------------------------------------------------------------------
-| Admin - Create Service
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   Admin - Create Service
+========================================================= */
 
-const createService = async (req, res) => {
+const createService = async (
+  req,
+  res
+) => {
   try {
     const {
       name,
@@ -187,118 +908,164 @@ const createService = async (req, res) => {
       displayOrder,
     } = req.body;
 
-    /*
-    |--------------------------------------------------------------------------
-    | Basic validation
-    |--------------------------------------------------------------------------
-    */
+    const normalizedService = {
+      name: cleanString(name),
 
-    if (!name || !slug || !category) {
-      return res.status(400).json({
-        success: false,
-        message: "Name, slug and category are required.",
-      });
-    }
+      slug: cleanString(slug).toLowerCase(),
 
-    if (
-      basePrice === undefined ||
-      basePrice === null ||
-      Number.isNaN(Number(basePrice))
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Valid base price is required.",
-      });
-    }
+      category: cleanString(category),
 
-    /*
-    |--------------------------------------------------------------------------
-    | Check duplicate slug
-    |--------------------------------------------------------------------------
-    */
+      description:
+        description !== undefined
+          ? String(description).trim()
+          : "",
 
-    const existingService = await Service.findOne({
-      slug: String(slug).trim().toLowerCase(),
-    });
+      pricingType:
+        pricingType || "fixed",
 
-    if (existingService) {
-      return res.status(409).json({
-        success: false,
-        message: "A service with this slug already exists.",
-      });
-    }
+      basePrice:
+        Number(basePrice),
 
-    /*
-    |--------------------------------------------------------------------------
-    | Create service
-    |--------------------------------------------------------------------------
-    */
+      unit:
+        unit !== undefined
+          ? String(unit).trim()
+          : "",
 
-    const service = await Service.create({
-      name: String(name).trim(),
-      slug: String(slug).trim().toLowerCase(),
-      category: String(category).trim(),
-      description: description || "",
-      pricingType: pricingType || "fixed",
-      basePrice: Number(basePrice),
-      unit: unit || "",
       minQuantity:
-        minQuantity !== undefined
+        minQuantity !== undefined &&
+        minQuantity !== null &&
+        minQuantity !== ""
           ? Number(minQuantity)
           : 1,
+
       maxQuantity:
         maxQuantity !== undefined &&
         maxQuantity !== null &&
         maxQuantity !== ""
           ? Number(maxQuantity)
           : undefined,
-      pricingOptions: Array.isArray(pricingOptions)
-        ? pricingOptions
-        : [],
-      fields: Array.isArray(fields) ? fields : [],
+
+      pricingOptions:
+        Array.isArray(pricingOptions)
+          ? pricingOptions
+          : [],
+
+      fields:
+        Array.isArray(fields)
+          ? fields
+          : [],
+
       isActive:
         isActive !== undefined
-          ? Boolean(isActive)
+          ? isActive
           : true,
+
       displayOrder:
-        displayOrder !== undefined
+        displayOrder !== undefined &&
+        displayOrder !== null &&
+        displayOrder !== ""
           ? Number(displayOrder)
           : 0,
-    });
+    };
+
+    /*
+     * Validate complete configuration.
+     */
+    const validationError =
+      validateServiceConfiguration(
+        normalizedService
+      );
+
+    if (validationError) {
+      return res.status(400).json({
+        success: false,
+        message: validationError,
+      });
+    }
+
+    /*
+     * Check duplicate slug.
+     */
+    const existingService =
+      await Service.findOne({
+        slug: normalizedService.slug,
+      });
+
+    if (existingService) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "A service with this slug already exists.",
+      });
+    }
+
+    /*
+     * Create service.
+     */
+    const service =
+      await Service.create(
+        normalizedService
+      );
 
     return res.status(201).json({
       success: true,
-      message: "Service created successfully.",
+      message:
+        "Service created successfully.",
       service,
     });
   } catch (error) {
-    console.error("Create service error:", error);
+    console.error(
+      "Create service error:",
+      error
+    );
 
-    /*
-     * Handle Mongo duplicate key error.
-     */
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-        message: "A service with this slug already exists.",
+        message:
+          "A service with this slug already exists.",
+      });
+    }
+
+    if (
+      error.name ===
+      "ValidationError"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
       });
     }
 
     return res.status(500).json({
       success: false,
-      message: "Unable to create service.",
+      message:
+        "Unable to create service.",
     });
   }
 };
 
-/*
-|--------------------------------------------------------------------------
-| Admin - Update Service
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   Admin - Update Service
+========================================================= */
 
-const updateService = async (req, res) => {
+const updateService = async (
+  req,
+  res
+) => {
   try {
+    const service =
+      await Service.findById(
+        req.params.id
+      );
+
+    if (!service) {
+      return res.status(404).json({
+        success: false,
+        message: "Service not found.",
+      });
+    }
+
     const {
       name,
       slug,
@@ -315,183 +1082,225 @@ const updateService = async (req, res) => {
       displayOrder,
     } = req.body;
 
-    const service = await Service.findById(req.params.id);
+    /*
+     * Build the complete resulting configuration.
+     *
+     * Validation is performed against the final
+     * service state, not only the PATCH fields.
+     */
 
-    if (!service) {
-      return res.status(404).json({
+    const updatedConfiguration = {
+      name:
+        name !== undefined
+          ? cleanString(name)
+          : service.name,
+
+      slug:
+        slug !== undefined
+          ? cleanString(slug).toLowerCase()
+          : service.slug,
+
+      category:
+        category !== undefined
+          ? cleanString(category)
+          : service.category,
+
+      description:
+        description !== undefined
+          ? String(description).trim()
+          : service.description,
+
+      pricingType:
+        pricingType !== undefined
+          ? pricingType
+          : service.pricingType,
+
+      basePrice:
+        basePrice !== undefined
+          ? Number(basePrice)
+          : service.basePrice,
+
+      unit:
+        unit !== undefined
+          ? String(unit).trim()
+          : service.unit,
+
+      minQuantity:
+        minQuantity !== undefined
+          ? Number(minQuantity)
+          : service.minQuantity,
+
+      maxQuantity:
+        maxQuantity !== undefined
+          ? maxQuantity === null ||
+            maxQuantity === ""
+            ? undefined
+            : Number(maxQuantity)
+          : service.maxQuantity,
+
+      pricingOptions:
+        pricingOptions !== undefined
+          ? pricingOptions
+          : service.pricingOptions.map(
+              (option) =>
+                option.toObject
+                  ? option.toObject()
+                  : option
+            ),
+
+      fields:
+        fields !== undefined
+          ? fields
+          : service.fields.map(
+              (field) =>
+                field.toObject
+                  ? field.toObject()
+                  : field
+            ),
+
+      isActive:
+        isActive !== undefined
+          ? isActive
+          : service.isActive,
+
+      displayOrder:
+        displayOrder !== undefined
+          ? Number(displayOrder)
+          : service.displayOrder,
+    };
+
+    /*
+     * Validate complete resulting configuration.
+     */
+    const validationError =
+      validateServiceConfiguration(
+        updatedConfiguration
+      );
+
+    if (validationError) {
+      return res.status(400).json({
         success: false,
-        message: "Service not found.",
+        message: validationError,
       });
     }
 
     /*
-    |--------------------------------------------------------------------------
-    | Check slug uniqueness
-    |--------------------------------------------------------------------------
-    */
-
+     * Check slug uniqueness.
+     */
     if (slug !== undefined) {
-      const normalizedSlug = String(slug)
-        .trim()
-        .toLowerCase();
-
-      const existingService = await Service.findOne({
-        slug: normalizedSlug,
-        _id: {
-          $ne: service._id,
-        },
-      });
+      const existingService =
+        await Service.findOne({
+          slug:
+            updatedConfiguration.slug,
+          _id: {
+            $ne: service._id,
+          },
+        });
 
       if (existingService) {
         return res.status(409).json({
           success: false,
-          message: "A service with this slug already exists.",
+          message:
+            "A service with this slug already exists.",
         });
       }
-
-      service.slug = normalizedSlug;
     }
 
     /*
-    |--------------------------------------------------------------------------
-    | Update basic information
-    |--------------------------------------------------------------------------
-    */
+     * Apply validated configuration.
+     */
+    service.name =
+      updatedConfiguration.name;
 
-    if (name !== undefined) {
-      service.name = String(name).trim();
-    }
+    service.slug =
+      updatedConfiguration.slug;
 
-    if (category !== undefined) {
-      service.category = String(category).trim();
-    }
+    service.category =
+      updatedConfiguration.category;
 
-    if (description !== undefined) {
-      service.description = description;
-    }
+    service.description =
+      updatedConfiguration.description;
 
-    /*
-    |--------------------------------------------------------------------------
-    | Update pricing
-    |--------------------------------------------------------------------------
-    */
+    service.pricingType =
+      updatedConfiguration.pricingType;
 
-    if (pricingType !== undefined) {
-      service.pricingType = pricingType;
-    }
+    service.basePrice =
+      updatedConfiguration.basePrice;
 
-    if (basePrice !== undefined) {
-      const parsedBasePrice = Number(basePrice);
+    service.unit =
+      updatedConfiguration.unit;
 
-      if (
-        Number.isNaN(parsedBasePrice) ||
-        parsedBasePrice < 0
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "Base price must be a valid positive number.",
-        });
-      }
+    service.minQuantity =
+      updatedConfiguration.minQuantity;
 
-      service.basePrice = parsedBasePrice;
-    }
+    service.maxQuantity =
+      updatedConfiguration.maxQuantity;
 
-    if (unit !== undefined) {
-      service.unit = unit;
-    }
+    service.pricingOptions =
+      updatedConfiguration.pricingOptions;
 
-    if (minQuantity !== undefined) {
-      service.minQuantity = Number(minQuantity);
-    }
+    service.fields =
+      updatedConfiguration.fields;
 
-    if (maxQuantity !== undefined) {
-      service.maxQuantity =
-        maxQuantity === null || maxQuantity === ""
-          ? undefined
-          : Number(maxQuantity);
-    }
+    service.isActive =
+      updatedConfiguration.isActive;
 
-    /*
-    |--------------------------------------------------------------------------
-    | Update pricing options
-    |--------------------------------------------------------------------------
-    */
-
-    if (pricingOptions !== undefined) {
-      if (!Array.isArray(pricingOptions)) {
-        return res.status(400).json({
-          success: false,
-          message: "Pricing options must be an array.",
-        });
-      }
-
-      service.pricingOptions = pricingOptions;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Update dynamic fields
-    |--------------------------------------------------------------------------
-    */
-
-    if (fields !== undefined) {
-      if (!Array.isArray(fields)) {
-        return res.status(400).json({
-          success: false,
-          message: "Service fields must be an array.",
-        });
-      }
-
-      service.fields = fields;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Update status/order
-    |--------------------------------------------------------------------------
-    */
-
-    if (isActive !== undefined) {
-      service.isActive = Boolean(isActive);
-    }
-
-    if (displayOrder !== undefined) {
-      service.displayOrder = Number(displayOrder);
-    }
+    service.displayOrder =
+      updatedConfiguration.displayOrder;
 
     await service.save();
 
     return res.status(200).json({
       success: true,
-      message: "Service updated successfully.",
+      message:
+        "Service updated successfully.",
       service,
     });
   } catch (error) {
-    console.error("Update service error:", error);
+    console.error(
+      "Update service error:",
+      error
+    );
 
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-        message: "A service with this slug already exists.",
+        message:
+          "A service with this slug already exists.",
+      });
+    }
+
+    if (
+      error.name ===
+      "ValidationError"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
       });
     }
 
     return res.status(500).json({
       success: false,
-      message: "Unable to update service.",
+      message:
+        "Unable to update service.",
     });
   }
 };
 
-/*
-|--------------------------------------------------------------------------
-| Admin - Toggle Service Status
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   Admin - Toggle Service Status
+========================================================= */
 
-const toggleServiceStatus = async (req, res) => {
+const toggleServiceStatus = async (
+  req,
+  res
+) => {
   try {
-    const service = await Service.findById(req.params.id);
+    const service =
+      await Service.findById(
+        req.params.id
+      );
 
     if (!service) {
       return res.status(404).json({
@@ -500,7 +1309,8 @@ const toggleServiceStatus = async (req, res) => {
       });
     }
 
-    service.isActive = !service.isActive;
+    service.isActive =
+      !service.isActive;
 
     await service.save();
 
@@ -512,21 +1322,27 @@ const toggleServiceStatus = async (req, res) => {
       service,
     });
   } catch (error) {
-    console.error("Toggle service status error:", error);
+    console.error(
+      "Toggle service status error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to update service status.",
+      message:
+        "Unable to update service status.",
     });
   }
 };
 
+/* =========================================================
+   Exports
+========================================================= */
+
 module.exports = {
   getPublicServices,
-
   getActiveServices,
   getServiceById,
-
   getAdminServices,
   getAdminServiceById,
   createService,

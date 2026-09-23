@@ -8,6 +8,7 @@ import {
   ShoppingBag,
   Users,
   KeyRound,
+  Layers3
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -199,6 +200,13 @@ const AdminLayout = () => {
               end
               onClick={closeSidebar}
             />
+
+            <AdminSidebarItem
+  icon={Layers3}
+  label="Services"
+  to="/admin/services"
+  onClick={closeSidebar}
+/>
 
             <AdminSidebarItem
               icon={ShoppingBag}
