@@ -117,7 +117,7 @@ const CodManagement = () => {
           min-h-[300px]
           items-center
           justify-center
-        "
+        " 
       >
         <div
           className="

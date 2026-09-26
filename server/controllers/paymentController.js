@@ -2,9 +2,21 @@ const razorpay = require("../config/razorpay");
 const Order = require("../models/Order");
 const crypto = require("crypto");
 
+/*
+|--------------------------------------------------------------------------
+| Create Razorpay Order
+|--------------------------------------------------------------------------
+*/
+
 const createRazorpayOrder = async (req, res) => {
   try {
     const { orderId } = req.body;
+
+    /*
+    |--------------------------------------------------------------------------
+    | 1. Validate order ID
+    |--------------------------------------------------------------------------
+    */
 
     if (!orderId) {
       return res.status(400).json({
@@ -13,7 +25,12 @@ const createRazorpayOrder = async (req, res) => {
       });
     }
 
-    // Find client's order
+    /*
+    |--------------------------------------------------------------------------
+    | 2. Find client's order
+    |--------------------------------------------------------------------------
+    */
+
     const order = await Order.findOne({
       _id: orderId,
       client: req.user.userId,
@@ -26,23 +43,49 @@ const createRazorpayOrder = async (req, res) => {
       });
     }
 
-    // Only online payments
+    /*
+    |--------------------------------------------------------------------------
+    | 3. Only online payments
+    |--------------------------------------------------------------------------
+    */
+
     if (order.paymentMethod !== "online") {
       return res.status(400).json({
         success: false,
-        message: "This order is not configured for online payment.",
+        message:
+          "This order is not configured for online payment.",
       });
     }
 
-    // Prevent paying an already-paid order
+    /*
+    |--------------------------------------------------------------------------
+    | 4. Prevent paying an already-paid order
+    |--------------------------------------------------------------------------
+    */
+
     if (order.paymentStatus === "paid") {
       return res.status(400).json({
         success: false,
-        message: "This order has already been paid.",
+        message:
+          "This order has already been paid.",
       });
     }
 
-    // Amount must be greater than zero
+    /*
+    |--------------------------------------------------------------------------
+    | 5. Validate final order amount
+    |--------------------------------------------------------------------------
+    |
+    | order.amount is already calculated by the order controller.
+    |
+    | For online orders:
+    |
+    | subtotal + 18% GST = order.amount
+    |
+    | Never calculate the amount again here.
+    |
+    */
+
     if (!order.amount || order.amount <= 0) {
       return res.status(400).json({
         success: false,
@@ -50,45 +93,116 @@ const createRazorpayOrder = async (req, res) => {
       });
     }
 
-    const razorpayOrder = await razorpay.orders.create({
-      amount: Math.round(order.amount * 100),
-      currency: "INR",
-      receipt: order.orderNumber,
-      notes: {
-        orderId: order._id.toString(),
-        orderNumber: order.orderNumber,
-      },
-    });
+    /*
+    |--------------------------------------------------------------------------
+    | 6. Create Razorpay order
+    |--------------------------------------------------------------------------
+    |
+    | Razorpay expects amount in paise.
+    |
+    | Example:
+    |
+    | order.amount = 11800 INR
+    |
+    | Razorpay amount = 1180000 paise
+    |
+    */
 
-    order.razorpayOrderId = razorpayOrder.id;
-    order.paymentStatus = "processing";
+    const razorpayOrder =
+      await razorpay.orders.create({
+        amount: Math.round(
+          order.amount * 100
+        ),
+
+        currency: "INR",
+
+        receipt: order.orderNumber,
+
+        notes: {
+          orderId: order._id.toString(),
+          orderNumber: order.orderNumber,
+        },
+      });
+
+    /*
+    |--------------------------------------------------------------------------
+    | 7. Save Razorpay order information
+    |--------------------------------------------------------------------------
+    */
+
+    order.razorpayOrderId =
+      razorpayOrder.id;
+
+    order.paymentStatus =
+      "processing";
 
     await order.save();
 
+    /*
+    |--------------------------------------------------------------------------
+    | 8. Response
+    |--------------------------------------------------------------------------
+    */
+
     return res.status(200).json({
       success: true,
+
       razorpayOrder: {
         id: razorpayOrder.id,
         amount: razorpayOrder.amount,
         currency: razorpayOrder.currency,
       },
+
       order: {
         id: order._id,
-        orderNumber: order.orderNumber,
-        amount: order.amount,
+
+        orderNumber:
+          order.orderNumber,
+
+        /*
+         * Pricing breakdown.
+         *
+         * These fields are useful for the
+         * frontend payment summary.
+         */
+
+        subtotal:
+          order.subtotal,
+
+        gstRate:
+          order.gstRate,
+
+        gstAmount:
+          order.gstAmount,
+
+        amount:
+          order.amount,
       },
     });
   } catch (error) {
-    console.error("Create Razorpay order error:", error);
+    console.error(
+      "Create Razorpay order error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to create payment order.",
+      message:
+        "Unable to create payment order.",
     });
   }
 };
 
-const verifyRazorpayPayment = async (req, res) => {
+/*
+|--------------------------------------------------------------------------
+| Verify Razorpay Payment
+|--------------------------------------------------------------------------
+*/
+
+const verifyRazorpayPayment = async (
+  req,
+  res
+) => {
   try {
     const {
       orderId,
@@ -96,6 +210,12 @@ const verifyRazorpayPayment = async (req, res) => {
       razorpay_payment_id,
       razorpay_signature,
     } = req.body;
+
+    /*
+    |--------------------------------------------------------------------------
+    | 1. Validate payment data
+    |--------------------------------------------------------------------------
+    */
 
     if (
       !orderId ||
@@ -105,9 +225,16 @@ const verifyRazorpayPayment = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: "Payment verification data is incomplete.",
+        message:
+          "Payment verification data is incomplete.",
       });
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | 2. Find client's order
+    |--------------------------------------------------------------------------
+    */
 
     const order = await Order.findOne({
       _id: orderId,
@@ -121,14 +248,28 @@ const verifyRazorpayPayment = async (req, res) => {
       });
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | 3. Verify Razorpay order ID
+    |--------------------------------------------------------------------------
+    */
+
     if (
-      order.razorpayOrderId !== razorpay_order_id
+      order.razorpayOrderId !==
+      razorpay_order_id
     ) {
       return res.status(400).json({
         success: false,
-        message: "Razorpay order mismatch.",
+        message:
+          "Razorpay order mismatch.",
       });
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | 4. Generate payment signature
+    |--------------------------------------------------------------------------
+    */
 
     const generatedSignature =
       crypto
@@ -141,14 +282,28 @@ const verifyRazorpayPayment = async (req, res) => {
         )
         .digest("hex");
 
+    /*
+    |--------------------------------------------------------------------------
+    | 5. Verify signature
+    |--------------------------------------------------------------------------
+    */
+
     if (
-      generatedSignature !== razorpay_signature
+      generatedSignature !==
+      razorpay_signature
     ) {
       return res.status(400).json({
         success: false,
-        message: "Payment verification failed.",
+        message:
+          "Payment verification failed.",
       });
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | 6. Save successful payment
+    |--------------------------------------------------------------------------
+    */
 
     order.razorpayPaymentId =
       razorpay_payment_id;
@@ -160,14 +315,38 @@ const verifyRazorpayPayment = async (req, res) => {
 
     await order.save();
 
+    /*
+    |--------------------------------------------------------------------------
+    | 7. Response
+    |--------------------------------------------------------------------------
+    */
+
     return res.status(200).json({
       success: true,
-      message: "Payment verified successfully.",
+
+      message:
+        "Payment verified successfully.",
+
       order: {
         id: order._id,
-        orderNumber: order.orderNumber,
-        paymentStatus: order.paymentStatus,
-        amount: order.amount,
+
+        orderNumber:
+          order.orderNumber,
+
+        paymentStatus:
+          order.paymentStatus,
+
+        subtotal:
+          order.subtotal,
+
+        gstRate:
+          order.gstRate,
+
+        gstAmount:
+          order.gstAmount,
+
+        amount:
+          order.amount,
       },
     });
   } catch (error) {
@@ -178,7 +357,8 @@ const verifyRazorpayPayment = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Unable to verify payment.",
+      message:
+        "Unable to verify payment.",
     });
   }
 };

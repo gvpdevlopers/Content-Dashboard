@@ -92,7 +92,7 @@ const normalizeName = (value) => {
 const validateQuantityRange = (
   minQuantity,
   maxQuantity,
-  label = "Quantity"
+  label = "Quantity",
 ) => {
   if (!isPositiveInteger(minQuantity)) {
     return `${label} minimum quantity must be a positive integer.`;
@@ -107,7 +107,10 @@ const validateQuantityRange = (
       return `${label} maximum quantity must be a positive integer.`;
     }
 
-    if (Number(minQuantity) > Number(maxQuantity)) {
+    if (
+      Number(minQuantity) >
+      Number(maxQuantity)
+    ) {
       return `${label} minimum quantity cannot be greater than maximum quantity.`;
     }
   }
@@ -119,12 +122,18 @@ const validateQuantityRange = (
    Validate Field Options
 ========================================================= */
 
-const validateFieldOptions = (field, fieldPath) => {
+const validateFieldOptions = (
+  field,
+  fieldPath,
+) => {
   const type = field.type || "text";
 
   /*
-   * Fields that support selectable options.
-   */
+  |--------------------------------------------------------------------------
+  | Fields that do not support options
+  |--------------------------------------------------------------------------
+  */
+
   if (!OPTION_FIELD_TYPES.includes(type)) {
     if (
       field.options !== undefined &&
@@ -145,8 +154,11 @@ const validateFieldOptions = (field, fieldPath) => {
   }
 
   /*
-   * Select / radio / checkbox must have options.
-   */
+  |--------------------------------------------------------------------------
+  | Fields that require options
+  |--------------------------------------------------------------------------
+  */
+
   if (!Array.isArray(field.options)) {
     return `${fieldPath} options must be an array.`;
   }
@@ -163,7 +175,9 @@ const validateFieldOptions = (field, fieldPath) => {
     index += 1
   ) {
     const option = field.options[index];
-    const optionPath = `${fieldPath} option ${index + 1}`;
+
+    const optionPath =
+      `${fieldPath} option ${index + 1}`;
 
     if (
       !option ||
@@ -184,21 +198,17 @@ const validateFieldOptions = (field, fieldPath) => {
       return `${optionPath} value is required.`;
     }
 
-    /*
-     * Option values must be unique.
-     * Comparison is case-insensitive.
-     */
-    const normalizedValue = normalizeName(value);
+    const normalizedValue =
+      normalizeName(value);
 
-    if (optionValues.has(normalizedValue)) {
+    if (
+      optionValues.has(normalizedValue)
+    ) {
       return `${fieldPath} contains duplicate option value "${value}".`;
     }
 
     optionValues.add(normalizedValue);
 
-    /*
-     * Option price must be a valid non-negative number.
-     */
     if (!isNonNegativeNumber(option.price)) {
       return `${optionPath} price must be a valid non-negative number.`;
     }
@@ -211,7 +221,10 @@ const validateFieldOptions = (field, fieldPath) => {
    Validate Individual Field
 ========================================================= */
 
-const validateField = (field, fieldPath) => {
+const validateField = (
+  field,
+  fieldPath,
+) => {
   if (
     !field ||
     typeof field !== "object" ||
@@ -231,9 +244,6 @@ const validateField = (field, fieldPath) => {
     return `${fieldPath} label is required.`;
   }
 
-  /*
-   * Validate field type.
-   */
   if (
     field.type !== undefined &&
     !VALID_FIELD_TYPES.includes(field.type)
@@ -241,11 +251,6 @@ const validateField = (field, fieldPath) => {
     return `${fieldPath} has an invalid field type.`;
   }
 
-  const type = field.type || "text";
-
-  /*
-   * Required must be boolean.
-   */
   if (
     field.required !== undefined &&
     !isBoolean(field.required)
@@ -253,33 +258,22 @@ const validateField = (field, fieldPath) => {
     return `${fieldPath} required must be a boolean.`;
   }
 
-  /*
-   * Placeholder.
-   */
   if (
     field.placeholder !== undefined &&
-    field.placeholder !== null
+    field.placeholder !== null &&
+    typeof field.placeholder !== "string"
   ) {
-    if (typeof field.placeholder !== "string") {
-      return `${fieldPath} placeholder must be a string.`;
-    }
+    return `${fieldPath} placeholder must be a string.`;
   }
 
-  /*
-   * Help text.
-   */
   if (
     field.helpText !== undefined &&
-    field.helpText !== null
+    field.helpText !== null &&
+    typeof field.helpText !== "string"
   ) {
-    if (typeof field.helpText !== "string") {
-      return `${fieldPath} helpText must be a string.`;
-    }
+    return `${fieldPath} helpText must be a string.`;
   }
 
-  /*
-   * Display order.
-   */
   if (
     field.order !== undefined &&
     !isNonNegativeInteger(field.order)
@@ -287,9 +281,6 @@ const validateField = (field, fieldPath) => {
     return `${fieldPath} order must be a non-negative integer.`;
   }
 
-  /*
-   * Min value.
-   */
   if (
     field.min !== undefined &&
     field.min !== null &&
@@ -300,9 +291,6 @@ const validateField = (field, fieldPath) => {
     }
   }
 
-  /*
-   * Max value.
-   */
   if (
     field.max !== undefined &&
     field.max !== null &&
@@ -313,9 +301,6 @@ const validateField = (field, fieldPath) => {
     }
   }
 
-  /*
-   * Min cannot be greater than max.
-   */
   if (
     field.min !== undefined &&
     field.max !== undefined &&
@@ -324,14 +309,14 @@ const validateField = (field, fieldPath) => {
     field.min !== "" &&
     field.max !== ""
   ) {
-    if (Number(field.min) > Number(field.max)) {
+    if (
+      Number(field.min) >
+      Number(field.max)
+    ) {
       return `${fieldPath} min cannot be greater than max.`;
     }
   }
 
-  /*
-   * Step must be positive.
-   */
   if (
     field.step !== undefined &&
     field.step !== null &&
@@ -345,19 +330,11 @@ const validateField = (field, fieldPath) => {
     }
   }
 
-  /*
-   * Min / max / step only make practical sense
-   * for number fields.
-   *
-   * We don't reject them on other field types here
-   * because existing service configurations may contain
-   * them and the schema supports these properties generally.
-   */
-
-  const optionsError = validateFieldOptions(
-    field,
-    fieldPath
-  );
+  const optionsError =
+    validateFieldOptions(
+      field,
+      fieldPath,
+    );
 
   if (optionsError) {
     return optionsError;
@@ -372,7 +349,7 @@ const validateField = (field, fieldPath) => {
 
 const validateFields = (
   fields,
-  scopeName = "Service"
+  scopeName = "Service",
 ) => {
   if (!Array.isArray(fields)) {
     return `${scopeName} fields must be an array.`;
@@ -386,26 +363,445 @@ const validateFields = (
     index += 1
   ) {
     const field = fields[index];
-    const fieldPath = `${scopeName} field ${index + 1}`;
 
-    const fieldError = validateField(
-      field,
-      fieldPath
-    );
+    const fieldPath =
+      `${scopeName} field ${index + 1}`;
+
+    const fieldError =
+      validateField(
+        field,
+        fieldPath,
+      );
 
     if (fieldError) {
       return fieldError;
     }
 
-    const fieldName = cleanString(field.name);
+    const fieldName =
+      cleanString(field.name);
+
     const normalizedFieldName =
       normalizeName(fieldName);
 
-    if (fieldNames.has(normalizedFieldName)) {
+    if (
+      fieldNames.has(
+        normalizedFieldName,
+      )
+    ) {
       return `${scopeName} contains duplicate field name "${fieldName}".`;
     }
 
-    fieldNames.add(normalizedFieldName);
+    fieldNames.add(
+      normalizedFieldName,
+    );
+  }
+
+  return null;
+};
+
+/* =========================================================
+   Validate Repeatable Groups
+========================================================= */
+
+const validateRepeatableGroups = (
+  repeatableGroups,
+  pricingOptions = [],
+  scopeName = "Service",
+) => {
+  if (!Array.isArray(repeatableGroups)) {
+    return `${scopeName} repeatable groups must be an array.`;
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Collect available pricing groups
+  |--------------------------------------------------------------------------
+  */
+
+  const availablePricingGroups = new Set();
+
+  if (Array.isArray(pricingOptions)) {
+    pricingOptions.forEach((option) => {
+      const groupName =
+        normalizeName(option?.group);
+
+      if (groupName) {
+        availablePricingGroups.add(
+          groupName,
+        );
+      }
+    });
+  }
+
+  const groupNames = new Set();
+
+  for (
+    let index = 0;
+    index < repeatableGroups.length;
+    index += 1
+  ) {
+    const group =
+      repeatableGroups[index];
+
+    const groupPath =
+      `${scopeName} repeatable group ${index + 1}`;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Basic object validation
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      !group ||
+      typeof group !== "object" ||
+      Array.isArray(group)
+    ) {
+      return `${groupPath} must be a valid object.`;
+    }
+
+    const name =
+      cleanString(group.name);
+
+    const label =
+      cleanString(group.label);
+
+    if (!name) {
+      return `${groupPath} name is required.`;
+    }
+
+    if (!label) {
+      return `${groupPath} label is required.`;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Duplicate repeatable group names
+    |--------------------------------------------------------------------------
+    */
+
+    const normalizedName =
+      normalizeName(name);
+
+    if (
+      groupNames.has(
+        normalizedName,
+      )
+    ) {
+      return `${scopeName} contains duplicate repeatable group name "${name}".`;
+    }
+
+    groupNames.add(
+      normalizedName,
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Description
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      group.description !== undefined &&
+      group.description !== null &&
+      typeof group.description !== "string"
+    ) {
+      return `${groupPath} description must be a string.`;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Minimum / Maximum items
+    |--------------------------------------------------------------------------
+    */
+
+    const minItems =
+      group.minItems !== undefined &&
+      group.minItems !== null &&
+      group.minItems !== ""
+        ? group.minItems
+        : 1;
+
+    const maxItems =
+      group.maxItems !== undefined &&
+      group.maxItems !== null &&
+      group.maxItems !== ""
+        ? group.maxItems
+        : 10;
+
+    if (
+      !isNonNegativeInteger(
+        minItems,
+      )
+    ) {
+      return `${groupPath} minItems must be a non-negative integer.`;
+    }
+
+    if (
+      !isPositiveInteger(
+        maxItems,
+      )
+    ) {
+      return `${groupPath} maxItems must be a positive integer.`;
+    }
+
+    if (
+      Number(minItems) >
+      Number(maxItems)
+    ) {
+      return `${groupPath} minItems cannot be greater than maxItems.`;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Active status
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      group.isActive !== undefined &&
+      !isBoolean(group.isActive)
+    ) {
+      return `${groupPath} isActive must be a boolean.`;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Display order
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      group.order !== undefined &&
+      !isNonNegativeInteger(
+        group.order,
+      )
+    ) {
+      return `${groupPath} order must be a non-negative integer.`;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Pricing Groups
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      group.pricingGroups !== undefined &&
+      group.pricingGroups !== null &&
+      !Array.isArray(group.pricingGroups)
+    ) {
+      return `${groupPath} pricingGroups must be an array.`;
+    }
+
+    const configuredPricingGroups = [];
+
+    if (Array.isArray(group.pricingGroups)) {
+      const pricingGroupNames = new Set();
+
+      for (
+        let pricingIndex = 0;
+        pricingIndex < group.pricingGroups.length;
+        pricingIndex += 1
+      ) {
+        const pricingGroup =
+          cleanString(
+            group.pricingGroups[
+              pricingIndex
+            ],
+          );
+
+        const pricingGroupPath =
+          `${groupPath} pricing group ${pricingIndex + 1}`;
+
+        if (!pricingGroup) {
+          return `${pricingGroupPath} must be a non-empty string.`;
+        }
+
+        const normalizedPricingGroup =
+          normalizeName(pricingGroup);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Duplicate pricing group references
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+          pricingGroupNames.has(
+            normalizedPricingGroup,
+          )
+        ) {
+          return `${groupPath} contains duplicate pricing group "${pricingGroup}".`;
+        }
+
+        pricingGroupNames.add(
+          normalizedPricingGroup,
+        );
+
+        configuredPricingGroups.push(
+          pricingGroup,
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Pricing group must exist
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+          !availablePricingGroups.has(
+            normalizedPricingGroup,
+          )
+        ) {
+          return `${groupPath} references pricing group "${pricingGroup}", but no matching pricing option group exists.`;
+        }
+      }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Required Pricing Groups
+    |--------------------------------------------------------------------------
+    |
+    | Example:
+    |
+    | pricingGroups: [
+    |   "shoot",
+    |   "drone",
+    |   "host"
+    | ]
+    |
+    | requiredPricingGroups: [
+    |   "shoot"
+    | ]
+    |
+    | This means:
+    | - Shoot is required
+    | - Drone is optional
+    | - Host is optional
+    |
+    */
+
+    if (
+      group.requiredPricingGroups !== undefined &&
+      group.requiredPricingGroups !== null &&
+      !Array.isArray(
+        group.requiredPricingGroups,
+      )
+    ) {
+      return `${groupPath} requiredPricingGroups must be an array.`;
+    }
+
+    if (
+      Array.isArray(
+        group.requiredPricingGroups,
+      )
+    ) {
+      const requiredPricingGroupNames =
+        new Set();
+
+      const configuredPricingGroupSet =
+        new Set(
+          configuredPricingGroups.map(
+            (value) =>
+              normalizeName(value),
+          ),
+        );
+
+      for (
+        let requiredIndex = 0;
+        requiredIndex <
+        group.requiredPricingGroups.length;
+        requiredIndex += 1
+      ) {
+        const requiredPricingGroup =
+          cleanString(
+            group.requiredPricingGroups[
+              requiredIndex
+            ],
+          );
+
+        const requiredPricingGroupPath =
+          `${groupPath} required pricing group ${requiredIndex + 1}`;
+
+        if (!requiredPricingGroup) {
+          return `${requiredPricingGroupPath} must be a non-empty string.`;
+        }
+
+        const normalizedRequiredPricingGroup =
+          normalizeName(
+            requiredPricingGroup,
+          );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Duplicate required pricing groups
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+          requiredPricingGroupNames.has(
+            normalizedRequiredPricingGroup,
+          )
+        ) {
+          return `${groupPath} contains duplicate required pricing group "${requiredPricingGroup}".`;
+        }
+
+        requiredPricingGroupNames.add(
+          normalizedRequiredPricingGroup,
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Required group must exist globally
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+          !availablePricingGroups.has(
+            normalizedRequiredPricingGroup,
+          )
+        ) {
+          return `${groupPath} required pricing group "${requiredPricingGroup}" does not exist in the service pricing options.`;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Required group must be configured
+        | inside repeatable group's pricingGroups
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+          !configuredPricingGroupSet.has(
+            normalizedRequiredPricingGroup,
+          )
+        ) {
+          return `${groupPath} required pricing group "${requiredPricingGroup}" must also be included in pricingGroups.`;
+        }
+      }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Repeatable Fields
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      group.fields !== undefined
+    ) {
+      const fieldsError =
+        validateFields(
+          group.fields,
+          groupPath,
+        );
+
+      if (fieldsError) {
+        return fieldsError;
+      }
+    }
   }
 
   return null;
@@ -416,22 +812,28 @@ const validateFields = (
 ========================================================= */
 
 const validatePricingOptions = (
-  pricingOptions
+  pricingOptions,
 ) => {
   if (!Array.isArray(pricingOptions)) {
     return "Pricing options must be an array.";
   }
 
-  const pricingOptionIds = new Set();
-  const pricingOptionNames = new Set();
+  const pricingOptionIds =
+    new Set();
+
+  const pricingOptionNames =
+    new Set();
 
   for (
     let index = 0;
     index < pricingOptions.length;
     index += 1
   ) {
-    const option = pricingOptions[index];
-    const optionPath = `Pricing option ${index + 1}`;
+    const option =
+      pricingOptions[index];
+
+    const optionPath =
+      `Pricing option ${index + 1}`;
 
     if (
       !option ||
@@ -441,59 +843,54 @@ const validatePricingOptions = (
       return `${optionPath} must be a valid object.`;
     }
 
-    const name = cleanString(option.name);
-    const unit = cleanString(option.unit);
+    const name =
+      cleanString(option.name);
 
-    /*
-     * Name.
-     */
+    const unit =
+      cleanString(option.unit);
+
     if (!name) {
       return `${optionPath} name is required.`;
     }
 
-    /*
-     * Prevent duplicate pricing option names.
-     *
-     * Comparison is case-insensitive.
-     */
-    const normalizedName = normalizeName(name);
+    const normalizedName =
+      normalizeName(name);
 
-    if (pricingOptionNames.has(normalizedName)) {
+    if (
+      pricingOptionNames.has(
+        normalizedName,
+      )
+    ) {
       return `Pricing options contain duplicate name "${name}".`;
     }
 
-    pricingOptionNames.add(normalizedName);
+    pricingOptionNames.add(
+      normalizedName,
+    );
 
-    /*
-     * Unit.
-     */
     if (!unit) {
       return `${optionPath} unit is required.`;
     }
 
-    /*
-     * Price.
-     */
-    if (!isNonNegativeNumber(option.price)) {
+    if (
+      !isNonNegativeNumber(
+        option.price,
+      )
+    ) {
       return `${optionPath} price must be a valid non-negative number.`;
     }
 
-    /*
-     * Quantity.
-     */
-    const quantityError = validateQuantityRange(
-      option.minQuantity,
-      option.maxQuantity,
-      optionPath
-    );
+    const quantityError =
+      validateQuantityRange(
+        option.minQuantity,
+        option.maxQuantity,
+        optionPath,
+      );
 
     if (quantityError) {
       return quantityError;
     }
 
-    /*
-     * Active state.
-     */
     if (
       option.isActive !== undefined &&
       !isBoolean(option.isActive)
@@ -501,30 +898,31 @@ const validatePricingOptions = (
       return `${optionPath} isActive must be a boolean.`;
     }
 
-    /*
-     * Display order.
-     */
     if (
       option.order !== undefined &&
-      !isNonNegativeInteger(option.order)
+      !isNonNegativeInteger(
+        option.order,
+      )
     ) {
       return `${optionPath} order must be a non-negative integer.`;
     }
 
     /*
-     * Group.
-     */
+    |--------------------------------------------------------------------------
+    | Pricing Group
+    |--------------------------------------------------------------------------
+    */
+
     if (
       option.group !== undefined &&
       option.group !== null
     ) {
-      if (typeof option.group !== "string") {
+      if (
+        typeof option.group !== "string"
+      ) {
         return `${optionPath} group must be a string.`;
       }
 
-      /*
-       * If group is supplied, it cannot only contain spaces.
-       */
       if (
         option.group.trim().length === 0
       ) {
@@ -533,35 +931,53 @@ const validatePricingOptions = (
     }
 
     /*
-     * Pricing option ID.
-     *
-     * New pricing options can omit _id.
-     * Existing options should contain valid ObjectIds.
-     */
-    if (option._id !== undefined && option._id !== null) {
-      const optionId = String(option._id);
+    |--------------------------------------------------------------------------
+    | Pricing Option ID
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      option._id !== undefined &&
+      option._id !== null
+    ) {
+      const optionId =
+        String(option._id);
 
       if (
-        !mongoose.Types.ObjectId.isValid(optionId)
+        !mongoose.Types.ObjectId.isValid(
+          optionId,
+        )
       ) {
         return `${optionPath} has an invalid ID.`;
       }
 
-      if (pricingOptionIds.has(optionId)) {
+      if (
+        pricingOptionIds.has(
+          optionId,
+        )
+      ) {
         return `${optionPath} contains a duplicate pricing option ID.`;
       }
 
-      pricingOptionIds.add(optionId);
+      pricingOptionIds.add(
+        optionId,
+      );
     }
 
     /*
-     * Pricing option fields.
-     */
-    if (option.fields !== undefined) {
-      const fieldsError = validateFields(
-        option.fields,
-        `${optionPath}`
-      );
+    |--------------------------------------------------------------------------
+    | Pricing Option Fields
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      option.fields !== undefined
+    ) {
+      const fieldsError =
+        validateFields(
+          option.fields,
+          optionPath,
+        );
 
       if (fieldsError) {
         return fieldsError;
@@ -577,7 +993,7 @@ const validatePricingOptions = (
 ========================================================= */
 
 const validateServiceConfiguration = (
-  data
+  data,
 ) => {
   const {
     name,
@@ -589,13 +1005,16 @@ const validateServiceConfiguration = (
     maxQuantity,
     pricingOptions,
     fields,
+    repeatableGroups,
     isActive,
     displayOrder,
   } = data;
 
   /*
-   * Basic information.
-   */
+  |--------------------------------------------------------------------------
+  | Basic Service Information
+  |--------------------------------------------------------------------------
+  */
 
   if (!cleanString(name)) {
     return "Name is required.";
@@ -610,35 +1029,45 @@ const validateServiceConfiguration = (
   }
 
   /*
-   * Pricing type.
-   */
+  |--------------------------------------------------------------------------
+  | Pricing Type
+  |--------------------------------------------------------------------------
+  */
 
   if (
     pricingType !== undefined &&
     !VALID_PRICING_TYPES.includes(
-      pricingType
+      pricingType,
     )
   ) {
     return "Invalid pricing type.";
   }
 
   /*
-   * Base price.
-   */
+  |--------------------------------------------------------------------------
+  | Base Price
+  |--------------------------------------------------------------------------
+  */
 
-  if (!isNonNegativeNumber(basePrice)) {
+  if (
+    !isNonNegativeNumber(
+      basePrice,
+    )
+  ) {
     return "Base price must be a valid non-negative number.";
   }
 
   /*
-   * Service quantity.
-   */
+  |--------------------------------------------------------------------------
+  | Service Quantity
+  |--------------------------------------------------------------------------
+  */
 
   const quantityError =
     validateQuantityRange(
       minQuantity,
       maxQuantity,
-      "Service"
+      "Service",
     );
 
   if (quantityError) {
@@ -646,8 +1075,10 @@ const validateServiceConfiguration = (
   }
 
   /*
-   * Active state.
-   */
+  |--------------------------------------------------------------------------
+  | Active Status
+  |--------------------------------------------------------------------------
+  */
 
   if (
     isActive !== undefined &&
@@ -657,25 +1088,32 @@ const validateServiceConfiguration = (
   }
 
   /*
-   * Display order.
-   */
+  |--------------------------------------------------------------------------
+  | Display Order
+  |--------------------------------------------------------------------------
+  */
 
   if (
     displayOrder !== undefined &&
-    !isNonNegativeInteger(displayOrder)
+    !isNonNegativeInteger(
+      displayOrder,
+    )
   ) {
     return "Display order must be a non-negative integer.";
   }
 
   /*
-   * Service fields.
-   */
+  |--------------------------------------------------------------------------
+  | Service Fields
+  |--------------------------------------------------------------------------
+  */
 
   if (fields !== undefined) {
-    const fieldsError = validateFields(
-      fields,
-      "Service"
-    );
+    const fieldsError =
+      validateFields(
+        fields,
+        "Service",
+      );
 
     if (fieldsError) {
       return fieldsError;
@@ -683,17 +1121,45 @@ const validateServiceConfiguration = (
   }
 
   /*
-   * Pricing options.
-   */
+  |--------------------------------------------------------------------------
+  | Pricing Options
+  |--------------------------------------------------------------------------
+  */
 
   if (pricingOptions !== undefined) {
     const pricingOptionsError =
       validatePricingOptions(
-        pricingOptions
+        pricingOptions,
       );
 
     if (pricingOptionsError) {
       return pricingOptionsError;
+    }
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Repeatable Groups
+  |--------------------------------------------------------------------------
+  |
+  | Validate AFTER pricing options so that pricingGroups
+  | and requiredPricingGroups can be checked against
+  | the actual pricing option groups.
+  |
+  */
+
+  if (
+    repeatableGroups !== undefined
+  ) {
+    const repeatableGroupsError =
+      validateRepeatableGroups(
+        repeatableGroups,
+        pricingOptions || [],
+        "Service",
+      );
+
+    if (repeatableGroupsError) {
+      return repeatableGroupsError;
     }
   }
 
@@ -706,25 +1172,28 @@ const validateServiceConfiguration = (
 
 const getPublicServices = async (
   req,
-  res
+  res,
 ) => {
   try {
-    const services = await Service.find(
-      { isActive: true },
-      {
-        name: 1,
-        slug: 1,
-        category: 1,
-        description: 1,
-        pricingType: 1,
-        basePrice: 1,
-        unit: 1,
+    const services =
+      await Service.find(
+        {
+          isActive: true,
+        },
+        {
+          name: 1,
+          slug: 1,
+          category: 1,
+          description: 1,
+          pricingType: 1,
+          basePrice: 1,
+          unit: 1,
+          displayOrder: 1,
+        },
+      ).sort({
         displayOrder: 1,
-      }
-    ).sort({
-      displayOrder: 1,
-      name: 1,
-    });
+        name: 1,
+      });
 
     return res.status(200).json({
       success: true,
@@ -733,12 +1202,13 @@ const getPublicServices = async (
   } catch (error) {
     console.error(
       "Get public services error:",
-      error
+      error,
     );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to fetch public services.",
+      message:
+        "Unable to fetch public services.",
     });
   }
 };
@@ -749,15 +1219,16 @@ const getPublicServices = async (
 
 const getActiveServices = async (
   req,
-  res
+  res,
 ) => {
   try {
-    const services = await Service.find({
-      isActive: true,
-    }).sort({
-      displayOrder: 1,
-      name: 1,
-    });
+    const services =
+      await Service.find({
+        isActive: true,
+      }).sort({
+        displayOrder: 1,
+        name: 1,
+      });
 
     return res.status(200).json({
       success: true,
@@ -766,12 +1237,13 @@ const getActiveServices = async (
   } catch (error) {
     console.error(
       "Get services error:",
-      error
+      error,
     );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to fetch services.",
+      message:
+        "Unable to fetch services.",
     });
   }
 };
@@ -782,18 +1254,20 @@ const getActiveServices = async (
 
 const getServiceById = async (
   req,
-  res
+  res,
 ) => {
   try {
-    const service = await Service.findOne({
-      _id: req.params.id,
-      isActive: true,
-    });
+    const service =
+      await Service.findOne({
+        _id: req.params.id,
+        isActive: true,
+      });
 
     if (!service) {
       return res.status(404).json({
         success: false,
-        message: "Service not found.",
+        message:
+          "Service not found.",
       });
     }
 
@@ -804,12 +1278,13 @@ const getServiceById = async (
   } catch (error) {
     console.error(
       "Get service error:",
-      error
+      error,
     );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to fetch service.",
+      message:
+        "Unable to fetch service.",
     });
   }
 };
@@ -820,11 +1295,11 @@ const getServiceById = async (
 
 const getAdminServices = async (
   req,
-  res
+  res,
 ) => {
   try {
-    const services = await Service.find({})
-      .sort({
+    const services =
+      await Service.find({}).sort({
         displayOrder: 1,
         name: 1,
       });
@@ -836,12 +1311,13 @@ const getAdminServices = async (
   } catch (error) {
     console.error(
       "Get admin services error:",
-      error
+      error,
     );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to fetch services.",
+      message:
+        "Unable to fetch services.",
     });
   }
 };
@@ -852,17 +1328,19 @@ const getAdminServices = async (
 
 const getAdminServiceById = async (
   req,
-  res
+  res,
 ) => {
   try {
-    const service = await Service.findById(
-      req.params.id
-    );
+    const service =
+      await Service.findById(
+        req.params.id,
+      );
 
     if (!service) {
       return res.status(404).json({
         success: false,
-        message: "Service not found.",
+        message:
+          "Service not found.",
       });
     }
 
@@ -873,12 +1351,13 @@ const getAdminServiceById = async (
   } catch (error) {
     console.error(
       "Get admin service error:",
-      error
+      error,
     );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to fetch service.",
+      message:
+        "Unable to fetch service.",
     });
   }
 };
@@ -889,7 +1368,7 @@ const getAdminServiceById = async (
 
 const createService = async (
   req,
-  res
+  res,
 ) => {
   try {
     const {
@@ -904,16 +1383,20 @@ const createService = async (
       maxQuantity,
       pricingOptions,
       fields,
+      repeatableGroups,
       isActive,
       displayOrder,
     } = req.body;
 
     const normalizedService = {
-      name: cleanString(name),
+      name:
+        cleanString(name),
 
-      slug: cleanString(slug).toLowerCase(),
+      slug:
+        cleanString(slug).toLowerCase(),
 
-      category: cleanString(category),
+      category:
+        cleanString(category),
 
       description:
         description !== undefined
@@ -955,6 +1438,13 @@ const createService = async (
           ? fields
           : [],
 
+      repeatableGroups:
+        Array.isArray(
+          repeatableGroups,
+        )
+          ? repeatableGroups
+          : [],
+
       isActive:
         isActive !== undefined
           ? isActive
@@ -969,26 +1459,34 @@ const createService = async (
     };
 
     /*
-     * Validate complete configuration.
-     */
+    |--------------------------------------------------------------------------
+    | Validate Configuration
+    |--------------------------------------------------------------------------
+    */
+
     const validationError =
       validateServiceConfiguration(
-        normalizedService
+        normalizedService,
       );
 
     if (validationError) {
       return res.status(400).json({
         success: false,
-        message: validationError,
+        message:
+          validationError,
       });
     }
 
     /*
-     * Check duplicate slug.
-     */
+    |--------------------------------------------------------------------------
+    | Check Duplicate Slug
+    |--------------------------------------------------------------------------
+    */
+
     const existingService =
       await Service.findOne({
-        slug: normalizedService.slug,
+        slug:
+          normalizedService.slug,
       });
 
     if (existingService) {
@@ -1000,11 +1498,14 @@ const createService = async (
     }
 
     /*
-     * Create service.
-     */
+    |--------------------------------------------------------------------------
+    | Create Service
+    |--------------------------------------------------------------------------
+    */
+
     const service =
       await Service.create(
-        normalizedService
+        normalizedService,
       );
 
     return res.status(201).json({
@@ -1016,7 +1517,7 @@ const createService = async (
   } catch (error) {
     console.error(
       "Create service error:",
-      error
+      error,
     );
 
     if (error.code === 11000) {
@@ -1033,7 +1534,8 @@ const createService = async (
     ) {
       return res.status(400).json({
         success: false,
-        message: error.message,
+        message:
+          error.message,
       });
     }
 
@@ -1051,18 +1553,19 @@ const createService = async (
 
 const updateService = async (
   req,
-  res
+  res,
 ) => {
   try {
     const service =
       await Service.findById(
-        req.params.id
+        req.params.id,
       );
 
     if (!service) {
       return res.status(404).json({
         success: false,
-        message: "Service not found.",
+        message:
+          "Service not found.",
       });
     }
 
@@ -1078,16 +1581,16 @@ const updateService = async (
       maxQuantity,
       pricingOptions,
       fields,
+      repeatableGroups,
       isActive,
       displayOrder,
     } = req.body;
 
     /*
-     * Build the complete resulting configuration.
-     *
-     * Validation is performed against the final
-     * service state, not only the PATCH fields.
-     */
+    |--------------------------------------------------------------------------
+    | Build Complete Updated Configuration
+    |--------------------------------------------------------------------------
+    */
 
     const updatedConfiguration = {
       name:
@@ -1145,7 +1648,7 @@ const updateService = async (
               (option) =>
                 option.toObject
                   ? option.toObject()
-                  : option
+                  : option,
             ),
 
       fields:
@@ -1155,8 +1658,20 @@ const updateService = async (
               (field) =>
                 field.toObject
                   ? field.toObject()
-                  : field
+                  : field,
             ),
+
+      repeatableGroups:
+        repeatableGroups !== undefined
+          ? repeatableGroups
+          : service.repeatableGroups
+            ? service.repeatableGroups.map(
+                (group) =>
+                  group.toObject
+                    ? group.toObject()
+                    : group,
+              )
+            : [],
 
       isActive:
         isActive !== undefined
@@ -1170,28 +1685,36 @@ const updateService = async (
     };
 
     /*
-     * Validate complete resulting configuration.
-     */
+    |--------------------------------------------------------------------------
+    | Validate Complete Updated Configuration
+    |--------------------------------------------------------------------------
+    */
+
     const validationError =
       validateServiceConfiguration(
-        updatedConfiguration
+        updatedConfiguration,
       );
 
     if (validationError) {
       return res.status(400).json({
         success: false,
-        message: validationError,
+        message:
+          validationError,
       });
     }
 
     /*
-     * Check slug uniqueness.
-     */
+    |--------------------------------------------------------------------------
+    | Check Duplicate Slug
+    |--------------------------------------------------------------------------
+    */
+
     if (slug !== undefined) {
       const existingService =
         await Service.findOne({
           slug:
             updatedConfiguration.slug,
+
           _id: {
             $ne: service._id,
           },
@@ -1207,8 +1730,11 @@ const updateService = async (
     }
 
     /*
-     * Apply validated configuration.
-     */
+    |--------------------------------------------------------------------------
+    | Update Service
+    |--------------------------------------------------------------------------
+    */
+
     service.name =
       updatedConfiguration.name;
 
@@ -1242,6 +1768,9 @@ const updateService = async (
     service.fields =
       updatedConfiguration.fields;
 
+    service.repeatableGroups =
+      updatedConfiguration.repeatableGroups;
+
     service.isActive =
       updatedConfiguration.isActive;
 
@@ -1259,7 +1788,7 @@ const updateService = async (
   } catch (error) {
     console.error(
       "Update service error:",
-      error
+      error,
     );
 
     if (error.code === 11000) {
@@ -1276,7 +1805,8 @@ const updateService = async (
     ) {
       return res.status(400).json({
         success: false,
-        message: error.message,
+        message:
+          error.message,
       });
     }
 
@@ -1294,18 +1824,19 @@ const updateService = async (
 
 const toggleServiceStatus = async (
   req,
-  res
+  res,
 ) => {
   try {
     const service =
       await Service.findById(
-        req.params.id
+        req.params.id,
       );
 
     if (!service) {
       return res.status(404).json({
         success: false,
-        message: "Service not found.",
+        message:
+          "Service not found.",
       });
     }
 
@@ -1316,15 +1847,16 @@ const toggleServiceStatus = async (
 
     return res.status(200).json({
       success: true,
-      message: service.isActive
-        ? "Service activated successfully."
-        : "Service deactivated successfully.",
+      message:
+        service.isActive
+          ? "Service activated successfully."
+          : "Service deactivated successfully.",
       service,
     });
   } catch (error) {
     console.error(
       "Toggle service status error:",
-      error
+      error,
     );
 
     return res.status(500).json({

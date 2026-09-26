@@ -2,11 +2,14 @@ import {
   ArrowRight,
   Banknote,
   Check,
+  ChevronDown,
+  ChevronUp,
   CreditCard,
   Info,
   Loader2,
   Minus,
   Plus,
+  X,
 } from "lucide-react";
 
 import OrderSuccess from "../components/OrderSuccess";
@@ -18,12 +21,16 @@ import { useEffect, useMemo, useState } from "react";
 
 /*
 |--------------------------------------------------------------------------
-| Helpers
+| Constants / Helpers
 |--------------------------------------------------------------------------
 */
 
+const ONLINE_GST_RATE = 18;
+
 const formatCurrency = (amount) => {
-  return `₹${Number(amount || 0).toLocaleString("en-IN")}`;
+  return `₹${Number(amount || 0).toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+  })}`;
 };
 
 const getSortedItems = (items = []) => {
@@ -52,10 +59,6 @@ const getPricingGroups = (service) => {
 
   options.forEach((option) => {
     const groupName = String(option.group || "").trim();
-
-    /*
-     * Options without a group are kept in their own fallback group.
-     */
     const key = groupName || "__ungrouped__";
 
     if (!groupMap.has(key)) {
@@ -73,6 +76,12 @@ const getPricingGroups = (service) => {
   });
 
   return groups;
+};
+
+const isGroupedService = (service) => {
+  return getPricingOptions(service).some(
+    (option) => String(option?.group || "").trim() !== "",
+  );
 };
 
 const getQuantityRules = (service, pricingOption) => {
@@ -103,7 +112,11 @@ const isEmptyValue = (value) => {
     return value.length === 0;
   }
 
-  return value === undefined || value === null || String(value).trim() === "";
+  return (
+    value === undefined ||
+    value === null ||
+    (typeof value === "string" && value.trim() === "")
+  );
 };
 
 const normalizeFieldType = (field) => {
@@ -114,23 +127,440 @@ const normalizeFieldType = (field) => {
   return String(field.type).toLowerCase();
 };
 
+const getRepeatableGroups = (service) => {
+  if (!Array.isArray(service?.repeatableGroups)) {
+    return [];
+  }
+
+  return getSortedItems(
+    service.repeatableGroups.filter(
+      (group) => group && group.isActive !== false,
+    ),
+  );
+};
+
+const getRepeatableGroupRules = (group) => {
+  const rawMin = Number(group?.minItems ?? 1);
+  const rawMax = Number(group?.maxItems ?? 10);
+
+  const minItems = Number.isFinite(rawMin) ? Math.max(0, rawMin) : 1;
+
+  const maxItems =
+    Number.isFinite(rawMax) && rawMax >= Math.max(1, minItems)
+      ? rawMax
+      : Math.max(10, minItems);
+
+  return {
+    minItems,
+    maxItems,
+  };
+};
+
+/*
+|--------------------------------------------------------------------------
+| Repeatable Group Pricing Helpers
+|--------------------------------------------------------------------------
+|
+| Repeatable groups (e.g. "reels") may declare their own pricingGroups
+| (e.g. ["shoot", "drone", "host"]) which reference the same grouped
+| pricing options already available on the service via `option.group`.
+| Each repeatable entry keeps its own independent selection/quantity for
+| every pricing group it exposes.
+|
+*/
+
+const getRepeatableGroupPricingGroups = (service, group) => {
+  const pricingGroupNames = Array.isArray(group?.pricingGroups)
+    ? group.pricingGroups.map((name) => String(name))
+    : [];
+
+  if (!pricingGroupNames.length) {
+    return [];
+  }
+
+  const allowedNames = new Set(pricingGroupNames);
+
+  return getPricingGroups(service).filter((pricingGroup) =>
+    allowedNames.has(String(pricingGroup.name)),
+  );
+};
+
+const isRequiredRepeatablePricingGroup = (group, pricingGroupName) => {
+  const requiredNames = Array.isArray(group?.requiredPricingGroups)
+    ? group.requiredPricingGroups.map((name) => String(name))
+    : [];
+
+  return requiredNames.includes(String(pricingGroupName));
+};
+
+const getRepeatableEntryPricingTotal = (service, group, entry) => {
+  const pricingGroups = getRepeatableGroupPricingGroups(service, group);
+
+  if (!pricingGroups.length) {
+    return 0;
+  }
+
+  let total = 0;
+
+  for (const pricingGroup of pricingGroups) {
+    const selectedOptionId = entry?.[pricingGroup.name];
+
+    if (!selectedOptionId) {
+      continue;
+    }
+
+    const option = pricingGroup.options.find(
+      (candidate) => String(candidate._id) === String(selectedOptionId),
+    );
+
+    if (!option) {
+      continue;
+    }
+
+    const rules = getQuantityRules(service, option);
+
+    const rawQuantity = entry?.pricingQuantities?.[pricingGroup.name];
+
+    const quantity =
+      rawQuantity !== undefined && rawQuantity !== null
+        ? Number(rawQuantity)
+        : rules.minQuantity;
+
+    total +=
+      Number(option.price || 0) *
+      (Number.isFinite(quantity) ? quantity : rules.minQuantity);
+  }
+
+  return total;
+};
+
+const createEmptyRepeatableItem = (group) => {
+  const item = {};
+
+  if (Array.isArray(group?.fields)) {
+    group.fields.forEach((field) => {
+      const fieldName = String(field?.name || "").trim();
+
+      if (!fieldName) {
+        return;
+      }
+
+      if (normalizeFieldType(field) === "checkbox") {
+        item[fieldName] = [];
+      } else {
+        item[fieldName] = "";
+      }
+    });
+  }
+
+  item.pricingQuantities = {};
+
+  return item;
+};
+
+const createInitialRepeatableData = (service) => {
+  const data = {};
+
+  getRepeatableGroups(service).forEach((group) => {
+    const { minItems } = getRepeatableGroupRules(group);
+
+    if (minItems > 0) {
+      data[group.name] = Array.from({ length: minItems }, () =>
+        createEmptyRepeatableItem(group),
+      );
+    }
+  });
+
+  return data;
+};
+
+const getActiveFieldsForItem = (item) => {
+  if (!item?.service) {
+    return [];
+  }
+
+  const serviceFields = Array.isArray(item.service.fields)
+    ? item.service.fields
+    : [];
+
+  const selectedOptions = item.isGroupedPricing
+    ? Object.values(item.selectedPricingOptions || {}).filter(Boolean)
+    : item.selectedPricingOption
+      ? [item.selectedPricingOption]
+      : [];
+
+  const fieldMap = new Map();
+
+  for (const field of serviceFields) {
+    const fieldName = String(field?.name || "").trim();
+
+    if (fieldName) {
+      fieldMap.set(fieldName, field);
+    }
+  }
+
+  for (const pricingOption of selectedOptions) {
+    if (!Array.isArray(pricingOption?.fields)) {
+      continue;
+    }
+
+    for (const field of pricingOption.fields) {
+      const fieldName = String(field?.name || "").trim();
+
+      if (fieldName) {
+        fieldMap.set(fieldName, field);
+      }
+    }
+  }
+
+  return getSortedItems(Array.from(fieldMap.values()));
+};
+
+const getSelectedFieldsPrice = (item) => {
+  const activeFields = getActiveFieldsForItem(item);
+
+  if (!activeFields.length) {
+    return 0;
+  }
+
+  let total = 0;
+
+  for (const field of activeFields) {
+    const fieldValue = item.formData?.[field.name];
+
+    if (isEmptyValue(fieldValue)) {
+      continue;
+    }
+
+    const selectedValues = Array.isArray(fieldValue)
+      ? fieldValue
+      : [fieldValue];
+
+    for (const selectedValue of selectedValues) {
+      const selectedOption = (field.options || []).find(
+        (option) => String(option.value) === String(selectedValue),
+      );
+
+      if (selectedOption) {
+        total += Number(selectedOption.price || 0);
+      }
+    }
+  }
+
+  return total;
+};
+
+const getRepeatableGroupsPrice = (item) => {
+  const groups = getRepeatableGroups(item?.service);
+
+  if (!groups.length) {
+    return 0;
+  }
+
+  let total = 0;
+
+  for (const group of groups) {
+    const entries = Array.isArray(item.formData?.[group.name])
+      ? item.formData[group.name]
+      : [];
+
+    if (!entries.length) {
+      continue;
+    }
+
+    for (const entry of entries) {
+      for (const field of group.fields || []) {
+        const fieldName = String(field?.name || "").trim();
+
+        if (!fieldName) {
+          continue;
+        }
+
+        const value = entry?.[fieldName];
+
+        if (isEmptyValue(value)) {
+          continue;
+        }
+
+        const selectedValues = Array.isArray(value) ? value : [value];
+
+        for (const selectedValue of selectedValues) {
+          const selectedOption = (field.options || []).find(
+            (option) => String(option.value) === String(selectedValue),
+          );
+
+          if (selectedOption) {
+            total += Number(selectedOption.price || 0);
+          }
+        }
+      }
+
+      total += getRepeatableEntryPricingTotal(item.service, group, entry);
+    }
+  }
+
+  return total;
+};
+
+const getItemQuantity = (item) => {
+  const quantityOption = item.isGroupedPricing
+    ? null
+    : item.selectedPricingOption;
+
+  const rules = getQuantityRules(item.service, quantityOption);
+
+  const rawQuantity = Number(item.formData?.quantity || rules.minQuantity);
+
+  if (!Number.isFinite(rawQuantity)) {
+    return rules.minQuantity;
+  }
+
+  let normalized = Math.floor(rawQuantity);
+
+  normalized = Math.max(rules.minQuantity, normalized);
+
+  if (rules.maxQuantity !== undefined) {
+    normalized = Math.min(rules.maxQuantity, normalized);
+  }
+
+  return normalized;
+};
+
+const getGroupedOptionQuantity = (item, groupKey, option) => {
+  const rules = getQuantityRules(item.service, option);
+  const rawQuantity = item.pricingQuantities?.[groupKey];
+
+  const quantity =
+    rawQuantity !== undefined && rawQuantity !== null
+      ? Number(rawQuantity)
+      : rules.minQuantity;
+
+  if (!Number.isFinite(quantity)) {
+    return rules.minQuantity;
+  }
+
+  let normalized = Math.floor(quantity);
+
+  normalized = Math.max(rules.minQuantity, normalized);
+
+  if (rules.maxQuantity !== undefined) {
+    normalized = Math.min(rules.maxQuantity, normalized);
+  }
+
+  return normalized;
+};
+
+const getItemEstimate = (item) => {
+  if (!item?.service) {
+    return 0;
+  }
+
+  const selectedFieldsPrice = getSelectedFieldsPrice(item);
+  const repeatableGroupsPrice = getRepeatableGroupsPrice(item);
+
+  const selectedOptions = Object.values(
+    item.selectedPricingOptions || {},
+  ).filter(Boolean);
+
+  if (item.isGroupedPricing) {
+    if (selectedOptions.length > 0) {
+      return (
+        selectedOptions.reduce((total, option) => {
+          const groupKey = String(option.group || "").trim() || "__ungrouped__";
+
+          const quantity = getGroupedOptionQuantity(item, groupKey, option);
+
+          return total + Number(option.price || 0) * quantity;
+        }, 0) +
+        selectedFieldsPrice +
+        repeatableGroupsPrice
+      );
+    }
+
+    return selectedFieldsPrice + repeatableGroupsPrice;
+  }
+
+  const quantity = getItemQuantity(item);
+
+  let basePrice = 0;
+
+  if (item.selectedPricingOption) {
+    basePrice = Number(item.selectedPricingOption.price || 0) * quantity;
+  } else {
+    switch (item.service.pricingType) {
+      case "fixed":
+        basePrice = Number(item.service.basePrice || 0);
+        break;
+
+      case "per_unit":
+      case "starting_from":
+        basePrice = Number(item.service.basePrice || 0) * quantity;
+        break;
+
+      case "custom":
+        basePrice = 0;
+        break;
+
+      default:
+        basePrice = Number(item.service.basePrice || 0);
+        break;
+    }
+  }
+
+  return basePrice + selectedFieldsPrice + repeatableGroupsPrice;
+};
+
+const isCustomUnpricedItem = (item) => {
+  if (!item?.service) {
+    return false;
+  }
+
+  if (item.service.pricingType !== "custom") {
+    return false;
+  }
+
+  if (item.isGroupedPricing) {
+    return (
+      Object.values(item.selectedPricingOptions || {}).filter(Boolean)
+        .length === 0
+    );
+  }
+
+  return !item.selectedPricingOption;
+};
+
+const createOrderItem = (service) => {
+  const grouped = isGroupedService(service);
+  const pricingOptions = getPricingOptions(service);
+  const quantityRules = getQuantityRules(service, null);
+
+  const shouldHaveQuantity =
+    service.pricingType === "per_unit" ||
+    service.pricingType === "starting_from" ||
+    pricingOptions.length > 0;
+
+  return {
+    service,
+    isGroupedPricing: grouped,
+    selectedPricingOption: null,
+    selectedPricingOptions: {},
+    pricingQuantities: {},
+    formData: {
+      ...(shouldHaveQuantity ? { quantity: quantityRules.minQuantity } : {}),
+      ...createInitialRepeatableData(service),
+    },
+  };
+};
+
 /*
 |--------------------------------------------------------------------------
 | Selection Field
 |--------------------------------------------------------------------------
-|
-| radio
-|   -> exactly one option
-|
-| checkbox
-|   -> zero or more options
-|
 */
 
-const SelectionField = ({ field, value, onChange }) => {
+const SelectionField = ({ field, value, onChange, compact = false }) => {
   const type = normalizeFieldType(field);
   const options = Array.isArray(field.options) ? field.options : [];
-
   const isCheckbox = type === "checkbox";
 
   const selectedValues = isCheckbox
@@ -162,31 +592,21 @@ const SelectionField = ({ field, value, onChange }) => {
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-medium text-zinc-900">{field.label}</p>
 
-          <span
-            className="
-              rounded-full
-              border
-              border-zinc-200
-              bg-zinc-50
-              px-2
-              py-0.5
-              text-[10px]
-              font-medium
-              uppercase
-              tracking-wide
-              text-zinc-400
-            "
-          >
+          <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
             {field.required ? "Required" : "Optional"}
           </span>
         </div>
 
         <p className="mt-1 text-xs text-zinc-400">
-          {isCheckbox ? "Select or deselect" : "Select one"}
+          {isCheckbox ? "Select one or more" : "Select one"}
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div
+        className={`grid gap-3 ${
+          compact ? "sm:grid-cols-1" : "sm:grid-cols-2"
+        }`}
+      >
         {options.map((option) => {
           const selected = selectedValues.includes(option.value);
 
@@ -202,18 +622,9 @@ const SelectionField = ({ field, value, onChange }) => {
                 }
               }}
               className={`
-                relative
-                flex
-                min-h-[68px]
-                items-center
-                gap-3
-                rounded-2xl
-                border
-                px-4
-                py-3.5
-                text-left
-                transition-all
-                duration-200
+                relative flex min-h-[62px] items-center gap-3 rounded-2xl
+                border px-4 py-3 text-left transition-all duration-200
+                hover:-translate-y-0.5
                 ${
                   selected
                     ? "border-zinc-900 bg-zinc-900 shadow-[0_10px_25px_rgba(0,0,0,0.08)]"
@@ -223,13 +634,7 @@ const SelectionField = ({ field, value, onChange }) => {
             >
               <span
                 className={`
-                  flex
-                  h-5
-                  w-5
-                  shrink-0
-                  items-center
-                  justify-center
-                  border
+                  flex h-5 w-5 shrink-0 items-center justify-center border
                   ${isCheckbox ? "rounded-md" : "rounded-full"}
                   ${
                     selected
@@ -243,24 +648,18 @@ const SelectionField = ({ field, value, onChange }) => {
 
               <span className="min-w-0 flex-1">
                 <span
-                  className={`
-                    block
-                    text-sm
-                    font-medium
-                    ${selected ? "text-white" : "text-zinc-900"}
-                  `}
+                  className={`block text-sm font-medium ${
+                    selected ? "text-white" : "text-zinc-900"
+                  }`}
                 >
                   {option.label}
                 </span>
 
                 {Number(option.price || 0) > 0 && (
                   <span
-                    className={`
-                      mt-0.5
-                      block
-                      text-xs
-                      ${selected ? "text-white/50" : "text-zinc-400"}
-                    `}
+                    className={`mt-0.5 block text-xs ${
+                      selected ? "text-white/50" : "text-zinc-400"
+                    }`}
                   >
                     +{formatCurrency(option.price)}
                   </span>
@@ -274,7 +673,6 @@ const SelectionField = ({ field, value, onChange }) => {
       {field.helpText && (
         <div className="mt-2.5 flex items-start gap-1.5 text-xs leading-5 text-zinc-400">
           <Info size={13} className="mt-0.5 shrink-0" />
-
           <span>{field.helpText}</span>
         </div>
       )}
@@ -288,11 +686,18 @@ const SelectionField = ({ field, value, onChange }) => {
 |--------------------------------------------------------------------------
 */
 
-const DynamicField = ({ field, value, onChange }) => {
+const DynamicField = ({ field, value, onChange, compact = false }) => {
   const type = normalizeFieldType(field);
 
   if (type === "radio" || type === "checkbox") {
-    return <SelectionField field={field} value={value} onChange={onChange} />;
+    return (
+      <SelectionField
+        field={field}
+        value={value}
+        onChange={onChange}
+        compact={compact}
+      />
+    );
   }
 
   if (type === "select") {
@@ -318,7 +723,6 @@ const DynamicField = ({ field, value, onChange }) => {
         {field.helpText && (
           <div className="mt-2.5 flex items-start gap-1.5 text-xs leading-5 text-zinc-400">
             <Info size={13} className="mt-0.5 shrink-0" />
-
             <span>{field.helpText}</span>
           </div>
         )}
@@ -327,40 +731,27 @@ const DynamicField = ({ field, value, onChange }) => {
   }
 
   const commonClassName = `
-    w-full
-    rounded-xl
-    border
-    border-zinc-200
-    bg-zinc-50
-    px-4
-    py-3.5
-    text-sm
-    text-zinc-900
-    outline-none
-    transition-all
-    duration-200
-    placeholder:text-zinc-400
-    hover:border-zinc-300
-    focus:border-zinc-400
-    focus:bg-white
-    focus:ring-4
-    focus:ring-zinc-900/[0.04]
+    w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3.5
+    text-sm text-zinc-900 outline-none transition-all duration-200
+    placeholder:text-zinc-400 hover:border-zinc-300 focus:border-zinc-400
+    focus:bg-white focus:ring-4 focus:ring-zinc-900/[0.04]
   `;
 
   const label = (
     <div className="mb-3">
-      <p className="text-sm font-medium text-zinc-900">{field.label}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-sm font-medium text-zinc-900">{field.label}</p>
 
-      <p className="mt-1 text-xs text-zinc-400">
-        {field.required ? "Required" : "Optional"}
-      </p>
+        <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+          {field.required ? "Required" : "Optional"}
+        </span>
+      </div>
     </div>
   );
 
   const helpText = field.helpText ? (
     <div className="mt-2.5 flex items-start gap-1.5 text-xs leading-5 text-zinc-400">
       <Info size={13} className="mt-0.5 shrink-0" />
-
       <span>{field.helpText}</span>
     </div>
   ) : null;
@@ -468,57 +859,52 @@ const QuantityControl = ({
   maxQuantity,
   unit,
   onChange,
+  dark = false,
 }) => {
   const canDecrease = quantity > minQuantity;
-
   const canIncrease = maxQuantity === undefined || quantity < maxQuantity;
 
-  const decrease = () => {
-    if (!canDecrease) {
-      return;
-    }
-
-    onChange(quantity - 1);
-  };
-
-  const increase = () => {
-    if (!canIncrease) {
-      return;
-    }
-
-    onChange(quantity + 1);
-  };
-
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-zinc-50 p-2">
+    <div
+      className={`
+        flex items-center rounded-xl border p-1
+        ${dark ? "border-white/10 bg-white/5" : "border-zinc-200 bg-zinc-50"}
+      `}
+    >
       <button
         type="button"
-        onClick={decrease}
+        onClick={() => canDecrease && onChange(quantity - 1)}
         disabled={!canDecrease}
-        className="
-          flex
-          h-10
-          w-10
-          items-center
-          justify-center
-          rounded-xl
-          text-zinc-500
+        className={`
+          flex h-8 w-8 items-center justify-center rounded-lg
           transition-all
-          hover:bg-white
-          hover:text-zinc-900
-          hover:cursor-pointer
-          disabled:cursor-not-allowed
-          disabled:opacity-30
-        "
+          ${
+            dark
+              ? "text-white/60 hover:bg-white/10 hover:text-white"
+              : "text-zinc-500 hover:bg-white hover:text-zinc-900"
+          }
+          disabled:cursor-not-allowed disabled:opacity-30
+        `}
+        aria-label="Decrease quantity"
       >
-        <Minus size={16} />
+        <Minus size={14} />
       </button>
 
-      <div className="text-center">
-        <p className="text-lg font-semibold text-zinc-900">{quantity}</p>
+      <div className="min-w-[52px] px-1 text-center">
+        <p
+          className={`text-sm font-semibold ${
+            dark ? "text-white" : "text-zinc-900"
+          }`}
+        >
+          {quantity}
+        </p>
 
         {unit && (
-          <p className="text-[11px] text-zinc-400">
+          <p
+            className={`text-[10px] ${
+              dark ? "text-white/35" : "text-zinc-400"
+            }`}
+          >
             {unit}
             {quantity !== 1 ? "s" : ""}
           </p>
@@ -527,25 +913,21 @@ const QuantityControl = ({
 
       <button
         type="button"
-        onClick={increase}
+        onClick={() => canIncrease && onChange(quantity + 1)}
         disabled={!canIncrease}
-        className="
-          flex
-          h-10
-          w-10
-          items-center
-          justify-center
-          rounded-xl
-          text-zinc-500
+        className={`
+          flex h-8 w-8 items-center justify-center rounded-lg
           transition-all
-          hover:bg-white
-          hover:text-zinc-900
-          hover:cursor-pointer
-          disabled:cursor-not-allowed
-          disabled:opacity-30
-        "
+          ${
+            dark
+              ? "text-white/60 hover:bg-white/10 hover:text-white"
+              : "text-zinc-500 hover:bg-white hover:text-zinc-900"
+          }
+          disabled:cursor-not-allowed disabled:opacity-30
+        `}
+        aria-label="Increase quantity"
       >
-        <Plus size={16} />
+        <Plus size={14} />
       </button>
     </div>
   );
@@ -563,41 +945,27 @@ const PaymentOption = ({
   icon: Icon,
   title,
   description,
+  disabled = false,
 }) => {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={`
-        group
-        relative
-        flex
-        w-full
-        items-start
-        gap-3.5
-        rounded-2xl
-        border
-        p-4
-        text-left
-        transition-all
-        duration-300
-        sm:p-5
+        group relative flex w-full items-start gap-3.5 rounded-2xl border p-4
+        text-left transition-all duration-300 sm:p-5
         ${
           selected
             ? "border-zinc-900 bg-zinc-900 shadow-[0_12px_35px_rgba(0,0,0,0.08)]"
-            : "border-zinc-200 bg-white hover:cursor-pointer hover:border-zinc-300 hover:shadow-[0_10px_30px_rgba(0,0,0,0.04)]"
+            : "border-zinc-200 bg-white hover:border-zinc-300 hover:shadow-[0_10px_30px_rgba(0,0,0,0.04)]"
         }
+        ${disabled ? "cursor-not-allowed opacity-45" : "hover:-translate-y-0.5"}
       `}
     >
       <div
         className={`
-          flex
-          h-10
-          w-10
-          shrink-0
-          items-center
-          justify-center
-          rounded-xl
+          flex h-10 w-10 shrink-0 items-center justify-center rounded-xl
           ${
             selected
               ? "bg-white text-zinc-900"
@@ -610,22 +978,17 @@ const PaymentOption = ({
 
       <div className="min-w-0 flex-1 pr-6">
         <p
-          className={`
-            text-sm
-            font-medium
-            ${selected ? "text-white" : "text-zinc-900"}
-          `}
+          className={`text-sm font-medium ${
+            selected ? "text-white" : "text-zinc-900"
+          }`}
         >
           {title}
         </p>
 
         <p
-          className={`
-            mt-1
-            text-xs
-            leading-5
-            ${selected ? "text-white/50" : "text-zinc-500"}
-          `}
+          className={`mt-1 text-xs leading-5 ${
+            selected ? "text-white/50" : "text-zinc-500"
+          }`}
         >
           {description}
         </p>
@@ -642,55 +1005,370 @@ const PaymentOption = ({
 
 /*
 |--------------------------------------------------------------------------
+| Repeatable Group
+|--------------------------------------------------------------------------
+*/
+
+const RepeatableGroup = ({
+  group,
+  service,
+  entries,
+  onAdd,
+  onRemove,
+  onFieldChange,
+  onPricingOptionChange,
+  onPricingQuantityChange,
+  openOptionalFields,
+  toggleOptionalField,
+  disabled = false,
+}) => {
+  const safeEntries = Array.isArray(entries) ? entries : [];
+  const { minItems, maxItems } = getRepeatableGroupRules(group);
+
+  const pricingGroups = getRepeatableGroupPricingGroups(service, group);
+
+  const fields = getSortedItems(
+    Array.isArray(group.fields) ? group.fields : [],
+  );
+
+  const requiredFields = fields.filter((field) => field.required);
+
+  const optionalFields = fields.filter((field) => !field.required);
+
+  const canRemove = safeEntries.length > minItems;
+  const canAdd = safeEntries.length < maxItems;
+
+  return (
+    <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 p-4 sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-semibold text-zinc-900">
+              {group.label || group.name}
+            </h3>
+
+            <span className="rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+              {safeEntries.length} {safeEntries.length === 1 ? "item" : "items"}
+            </span>
+          </div>
+
+          {group.description && (
+            <p className="mt-1 text-xs leading-5 text-zinc-500">
+              {group.description}
+            </p>
+          )}
+
+          <p className="mt-1 text-[11px] text-zinc-400">
+            Minimum {minItems} · Maximum {maxItems}
+          </p>
+        </div>
+
+        {canAdd && (
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onAdd}
+            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-all hover:-translate-y-0.5 hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Plus size={14} />
+            Add Another {group.label || "Item"}
+          </button>
+        )}
+      </div>
+
+      <div className="mt-5 space-y-4">
+        {safeEntries.map((entry, entryIndex) => {
+          const optionalOpenKey = `${group.name}:${entryIndex}`;
+
+          return (
+            <div
+              key={`${group.name}-${entryIndex}`}
+              className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5"
+            >
+              <div className="flex items-center justify-between gap-3 border-b border-zinc-100 pb-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-400">
+                    {group.label || "Item"} {entryIndex + 1}
+                  </p>
+                </div>
+
+                {canRemove && (
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => onRemove(entryIndex)}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label={`Remove ${
+                      group.label || "item"
+                    } ${entryIndex + 1}`}
+                  >
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
+
+              {pricingGroups.length > 0 && (
+                <div className="mt-5 space-y-6">
+                  {pricingGroups.map((pricingGroup) => {
+                    const title = pricingGroup.name
+                      ? pricingGroup.name.charAt(0).toUpperCase() +
+                        pricingGroup.name.slice(1)
+                      : "Options";
+
+                    const required = isRequiredRepeatablePricingGroup(
+                      group,
+                      pricingGroup.name,
+                    );
+
+                    const selectedOptionId = entry?.[pricingGroup.name];
+
+                    return (
+                      <div key={pricingGroup.key}>
+                        <div className="mb-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-medium text-zinc-900">
+                              {title}
+                            </p>
+
+                            <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+                              {required ? "Required" : "Optional"}
+                            </span>
+                          </div>
+
+                          <p className="mt-1 text-xs text-zinc-400">
+                            Select one
+                          </p>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {pricingGroup.options.map((option) => {
+                            const optionSelected =
+                              String(selectedOptionId) === String(option._id);
+
+                            const rules = getQuantityRules(service, option);
+
+                            const optionQuantity = optionSelected
+                              ? Number(
+                                  entry?.pricingQuantities?.[
+                                    pricingGroup.name
+                                  ] ?? rules.minQuantity,
+                                )
+                              : rules.minQuantity;
+
+                            return (
+                              <div
+                                key={option._id}
+                                className={`
+                                  relative rounded-2xl border p-4
+                                  transition-all duration-200
+                                  ${
+                                    optionSelected
+                                      ? "border-zinc-900 bg-zinc-900 shadow-[0_12px_30px_rgba(0,0,0,0.08)]"
+                                      : "border-zinc-200 bg-white hover:-translate-y-0.5 hover:border-zinc-300 hover:bg-zinc-50"
+                                  }
+                                `}
+                              >
+                                <button
+                                  type="button"
+                                  disabled={disabled}
+                                  onClick={() =>
+                                    onPricingOptionChange(
+                                      entryIndex,
+                                      pricingGroup.name,
+                                      option,
+                                    )
+                                  }
+                                  className="w-full text-left disabled:cursor-not-allowed"
+                                >
+                                  <div className="flex items-start gap-3">
+                                    <span
+                                      className={`
+                                        mt-0.5 flex h-5 w-5 shrink-0
+                                        items-center justify-center
+                                        rounded-full border
+                                        ${
+                                          optionSelected
+                                            ? "border-white bg-white text-zinc-900"
+                                            : "border-zinc-300 bg-white"
+                                        }
+                                      `}
+                                    >
+                                      {optionSelected && (
+                                        <Check size={12} strokeWidth={2.5} />
+                                      )}
+                                    </span>
+
+                                    <span className="min-w-0 flex-1">
+                                      <span
+                                        className={`block text-sm font-semibold ${
+                                          optionSelected
+                                            ? "text-white"
+                                            : "text-zinc-900"
+                                        }`}
+                                      >
+                                        {option.name}
+                                      </span>
+
+                                      {option.description && (
+                                        <span
+                                          className={`mt-1 block text-xs leading-5 ${
+                                            optionSelected
+                                              ? "text-white/50"
+                                              : "text-zinc-500"
+                                          }`}
+                                        >
+                                          {option.description}
+                                        </span>
+                                      )}
+
+                                      <span
+                                        className={`mt-1.5 block text-xs font-medium ${
+                                          optionSelected
+                                            ? "text-white/70"
+                                            : "text-zinc-500"
+                                        }`}
+                                      >
+                                        {formatCurrency(option.price)} /{" "}
+                                        {option.unit || "unit"}
+                                      </span>
+                                    </span>
+                                  </div>
+                                </button>
+
+                                {optionSelected && (
+                                  <div className="mt-4 border-t border-white/10 pt-3">
+                                    <div className="flex items-center justify-between gap-3">
+                                      <div>
+                                        <p className="text-[11px] font-medium text-white/50">
+                                          Quantity
+                                        </p>
+
+                                        <p className="mt-0.5 text-[11px] text-white/35">
+                                          Minimum: {rules.minQuantity}
+                                        </p>
+                                      </div>
+
+                                      <QuantityControl
+                                        quantity={optionQuantity}
+                                        minQuantity={rules.minQuantity}
+                                        maxQuantity={rules.maxQuantity}
+                                        unit={option.unit || "unit"}
+                                        dark
+                                        onChange={(nextQuantity) =>
+                                          onPricingQuantityChange(
+                                            entryIndex,
+                                            pricingGroup.name,
+                                            nextQuantity,
+                                          )
+                                        }
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {requiredFields.length > 0 && (
+                <div className="mt-5 space-y-6">
+                  {requiredFields.map((field) => (
+                    <DynamicField
+                      key={field.name}
+                      field={field}
+                      value={entry?.[field.name]}
+                      onChange={(fieldName, value) =>
+                        onFieldChange(entryIndex, fieldName, value)
+                      }
+                      compact
+                    />
+                  ))}
+                </div>
+              )}
+
+              {optionalFields.length > 0 && (
+                <div
+                  className={`${
+                    requiredFields.length > 0
+                      ? "mt-6 border-t border-zinc-100 pt-5"
+                      : "mt-5"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleOptionalField(optionalOpenKey)}
+                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-left transition hover:border-zinc-300 hover:bg-white"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-zinc-800">
+                        Optional details
+                      </p>
+
+                      <p className="mt-0.5 text-xs text-zinc-400">
+                        Add any additional information for this{" "}
+                        {String(group.label || "item").toLowerCase()}.
+                      </p>
+                    </div>
+
+                    {openOptionalFields[optionalOpenKey] ? (
+                      <ChevronUp size={16} className="shrink-0 text-zinc-400" />
+                    ) : (
+                      <ChevronDown
+                        size={16}
+                        className="shrink-0 text-zinc-400"
+                      />
+                    )}
+                  </button>
+
+                  {openOptionalFields[optionalOpenKey] && (
+                    <div className="mt-5 space-y-6">
+                      {optionalFields.map((field) => (
+                        <DynamicField
+                          key={field.name}
+                          field={field}
+                          value={entry?.[field.name]}
+                          onChange={(fieldName, value) =>
+                            onFieldChange(entryIndex, fieldName, value)
+                          }
+                          compact
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+/*
+|--------------------------------------------------------------------------
 | New Order
 |--------------------------------------------------------------------------
 */
 
 const NewOrder = () => {
   const [services, setServices] = useState([]);
+  const [orderItems, setOrderItems] = useState([]);
 
-  const [selectedService, setSelectedService] = useState(null);
-
-  /*
-   * Normal services with one pricing option.
-   */
-  const [selectedPricingOption, setSelectedPricingOption] = useState(null);
-
-  /*
-   * Grouped pricing.
-   *
-   * Example:
-   *
-   * {
-   *   shoot: cameraOption,
-   *   drone: droneOption,
-   *   host: localOption
-   * }
-   */
-  const [selectedPricingOptions, setSelectedPricingOptions] = useState({});
-
-  /*
-   * Per-group quantities.
-   *
-   * Example:
-   *
-   * {
-   *   shoot: 2,
-   *   drone: 1,
-   *   host: 1
-   * }
-   */
-  const [pricingQuantities, setPricingQuantities] = useState({});
-
-  const [formData, setFormData] = useState({});
-
-  const [additionalRequirements, setAdditionalRequirements] = useState("");
+  const [activeServiceIndex, setActiveServiceIndex] = useState(0);
 
   const [paymentMethod, setPaymentMethod] = useState("cod");
 
+  const [additionalRequirements, setAdditionalRequirements] = useState("");
+
   const [loadingServices, setLoadingServices] = useState(true);
 
-  const [loadingService, setLoadingService] = useState(false);
+  const [loadingServiceId, setLoadingServiceId] = useState("");
 
   const [error, setError] = useState("");
 
@@ -698,19 +1376,9 @@ const NewOrder = () => {
 
   const [orderSuccess, setOrderSuccess] = useState(null);
 
-  /*
-  |--------------------------------------------------------------------------
-  | Is Grouped Pricing
-  |--------------------------------------------------------------------------
-  */
+  const [openOptionalFields, setOpenOptionalFields] = useState({});
 
-  const isGroupedPricing = useMemo(() => {
-    const pricingOptions = getPricingOptions(selectedService);
-
-    return pricingOptions.some(
-      (option) => String(option?.group || "").trim() !== "",
-    );
-  }, [selectedService]);
+  const [openServiceIds, setOpenServiceIds] = useState({});
 
   /*
   |--------------------------------------------------------------------------
@@ -735,36 +1403,12 @@ const NewOrder = () => {
         );
 
         setServices(sortedServices);
+      } catch (loadError) {
+        console.error("Failed to load services:", loadError);
 
-        if (sortedServices.length > 0) {
-          const firstService = sortedServices[0];
-
-          setSelectedService(firstService);
-
-          setSelectedPricingOption(null);
-
-          setSelectedPricingOptions({});
-
-          setPricingQuantities({});
-
-          const rules = getQuantityRules(firstService, null);
-
-          const shouldHaveQuantity =
-            firstService.pricingType === "per_unit" ||
-            firstService.pricingType === "starting_from";
-
-          setFormData(
-            shouldHaveQuantity
-              ? {
-                  quantity: rules.minQuantity,
-                }
-              : {},
-          );
-        }
-      } catch (error) {
-        console.error("Failed to load services:", error);
-
-        setError(error.response?.data?.message || "Unable to load services.");
+        setError(
+          loadError.response?.data?.message || "Unable to load services.",
+        );
       } finally {
         setLoadingServices(false);
       }
@@ -775,13 +1419,77 @@ const NewOrder = () => {
 
   /*
   |--------------------------------------------------------------------------
-  | Select Service
+  | Item Helpers
   |--------------------------------------------------------------------------
   */
 
-  const handleServiceChange = async (serviceId) => {
+  const updateItem = (index, updater) => {
+    setOrderItems((current) =>
+      current.map((item, itemIndex) => {
+        if (itemIndex !== index) {
+          return item;
+        }
+
+        return typeof updater === "function"
+          ? updater(item)
+          : { ...item, ...updater };
+      }),
+    );
+  };
+
+  const getSelectedServiceIds = () => {
+    return new Set(
+      orderItems
+        .map((item) => item?.service?._id)
+        .filter(Boolean)
+        .map(String),
+    );
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Service Selection
+  |--------------------------------------------------------------------------
+  */
+
+  const handleToggleService = async (serviceId) => {
+    if (!serviceId || submitting || loadingServiceId) {
+      return;
+    }
+
+    const existingIndex = orderItems.findIndex(
+      (item) => String(item?.service?._id) === String(serviceId),
+    );
+
+    if (existingIndex >= 0) {
+      setOrderItems((current) =>
+        current.filter((_, index) => index !== existingIndex),
+      );
+
+      setActiveServiceIndex((current) => {
+        if (current > existingIndex) {
+          return current - 1;
+        }
+
+        if (current === existingIndex && current >= orderItems.length - 1) {
+          return Math.max(0, current - 1);
+        }
+
+        return current;
+      });
+
+      setOpenServiceIds((current) => {
+        const next = { ...current };
+        delete next[serviceId];
+        return next;
+      });
+
+      setError("");
+      return;
+    }
+
     try {
-      setLoadingService(true);
+      setLoadingServiceId(serviceId);
       setError("");
 
       const data = await serviceService.getServiceById(serviceId);
@@ -792,165 +1500,163 @@ const NewOrder = () => {
         throw new Error("Selected service could not be loaded.");
       }
 
-      setSelectedService(service);
+      const nextItem = createOrderItem(service);
 
-      setSelectedPricingOption(null);
+      setOrderItems((current) => {
+        const next = [...current, nextItem];
 
-      setSelectedPricingOptions({});
+        setActiveServiceIndex(next.length - 1);
 
-      setPricingQuantities({});
+        return next;
+      });
 
-      const rules = getQuantityRules(service, null);
-
-      const shouldHaveQuantity =
-        service.pricingType === "per_unit" ||
-        service.pricingType === "starting_from";
-
-      setFormData(
-        shouldHaveQuantity
-          ? {
-              quantity: rules.minQuantity,
-            }
-          : {},
-      );
-
-      setAdditionalRequirements("");
-    } catch (error) {
-      console.error("Failed to load service:", error);
+      setOpenServiceIds((current) => ({
+        ...current,
+        [serviceId]: true,
+      }));
+    } catch (loadError) {
+      console.error("Failed to load service:", loadError);
 
       setError(
-        error.response?.data?.message ||
-          error.message ||
+        loadError.response?.data?.message ||
+          loadError.message ||
           "Unable to load selected service.",
       );
     } finally {
-      setLoadingService(false);
+      setLoadingServiceId("");
     }
   };
 
-  /*
-  |--------------------------------------------------------------------------
-  | Select Normal Pricing Option
-  |--------------------------------------------------------------------------
-  */
+  const handleServiceNameClick = (serviceId) => {
+    const existingIndex = orderItems.findIndex(
+      (item) => String(item?.service?._id) === String(serviceId),
+    );
 
-  const handlePricingOptionChange = (option) => {
-    setSelectedPricingOption(option);
-
-    const rules = getQuantityRules(selectedService, option);
-
-    setFormData((current) => ({
-      ...current,
-      quantity: rules.minQuantity,
-    }));
-
-    setError("");
-  };
-
-  /*
-  |--------------------------------------------------------------------------
-  | Select Grouped Pricing Option
-  |--------------------------------------------------------------------------
-  */
-
-  const handleGroupedPricingOptionChange = (group, option) => {
-    const currentSelected = selectedPricingOptions[group] || null;
-
-    const isDeselecting = currentSelected?._id === option?._id;
-
-    const nextSelected = isDeselecting ? null : option;
-
-    /*
-     * Update selected option.
-     */
-    setSelectedPricingOptions((current) => ({
-      ...current,
-      [group]: nextSelected,
-    }));
-
-    /*
-     * Update pricing quantity.
-     *
-     * If selected:
-     *   initialize to minimum.
-     *
-     * If deselected:
-     *   completely remove the quantity.
-     */
-    setPricingQuantities((current) => {
-      const next = {
-        ...current,
-      };
-
-      if (nextSelected) {
-        const rules = getQuantityRules(selectedService, nextSelected);
-
-        next[group] = rules.minQuantity;
-      } else {
-        delete next[group];
-      }
-
-      return next;
-    });
-
-    /*
-     * Store the selected pricing option ID
-     * in formData.
-     *
-     * This is much safer than converting names
-     * like "Founder Faced" into "founder_faced".
-     *
-     * Backend supports matching by option _id.
-     */
-    setFormData((current) => {
-      const next = {
-        ...current,
-      };
-
-      if (nextSelected) {
-        next[group] = String(nextSelected._id);
-      } else {
-        delete next[group];
-      }
-
-      return next;
-    });
-
-    setError("");
-  };
-
-  /*
-  |--------------------------------------------------------------------------
-  | Grouped Quantity
-  |--------------------------------------------------------------------------
-  */
-
-  const handleGroupedQuantityChange = (group, nextQuantity) => {
-    const option = selectedPricingOptions[group];
-
-    if (!option) {
+    if (existingIndex < 0) {
       return;
     }
 
-    const rules = getQuantityRules(selectedService, option);
-
-    let normalized = Number(nextQuantity);
-
-    if (!Number.isFinite(normalized)) {
-      normalized = rules.minQuantity;
-    }
-
-    normalized = Math.floor(normalized);
-
-    normalized = Math.max(rules.minQuantity, normalized);
-
-    if (rules.maxQuantity !== undefined) {
-      normalized = Math.min(rules.maxQuantity, normalized);
-    }
-
-    setPricingQuantities((current) => ({
+    setOpenServiceIds((current) => ({
       ...current,
-      [group]: normalized,
+      [serviceId]: !current[serviceId],
+    }));
+
+    setActiveServiceIndex(existingIndex);
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Pricing
+  |--------------------------------------------------------------------------
+  */
+
+  const handlePricingOptionChange = (itemIndex, option) => {
+    updateItem(itemIndex, (current) => {
+      const rules = getQuantityRules(current.service, option);
+
+      return {
+        ...current,
+        selectedPricingOption: option,
+        formData: {
+          ...(current.formData || {}),
+          quantity: rules.minQuantity,
+        },
+      };
+    });
+
+    setError("");
+  };
+
+  const handleGroupedPricingOptionChange = (itemIndex, group, option) => {
+    updateItem(itemIndex, (current) => {
+      const currentSelected = current.selectedPricingOptions?.[group] || null;
+
+      const isDeselecting = currentSelected?._id === option?._id;
+
+      const nextSelected = isDeselecting ? null : option;
+
+      const nextSelectedOptions = {
+        ...(current.selectedPricingOptions || {}),
+        [group]: nextSelected,
+      };
+
+      const nextQuantities = {
+        ...(current.pricingQuantities || {}),
+      };
+
+      const nextFormData = {
+        ...(current.formData || {}),
+      };
+
+      if (nextSelected) {
+        const rules = getQuantityRules(current.service, nextSelected);
+
+        nextQuantities[group] = rules.minQuantity;
+        nextFormData[group] = String(nextSelected._id);
+      } else {
+        delete nextQuantities[group];
+        delete nextFormData[group];
+      }
+
+      return {
+        ...current,
+        selectedPricingOptions: nextSelectedOptions,
+        pricingQuantities: nextQuantities,
+        formData: nextFormData,
+      };
+    });
+
+    setError("");
+  };
+
+  const handleGroupedQuantityChange = (itemIndex, group, nextQuantity) => {
+    updateItem(itemIndex, (current) => {
+      const option = current.selectedPricingOptions?.[group];
+
+      if (!option) {
+        return current;
+      }
+
+      const rules = getQuantityRules(current.service, option);
+
+      let normalized = Number(nextQuantity);
+
+      if (!Number.isFinite(normalized)) {
+        normalized = rules.minQuantity;
+      }
+
+      normalized = Math.floor(normalized);
+      normalized = Math.max(rules.minQuantity, normalized);
+
+      if (rules.maxQuantity !== undefined) {
+        normalized = Math.min(rules.maxQuantity, normalized);
+      }
+
+      return {
+        ...current,
+        pricingQuantities: {
+          ...(current.pricingQuantities || {}),
+          [group]: normalized,
+        },
+      };
+    });
+
+    setError("");
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Normal Field Changes
+  |--------------------------------------------------------------------------
+  */
+
+  const handleFieldChange = (itemIndex, fieldName, value) => {
+    updateItem(itemIndex, (current) => ({
+      ...current,
+      formData: {
+        ...(current.formData || {}),
+        [fieldName]: value,
+      },
     }));
 
     setError("");
@@ -958,535 +1664,390 @@ const NewOrder = () => {
 
   /*
   |--------------------------------------------------------------------------
-  | Field Change
+  | Repeatable Groups
   |--------------------------------------------------------------------------
   */
 
-  const handleFieldChange = (fieldName, value) => {
-    setFormData((current) => ({
-      ...current,
-      [fieldName]: value,
-    }));
-
-    setError("");
-  };
-
-  /*
-  |--------------------------------------------------------------------------
-  | Quantity Pricing Option
-  |--------------------------------------------------------------------------
-  */
-
-  const quantityPricingOption = useMemo(() => {
-    return isGroupedPricing ? null : selectedPricingOption;
-  }, [isGroupedPricing, selectedPricingOption]);
-
-  /*
-  |--------------------------------------------------------------------------
-  | Quantity Rules
-  |--------------------------------------------------------------------------
-  */
-
-  const quantityRules = useMemo(() => {
-    return getQuantityRules(selectedService, quantityPricingOption);
-  }, [selectedService, quantityPricingOption]);
-
-  /*
-  |--------------------------------------------------------------------------
-  | Has Quantity
-  |--------------------------------------------------------------------------
-  */
-
-  const hasQuantity = useMemo(() => {
-    return Boolean(
-      !isGroupedPricing &&
-      (quantityPricingOption ||
-        selectedService?.pricingType === "per_unit" ||
-        selectedService?.pricingType === "starting_from"),
-    );
-  }, [isGroupedPricing, quantityPricingOption, selectedService]);
-
-  /*
-  |--------------------------------------------------------------------------
-  | Normal Service Quantity
-  |--------------------------------------------------------------------------
-  */
-
-  const quantity = useMemo(() => {
-    const rawQuantity = Number(formData.quantity || quantityRules.minQuantity);
-
-    if (!Number.isFinite(rawQuantity)) {
-      return quantityRules.minQuantity;
-    }
-
-    let normalized = Math.floor(rawQuantity);
-
-    normalized = Math.max(quantityRules.minQuantity, normalized);
-
-    if (quantityRules.maxQuantity !== undefined) {
-      normalized = Math.min(quantityRules.maxQuantity, normalized);
-    }
-
-    return normalized;
-  }, [formData.quantity, quantityRules.minQuantity, quantityRules.maxQuantity]);
-
-  /*
-  |--------------------------------------------------------------------------
-  | Selected Grouped Pricing Options
-  |--------------------------------------------------------------------------
-  */
-
-  const selectedGroupedPricingOptions = useMemo(() => {
-    if (!isGroupedPricing) {
-      return [];
-    }
-
-    return Object.values(selectedPricingOptions).filter(Boolean);
-  }, [isGroupedPricing, selectedPricingOptions]);
-
-  /*
-  |--------------------------------------------------------------------------
-  | Active Fields
-  |--------------------------------------------------------------------------
-  |
-  | Field ownership:
-  |
-  | 1. Always include service-level fields.
-  |
-  | 2. Also include fields from the currently selected
-  |    pricing option(s).
-  |
-  | Normal pricing:
-  |    Service fields
-  |    +
-  |    Selected pricing option fields
-  |
-  | Grouped pricing:
-  |    Service fields
-  |    +
-  |    Fields from every selected pricing option
-  |
-  | Example:
-  |
-  |    Shoot   -> Cinematic
-  |    Drone   -> Yes
-  |    Host    -> Professional
-  |
-  | The active fields become:
-  |
-  |    Service fields
-  |    Cinematic-specific fields
-  |    Drone-specific fields
-  |    Professional-specific fields
-  |
-  | The field configuration itself is the source of truth.
-  | No group names such as "shoot", "drone" or "host" are
-  | used to determine which fields are displayed.
-  |
-  | If the same field name exists in multiple selected
-  | locations, the selected pricing-option field takes
-  | precedence over the service-level field.
-  */
-
-  const activeFields = useMemo(() => {
-    if (!selectedService) {
-      return [];
-    }
-
-    const serviceFields = Array.isArray(selectedService.fields)
-      ? selectedService.fields
-      : [];
-
-    const selectedOptions = isGroupedPricing
-      ? selectedGroupedPricingOptions
-      : selectedPricingOption
-        ? [selectedPricingOption]
+  const handleRepeatableAdd = (itemIndex, group) => {
+    updateItem(itemIndex, (current) => {
+      const currentEntries = Array.isArray(current.formData?.[group.name])
+        ? current.formData[group.name]
         : [];
 
-    const fieldMap = new Map();
+      const { maxItems } = getRepeatableGroupRules(group);
 
-    /*
-     * Always include service-level fields first.
-     */
-    for (const field of serviceFields) {
-      if (!field?.name) {
-        continue;
+      if (currentEntries.length >= maxItems) {
+        return current;
       }
 
-      const fieldName = String(field.name).trim();
+      return {
+        ...current,
+        formData: {
+          ...(current.formData || {}),
+          [group.name]: [...currentEntries, createEmptyRepeatableItem(group)],
+        },
+      };
+    });
 
-      if (!fieldName) {
-        continue;
+    setError("");
+  };
+
+  const handleRepeatableRemove = (itemIndex, group, entryIndex) => {
+    updateItem(itemIndex, (current) => {
+      const currentEntries = Array.isArray(current.formData?.[group.name])
+        ? current.formData[group.name]
+        : [];
+
+      const { minItems } = getRepeatableGroupRules(group);
+
+      if (currentEntries.length <= minItems) {
+        return current;
       }
 
-      fieldMap.set(fieldName, field);
-    }
+      return {
+        ...current,
+        formData: {
+          ...(current.formData || {}),
+          [group.name]: currentEntries.filter(
+            (_, index) => index !== entryIndex,
+          ),
+        },
+      };
+    });
 
-    /*
-     * Add fields from selected pricing option(s).
-     *
-     * For normal pricing there can be one selected option.
-     *
-     * For grouped pricing there can be multiple selected
-     * options, such as Shoot + Drone + Host.
-     *
-     * Unselected pricing options are never included here.
-     */
-    for (const pricingOption of selectedOptions) {
-      if (!pricingOption || !Array.isArray(pricingOption.fields)) {
-        continue;
+    setError("");
+  };
+
+  const handleRepeatableFieldChange = (
+    itemIndex,
+    group,
+    entryIndex,
+    fieldName,
+    value,
+  ) => {
+    updateItem(itemIndex, (current) => {
+      const currentEntries = Array.isArray(current.formData?.[group.name])
+        ? current.formData[group.name]
+        : [];
+
+      const nextEntries = currentEntries.map((entry, index) =>
+        index === entryIndex
+          ? {
+              ...(entry || {}),
+              [fieldName]: value,
+            }
+          : entry,
+      );
+
+      return {
+        ...current,
+        formData: {
+          ...(current.formData || {}),
+          [group.name]: nextEntries,
+        },
+      };
+    });
+
+    setError("");
+  };
+
+  const handleRepeatableEntryPricingOptionChange = (
+    itemIndex,
+    group,
+    entryIndex,
+    pricingGroupName,
+    option,
+  ) => {
+    updateItem(itemIndex, (current) => {
+      const currentEntries = Array.isArray(current.formData?.[group.name])
+        ? current.formData[group.name]
+        : [];
+
+      const existingEntry =
+        currentEntries[entryIndex] || createEmptyRepeatableItem(group);
+
+      const currentSelectedId = existingEntry[pricingGroupName];
+
+      const isDeselecting = String(currentSelectedId) === String(option?._id);
+
+      const nextEntry = {
+        ...existingEntry,
+        pricingQuantities: {
+          ...(existingEntry.pricingQuantities || {}),
+        },
+      };
+
+      if (isDeselecting) {
+        delete nextEntry[pricingGroupName];
+        delete nextEntry.pricingQuantities[pricingGroupName];
+      } else {
+        nextEntry[pricingGroupName] = String(option._id);
+
+        const rules = getQuantityRules(current.service, option);
+
+        nextEntry.pricingQuantities[pricingGroupName] = rules.minQuantity;
       }
 
-      for (const field of pricingOption.fields) {
-        if (!field?.name) {
-          continue;
-        }
+      const nextEntries = currentEntries.map((entry, index) =>
+        index === entryIndex ? nextEntry : entry,
+      );
 
-        const fieldName = String(field.name).trim();
+      return {
+        ...current,
+        formData: {
+          ...(current.formData || {}),
+          [group.name]: nextEntries,
+        },
+      };
+    });
 
-        if (!fieldName) {
-          continue;
-        }
+    setError("");
+  };
 
-        /*
-         * Pricing-option-specific fields take precedence over
-         * service-level fields with the same name.
-         */
-        fieldMap.set(fieldName, field);
+  const handleRepeatableEntryPricingQuantityChange = (
+    itemIndex,
+    group,
+    entryIndex,
+    pricingGroupName,
+    nextQuantity,
+  ) => {
+    updateItem(itemIndex, (current) => {
+      const currentEntries = Array.isArray(current.formData?.[group.name])
+        ? current.formData[group.name]
+        : [];
+
+      const existingEntry = currentEntries[entryIndex];
+
+      if (!existingEntry) {
+        return current;
       }
-    }
 
-    return getSortedItems(Array.from(fieldMap.values()));
-  }, [
-    selectedService,
-    selectedPricingOption,
-    selectedGroupedPricingOptions,
-    isGroupedPricing,
-  ]);
+      const selectedOptionId = existingEntry[pricingGroupName];
+
+      if (!selectedOptionId) {
+        return current;
+      }
+
+      const pricingGroups = getRepeatableGroupPricingGroups(
+        current.service,
+        group,
+      );
+
+      const pricingGroup = pricingGroups.find(
+        (candidate) => candidate.name === pricingGroupName,
+      );
+
+      const option = pricingGroup?.options.find(
+        (candidate) => String(candidate._id) === String(selectedOptionId),
+      );
+
+      if (!option) {
+        return current;
+      }
+
+      const rules = getQuantityRules(current.service, option);
+
+      let normalized = Number(nextQuantity);
+
+      if (!Number.isFinite(normalized)) {
+        normalized = rules.minQuantity;
+      }
+
+      normalized = Math.floor(normalized);
+      normalized = Math.max(rules.minQuantity, normalized);
+
+      if (rules.maxQuantity !== undefined) {
+        normalized = Math.min(rules.maxQuantity, normalized);
+      }
+
+      const nextEntry = {
+        ...existingEntry,
+        pricingQuantities: {
+          ...(existingEntry.pricingQuantities || {}),
+          [pricingGroupName]: normalized,
+        },
+      };
+
+      const nextEntries = currentEntries.map((entry, index) =>
+        index === entryIndex ? nextEntry : entry,
+      );
+
+      return {
+        ...current,
+        formData: {
+          ...(current.formData || {}),
+          [group.name]: nextEntries,
+        },
+      };
+    });
+
+    setError("");
+  };
+
+  const toggleOptionalField = (key) => {
+    setOpenOptionalFields((current) => ({
+      ...current,
+      [key]: !current[key],
+    }));
+  };
 
   /*
   |--------------------------------------------------------------------------
-  | Clean Inactive Dynamic Fields
+  | Quantity
   |--------------------------------------------------------------------------
-  |
-  | When a pricing option is deselected, its dynamic fields
-  | should no longer remain in formData.
-  |
-  | Existing values for still-active fields are preserved.
+  */
+
+  const getQuantityInfo = (item) => {
+    if (!item || item.isGroupedPricing) {
+      return {
+        hasQuantity: false,
+        quantity: 1,
+        rules: getQuantityRules(item?.service, null),
+        unit: item?.service?.unit,
+      };
+    }
+
+    const selectedPricingOption = item.selectedPricingOption || null;
+
+    const rules = getQuantityRules(item.service, selectedPricingOption);
+
+    const hasQuantity = Boolean(
+      selectedPricingOption ||
+      item.service?.pricingType === "per_unit" ||
+      item.service?.pricingType === "starting_from",
+    );
+
+    return {
+      hasQuantity,
+      quantity: getItemQuantity(item),
+      rules,
+      unit: selectedPricingOption?.unit || item.service?.unit,
+    };
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Active Fields / Cleanup
+  |--------------------------------------------------------------------------
   */
 
   useEffect(() => {
-    if (!selectedService) {
+    if (!orderItems.length) {
       return;
     }
 
-    const activeFieldNames = new Set(
-      activeFields
-        .map((field) => String(field?.name || "").trim())
-        .filter(Boolean),
-    );
-
-    const configuredDynamicFieldNames = new Set();
-
-    const collectFieldNames = (fields) => {
-      if (!Array.isArray(fields)) {
-        return;
-      }
-
-      for (const field of fields) {
-        const fieldName = String(field?.name || "").trim();
-
-        if (fieldName) {
-          configuredDynamicFieldNames.add(fieldName);
-        }
-      }
-    };
-
-    collectFieldNames(selectedService.fields);
-
-    for (const pricingOption of getPricingOptions(selectedService)) {
-      collectFieldNames(pricingOption?.fields);
-    }
-
-    setFormData((current) => {
+    setOrderItems((current) => {
       let changed = false;
 
-      const next = {
-        ...current,
-      };
+      const nextItems = current.map((item) => {
+        const configuredDynamicFieldNames = new Set();
 
-      /*
-       * Only remove keys that are actually configured
-       * as dynamic fields.
-       *
-       * This prevents deleting unrelated order data such
-       * as quantity or pricingQuantities.
-       */
-      for (const fieldName of configuredDynamicFieldNames) {
-        if (!activeFieldNames.has(fieldName) && fieldName in next) {
-          delete next[fieldName];
-          changed = true;
-        }
-      }
+        const collectFieldNames = (fields) => {
+          if (!Array.isArray(fields)) {
+            return;
+          }
 
-      return changed ? next : current;
-    });
-  }, [selectedService, activeFields]);
+          fields.forEach((field) => {
+            const fieldName = String(field?.name || "").trim();
 
-  /*
-  |--------------------------------------------------------------------------
-  | Grouped Pricing Total
-  |--------------------------------------------------------------------------
-  */
+            if (fieldName) {
+              configuredDynamicFieldNames.add(fieldName);
+            }
+          });
+        };
 
-  const selectedPricingOptionsPrice = useMemo(() => {
-    if (!isGroupedPricing) {
-      return Number(selectedPricingOption?.price || 0);
-    }
+        collectFieldNames(item.service?.fields);
 
-    return selectedGroupedPricingOptions.reduce((total, option) => {
-      const group = String(option?.group || "").trim();
+        getPricingOptions(item.service).forEach((pricingOption) => {
+          collectFieldNames(pricingOption?.fields);
+        });
 
-      const rules = getQuantityRules(selectedService, option);
-
-      const rawQuantity = pricingQuantities[group];
-
-      const optionQuantity =
-        rawQuantity !== undefined && rawQuantity !== null
-          ? Number(rawQuantity)
-          : rules.minQuantity;
-
-      const safeQuantity = Number.isFinite(optionQuantity)
-        ? Math.max(rules.minQuantity, Math.floor(optionQuantity))
-        : rules.minQuantity;
-
-      return total + Number(option?.price || 0) * safeQuantity;
-    }, 0);
-  }, [
-    isGroupedPricing,
-    selectedPricingOption,
-    selectedGroupedPricingOptions,
-    pricingQuantities,
-    selectedService,
-  ]);
-
-  /*
-  |--------------------------------------------------------------------------
-  | Dynamic Field Add-on Total
-  |--------------------------------------------------------------------------
-  */
-
-  const selectedFieldsPrice = useMemo(() => {
-    if (!activeFields.length) {
-      return 0;
-    }
-
-    let total = 0;
-
-    for (const field of activeFields) {
-      const fieldValue = formData[field.name];
-
-      if (isEmptyValue(fieldValue)) {
-        continue;
-      }
-
-      const selectedValues = Array.isArray(fieldValue)
-        ? fieldValue
-        : [fieldValue];
-
-      for (const selectedValue of selectedValues) {
-        const selectedOption = (field.options || []).find(
-          (option) => String(option.value) === String(selectedValue),
+        const activeFields = new Set(
+          getActiveFieldsForItem(item)
+            .map((field) => String(field?.name || "").trim())
+            .filter(Boolean),
         );
 
-        if (selectedOption) {
-          total += Number(selectedOption.price || 0);
-        }
-      }
-    }
+        const nextFormData = {
+          ...(item.formData || {}),
+        };
 
-    return total;
-  }, [activeFields, formData]);
+        configuredDynamicFieldNames.forEach((fieldName) => {
+          if (!activeFields.has(fieldName) && fieldName in nextFormData) {
+            delete nextFormData[fieldName];
+            changed = true;
+          }
+        });
+
+        if (!changed) {
+          return item;
+        }
+
+        return {
+          ...item,
+          formData: nextFormData,
+        };
+      });
+
+      return changed ? nextItems : current;
+    });
+  }, [orderItems]);
 
   /*
   |--------------------------------------------------------------------------
-  | Estimated Price
+  | Totals
   |--------------------------------------------------------------------------
   */
 
-  const estimatedPrice = useMemo(() => {
-    if (!selectedService) {
+  const itemEstimates = useMemo(
+    () => orderItems.map((item) => getItemEstimate(item)),
+    [orderItems],
+  );
+
+  const subtotal = useMemo(
+    () =>
+      itemEstimates.reduce((total, amount) => total + Number(amount || 0), 0),
+    [itemEstimates],
+  );
+
+  const hasCustomUnpricedService = useMemo(
+    () => orderItems.some((item) => isCustomUnpricedItem(item)),
+    [orderItems],
+  );
+
+  const gstAmount = useMemo(() => {
+    if (paymentMethod !== "online") {
       return 0;
     }
 
-    /*
-     * Grouped pricing.
-     */
-    if (isGroupedPricing) {
-      /*
-       * If at least one pricing option is selected,
-       * the selected options are the actual price.
-       *
-       * This also correctly supports a selected option
-       * whose price is 0.
-       */
-      if (selectedGroupedPricingOptions.length > 0) {
-        return selectedPricingOptionsPrice + selectedFieldsPrice;
-      }
+    return Number(((subtotal * ONLINE_GST_RATE) / 100).toFixed(2));
+  }, [paymentMethod, subtotal]);
 
-      /*
-       * No grouped option selected.
-       */
-      switch (selectedService.pricingType) {
-        case "fixed":
-          return Number(selectedService.basePrice || 0) + selectedFieldsPrice;
-
-        case "per_unit":
-        case "starting_from":
-          return (
-            Number(selectedService.basePrice || 0) * quantity +
-            selectedFieldsPrice
-          );
-
-        default:
-          return selectedFieldsPrice;
-      }
-    }
-
-    /*
-     * Normal service pricing.
-     */
-    let basePrice = 0;
-
-    if (selectedPricingOption) {
-      basePrice = Number(selectedPricingOption.price || 0) * quantity;
-    } else {
-      switch (selectedService.pricingType) {
-        case "fixed":
-          basePrice = Number(selectedService.basePrice || 0);
-          break;
-
-        case "per_unit":
-          basePrice = Number(selectedService.basePrice || 0) * quantity;
-          break;
-
-        case "starting_from":
-          basePrice = Number(selectedService.basePrice || 0) * quantity;
-          break;
-
-        case "custom":
-          basePrice = 0;
-          break;
-
-        default:
-          basePrice = Number(selectedService.basePrice || 0);
-      }
-    }
-
-    return basePrice + selectedFieldsPrice;
-  }, [
-    selectedService,
-    selectedPricingOption,
-    selectedGroupedPricingOptions,
-    selectedPricingOptionsPrice,
-    selectedFieldsPrice,
-    quantity,
-    isGroupedPricing,
-  ]);
+  const estimatedTotal = subtotal + gstAmount;
 
   /*
   |--------------------------------------------------------------------------
-  | Pricing Label
+  | Validation
   |--------------------------------------------------------------------------
   */
 
-  const pricingLabel = useMemo(() => {
-    if (isGroupedPricing) {
-      return "";
-    }
-
-    const unit = selectedPricingOption?.unit || selectedService?.unit;
-
-    if (!unit) {
-      return "";
-    }
-
-    return `per ${unit}`;
-  }, [isGroupedPricing, selectedPricingOption, selectedService]);
-
-  /*
-  |--------------------------------------------------------------------------
-  | Pricing Display
-  |--------------------------------------------------------------------------
-  */
-
-  const pricingDisplay = useMemo(() => {
-    if (!selectedService) {
-      return "Custom";
-    }
-
-    /*
-     * Grouped service with selected option,
-     * including a zero-price option.
-     */
-    if (isGroupedPricing && selectedGroupedPricingOptions.length > 0) {
-      return formatCurrency(estimatedPrice);
-    }
-
-    if (
-      selectedService.pricingType === "custom" &&
-      !selectedPricingOption &&
-      selectedGroupedPricingOptions.length === 0
-    ) {
-      return "Custom";
-    }
-
-    if (estimatedPrice <= 0) {
-      return "Custom";
-    }
-
-    return formatCurrency(estimatedPrice);
-  }, [
-    selectedService,
-    selectedPricingOption,
-    selectedGroupedPricingOptions,
-    estimatedPrice,
-    isGroupedPricing,
-  ]);
-
-  /*
-  |--------------------------------------------------------------------------
-  | Validate Dynamic Fields
-  |--------------------------------------------------------------------------
-  */
-
-  const validateFields = () => {
+  const validateFields = (item) => {
     const validationErrors = {};
+    const fields = getActiveFieldsForItem(item);
 
-    for (const field of activeFields) {
-      const value = formData[field.name];
-
+    for (const field of fields) {
+      const value = item.formData?.[field.name];
       const type = normalizeFieldType(field);
 
-      /*
-       * Required validation.
-       */
       if (field.required && isEmptyValue(value)) {
         validationErrors[field.name] = `${field.label} is required.`;
-
         continue;
       }
 
-      /*
-       * Optional empty field.
-       */
       if (isEmptyValue(value)) {
         continue;
       }
 
-      /*
-       * Checkbox.
-       */
       if (type === "checkbox") {
         const selectedValues = Array.isArray(value) ? value : [value];
 
@@ -1506,9 +2067,6 @@ const NewOrder = () => {
         continue;
       }
 
-      /*
-       * Radio / select.
-       */
       if (type === "radio" || type === "select") {
         const allowedValues = (field.options || []).map((option) =>
           String(option.value),
@@ -1522,25 +2080,29 @@ const NewOrder = () => {
         continue;
       }
 
-      /*
-       * Number.
-       */
       if (type === "number") {
         const numberValue = Number(value);
 
         if (!Number.isFinite(numberValue)) {
           validationErrors[field.name] =
             `${field.label} must be a valid number.`;
-
           continue;
         }
 
-        if (field.min !== undefined && numberValue < Number(field.min)) {
+        if (
+          field.min !== undefined &&
+          field.min !== null &&
+          numberValue < Number(field.min)
+        ) {
           validationErrors[field.name] =
             `${field.label} must be at least ${field.min}.`;
         }
 
-        if (field.max !== undefined && numberValue > Number(field.max)) {
+        if (
+          field.max !== undefined &&
+          field.max !== null &&
+          numberValue > Number(field.max)
+        ) {
           validationErrors[field.name] =
             `${field.label} must be at most ${field.max}.`;
         }
@@ -1557,9 +2119,6 @@ const NewOrder = () => {
         continue;
       }
 
-      /*
-       * URL.
-       */
       if (type === "url") {
         try {
           const url = new URL(String(value));
@@ -1575,9 +2134,6 @@ const NewOrder = () => {
         continue;
       }
 
-      /*
-       * Date.
-       */
       if (type === "date") {
         const date = new Date(value);
 
@@ -1590,31 +2146,229 @@ const NewOrder = () => {
     return validationErrors;
   };
 
-  /*
-  |--------------------------------------------------------------------------
-  | Validate Grouped Pricing
-  |--------------------------------------------------------------------------
-  */
+  const validateRepeatableGroups = (item) => {
+    const groups = getRepeatableGroups(item?.service);
 
-  const validateGroupedPricing = () => {
-    if (!isGroupedPricing) {
+    for (const group of groups) {
+      const entries = Array.isArray(item.formData?.[group.name])
+        ? item.formData[group.name]
+        : [];
+
+      const { minItems, maxItems } = getRepeatableGroupRules(group);
+
+      if (entries.length < minItems) {
+        return `${group.label || group.name} requires at least ${minItems} ${
+          minItems === 1 ? "item" : "items"
+        }.`;
+      }
+
+      if (entries.length > maxItems) {
+        return `${group.label || group.name} allows a maximum of ${maxItems} ${
+          maxItems === 1 ? "item" : "items"
+        }.`;
+      }
+
+      const repeatablePricingGroups = getRepeatableGroupPricingGroups(
+        item.service,
+        group,
+      );
+
+      for (let entryIndex = 0; entryIndex < entries.length; entryIndex += 1) {
+        const entry = entries[entryIndex] || {};
+
+        for (const pricingGroup of repeatablePricingGroups) {
+          const selectedOptionId = entry[pricingGroup.name];
+
+          const required = isRequiredRepeatablePricingGroup(
+            group,
+            pricingGroup.name,
+          );
+
+          const pricingGroupLabel = pricingGroup.name
+            ? pricingGroup.name.charAt(0).toUpperCase() +
+              pricingGroup.name.slice(1)
+            : "Option";
+
+          if (required && !selectedOptionId) {
+            return `${group.label || group.name} ${
+              entryIndex + 1
+            }: ${pricingGroupLabel} is required.`;
+          }
+
+          if (!selectedOptionId) {
+            continue;
+          }
+
+          const option = pricingGroup.options.find(
+            (candidate) => String(candidate._id) === String(selectedOptionId),
+          );
+
+          if (!option) {
+            return `${group.label || group.name} ${
+              entryIndex + 1
+            }: ${pricingGroupLabel} has an invalid selection.`;
+          }
+
+          const rules = getQuantityRules(item.service, option);
+
+          const rawQuantity = entry?.pricingQuantities?.[pricingGroup.name];
+
+          const quantity = Number(rawQuantity ?? rules.minQuantity);
+
+          if (!Number.isInteger(quantity)) {
+            return `${group.label || group.name} ${
+              entryIndex + 1
+            }: ${pricingGroupLabel} quantity must be a whole number.`;
+          }
+
+          if (quantity < rules.minQuantity) {
+            return `${group.label || group.name} ${
+              entryIndex + 1
+            }: ${pricingGroupLabel} requires a minimum quantity of ${
+              rules.minQuantity
+            }.`;
+          }
+
+          if (rules.maxQuantity !== undefined && quantity > rules.maxQuantity) {
+            return `${group.label || group.name} ${
+              entryIndex + 1
+            }: ${pricingGroupLabel} allows a maximum quantity of ${
+              rules.maxQuantity
+            }.`;
+          }
+        }
+
+        for (const field of group.fields || []) {
+          const value = entry[field.name];
+          const type = normalizeFieldType(field);
+
+          if (field.required && isEmptyValue(value)) {
+            return `${group.label || group.name} ${entryIndex + 1}: ${
+              field.label
+            } is required.`;
+          }
+
+          if (isEmptyValue(value)) {
+            continue;
+          }
+
+          if (type === "checkbox") {
+            const selectedValues = Array.isArray(value) ? value : [value];
+
+            const allowedValues = (field.options || []).map((option) =>
+              String(option.value),
+            );
+
+            const invalidValue = selectedValues.some(
+              (selectedValue) => !allowedValues.includes(String(selectedValue)),
+            );
+
+            if (invalidValue) {
+              return `${group.label || group.name} ${
+                entryIndex + 1
+              }: ${field.label} has an invalid selection.`;
+            }
+
+            continue;
+          }
+
+          if (type === "radio" || type === "select") {
+            const allowedValues = (field.options || []).map((option) =>
+              String(option.value),
+            );
+
+            if (!allowedValues.includes(String(value))) {
+              return `${group.label || group.name} ${
+                entryIndex + 1
+              }: ${field.label} has an invalid selection.`;
+            }
+
+            continue;
+          }
+
+          if (type === "number") {
+            const numberValue = Number(value);
+
+            if (!Number.isFinite(numberValue)) {
+              return `${group.label || group.name} ${
+                entryIndex + 1
+              }: ${field.label} must be a valid number.`;
+            }
+
+            if (
+              field.min !== undefined &&
+              field.min !== null &&
+              numberValue < Number(field.min)
+            ) {
+              return `${group.label || group.name} ${
+                entryIndex + 1
+              }: ${field.label} must be at least ${field.min}.`;
+            }
+
+            if (
+              field.max !== undefined &&
+              field.max !== null &&
+              numberValue > Number(field.max)
+            ) {
+              return `${group.label || group.name} ${
+                entryIndex + 1
+              }: ${field.label} must be at most ${field.max}.`;
+            }
+
+            continue;
+          }
+
+          if (type === "url") {
+            try {
+              const url = new URL(String(value));
+
+              if (!["http:", "https:"].includes(url.protocol)) {
+                return `${group.label || group.name} ${
+                  entryIndex + 1
+                }: ${field.label} must be a valid URL.`;
+              }
+            } catch {
+              return `${group.label || group.name} ${
+                entryIndex + 1
+              }: ${field.label} must be a valid URL.`;
+            }
+
+            continue;
+          }
+
+          if (type === "date") {
+            const date = new Date(value);
+
+            if (Number.isNaN(date.getTime())) {
+              return `${group.label || group.name} ${
+                entryIndex + 1
+              }: ${field.label} must be a valid date.`;
+            }
+          }
+        }
+      }
+    }
+
+    return "";
+  };
+
+  const validateGroupedPricing = (item) => {
+    if (!item.isGroupedPricing) {
       return "";
     }
 
-    const groups = getPricingGroups(selectedService);
+    const groups = getPricingGroups(item.service);
 
     for (const group of groups) {
-      const selectedOption = selectedPricingOptions[group.key];
+      const selectedOption = item.selectedPricingOptions?.[group.key];
 
-      // Groups are optional because the current Service schema
-      // does not have a group-level "required" property.
       if (!selectedOption) {
         continue;
       }
 
-      const rules = getQuantityRules(selectedService, selectedOption);
+      const rules = getQuantityRules(item.service, selectedOption);
 
-      const rawQuantity = pricingQuantities[group.key];
+      const rawQuantity = item.pricingQuantities?.[group.key];
 
       const selectedQuantity = Number(rawQuantity ?? rules.minQuantity);
 
@@ -1636,9 +2390,194 @@ const NewOrder = () => {
 
     return "";
   };
+
+  const validateOrderItem = (item) => {
+    const itemPricingOptions = getPricingOptions(item.service);
+
+    if (item.isGroupedPricing) {
+      const groupedError = validateGroupedPricing(item);
+
+      if (groupedError) {
+        return groupedError;
+      }
+    } else if (itemPricingOptions.length > 0 && !item.selectedPricingOption) {
+      return "Please select a service option.";
+    }
+
+    if (!item.isGroupedPricing) {
+      const shouldHaveQuantity = Boolean(
+        item.selectedPricingOption ||
+        item.service?.pricingType === "per_unit" ||
+        item.service?.pricingType === "starting_from",
+      );
+
+      if (shouldHaveQuantity) {
+        const itemQuantity = getItemQuantity(item);
+
+        const rules = getQuantityRules(
+          item.service,
+          item.selectedPricingOption,
+        );
+
+        if (itemQuantity < rules.minQuantity) {
+          return `Minimum quantity is ${rules.minQuantity}.`;
+        }
+
+        if (
+          rules.maxQuantity !== undefined &&
+          itemQuantity > rules.maxQuantity
+        ) {
+          return `Maximum quantity is ${rules.maxQuantity}.`;
+        }
+      }
+    }
+
+    const repeatableError = validateRepeatableGroups(item);
+
+    if (repeatableError) {
+      return repeatableError;
+    }
+
+    const validationErrors = validateFields(item);
+
+    if (Object.keys(validationErrors).length > 0) {
+      return Object.values(validationErrors)[0];
+    }
+
+    return "";
+  };
+
   /*
   |--------------------------------------------------------------------------
-  | Submit Order
+  | Backend Payload
+  |--------------------------------------------------------------------------
+  */
+
+  const buildCleanFormData = (item) => {
+    const cleanFormData = {};
+    const fields = getActiveFieldsForItem(item);
+
+    for (const field of fields) {
+      const value = item.formData?.[field.name];
+
+      if (value !== undefined && value !== null) {
+        cleanFormData[field.name] = value;
+      }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Repeatable Groups
+    |--------------------------------------------------------------------------
+    */
+
+    const repeatableGroups = getRepeatableGroups(item.service);
+
+    for (const group of repeatableGroups) {
+      const entries = Array.isArray(item.formData?.[group.name])
+        ? item.formData[group.name]
+        : [];
+
+      if (entries.length > 0) {
+        const repeatablePricingGroups = getRepeatableGroupPricingGroups(
+          item.service,
+          group,
+        );
+
+        cleanFormData[group.name] = entries.map((entry) => {
+          const cleanEntry = {};
+
+          for (const field of group.fields || []) {
+            const fieldName = String(field?.name || "").trim();
+
+            if (!fieldName) {
+              continue;
+            }
+
+            const value = entry?.[fieldName];
+
+            if (value !== undefined && value !== null) {
+              cleanEntry[fieldName] = value;
+            }
+          }
+
+          const entryPricingQuantities = {};
+
+          for (const pricingGroup of repeatablePricingGroups) {
+            const selectedOptionId = entry?.[pricingGroup.name];
+
+            if (!selectedOptionId) {
+              continue;
+            }
+
+            cleanEntry[pricingGroup.name] = String(selectedOptionId);
+
+            const option = pricingGroup.options.find(
+              (candidate) => String(candidate._id) === String(selectedOptionId),
+            );
+
+            const rules = getQuantityRules(item.service, option);
+
+            const rawQuantity = entry?.pricingQuantities?.[pricingGroup.name];
+
+            entryPricingQuantities[pricingGroup.name] =
+              rawQuantity !== undefined && rawQuantity !== null
+                ? Number(rawQuantity)
+                : rules.minQuantity;
+          }
+
+          if (Object.keys(entryPricingQuantities).length > 0) {
+            cleanEntry.pricingQuantities = entryPricingQuantities;
+          }
+
+          return cleanEntry;
+        });
+      }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Grouped Pricing
+    |--------------------------------------------------------------------------
+    */
+
+    if (item.isGroupedPricing) {
+      for (const [group, option] of Object.entries(
+        item.selectedPricingOptions || {},
+      )) {
+        if (option) {
+          cleanFormData[group] = String(option._id);
+        }
+      }
+
+      const selectedQuantities = {};
+
+      for (const [group, option] of Object.entries(
+        item.selectedPricingOptions || {},
+      )) {
+        if (!option) {
+          continue;
+        }
+
+        const rules = getQuantityRules(item.service, option);
+
+        const rawQuantity = item.pricingQuantities?.[group];
+
+        selectedQuantities[group] =
+          rawQuantity !== undefined && rawQuantity !== null
+            ? Number(rawQuantity)
+            : rules.minQuantity;
+      }
+
+      cleanFormData.pricingQuantities = selectedQuantities;
+    }
+
+    return cleanFormData;
+  };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Submit
   |--------------------------------------------------------------------------
   */
 
@@ -1647,207 +2586,66 @@ const NewOrder = () => {
 
     setError("");
 
-    if (!selectedService) {
-      setError("Please select a service.");
-
+    if (!orderItems.length) {
+      setError("Please select at least one service.");
       return;
     }
 
-    /*
-     * Grouped pricing validation.
-     */
-    if (isGroupedPricing) {
-      const groupedPricingError = validateGroupedPricing();
+    for (let index = 0; index < orderItems.length; index += 1) {
+      const itemError = validateOrderItem(orderItems[index]);
 
-      if (groupedPricingError) {
-        setError(groupedPricingError);
+      if (itemError) {
+        setActiveServiceIndex(index);
 
-        return;
-      }
-    } else {
-      /*
-       * Normal pricing validation.
-       */
-      const pricingOptions = getPricingOptions(selectedService);
+        const erroredServiceId = orderItems[index]?.service?._id;
 
-      if (pricingOptions.length > 0 && !selectedPricingOption) {
-        setError("Please select a service option.");
+        if (erroredServiceId) {
+          setOpenServiceIds((current) => ({
+            ...current,
+            [erroredServiceId]: true,
+          }));
+        }
 
-        return;
-      }
-    }
-
-    /*
-     * Normal service quantity validation.
-     *
-     * Grouped services use their own per-group
-     * quantities.
-     */
-    if (hasQuantity) {
-      if (quantity < quantityRules.minQuantity) {
-        setError(`Minimum quantity is ${quantityRules.minQuantity}.`);
-
-        return;
-      }
-
-      if (
-        quantityRules.maxQuantity !== undefined &&
-        quantity > quantityRules.maxQuantity
-      ) {
-        setError(`Maximum quantity is ${quantityRules.maxQuantity}.`);
-
+        setError(
+          `${orderItems[index].service?.name || "Service"}: ${itemError}`,
+        );
         return;
       }
     }
 
-    /*
-     * Dynamic field validation.
-     */
-    const validationErrors = validateFields();
-
-    if (Object.keys(validationErrors).length > 0) {
-      setError(Object.values(validationErrors)[0]);
-
+    if (paymentMethod === "online" && estimatedTotal <= 0) {
+      setError(
+        "Online payment requires a payable order amount. Please select a priced service option or use Cash on Delivery.",
+      );
       return;
     }
 
     try {
       setSubmitting(true);
 
-      /*
-       * Only send currently active configured fields.
-       *
-       * For normal pricing, this includes service-level
-       * fields and fields from the selected pricing option.
-       *
-       * For grouped pricing, this includes service-level
-       * fields and fields from all currently selected
-       * pricing options.
-       *
-       * Inactive/deselected option fields are excluded.
-       */
-      const cleanFormData = {};
+      const servicesPayload = orderItems.map((item) => ({
+        serviceId: item.service._id,
 
-      for (const field of activeFields) {
-        const value = formData[field.name];
+        ...(item.isGroupedPricing
+          ? {}
+          : {
+              pricingOptionId: item.selectedPricingOption?._id || undefined,
+            }),
 
-        if (value !== undefined && value !== null) {
-          cleanFormData[field.name] = value;
-        }
-      }
+        quantity: item.isGroupedPricing
+          ? 1
+          : item.selectedPricingOption ||
+              item.service?.pricingType === "per_unit" ||
+              item.service?.pricingType === "starting_from"
+            ? getItemQuantity(item)
+            : 1,
 
-      /*
-      |--------------------------------------------------------------------------
-      | Grouped pricing payload
-      |--------------------------------------------------------------------------
-      |
-      | IMPORTANT:
-      |
-      | We send the actual MongoDB pricing option _id
-      | for each selected group.
-      |
-      | Example:
-      |
-      | shoot: "6a9c0c15c5c693b1f9ec32ec"
-      |
-      | instead of:
-      |
-      | shoot: "camera"
-      |
-      | This avoids problems with names such as:
-      |
-      | "Founder Faced"
-      |
-      */
-
-      if (isGroupedPricing) {
-        const groupedFormData = {
-          ...cleanFormData,
-        };
-
-        /*
-         * Add selected pricing option IDs.
-         */
-        for (const [group, option] of Object.entries(selectedPricingOptions)) {
-          if (!option) {
-            continue;
-          }
-
-          groupedFormData[group] = String(option._id);
-        }
-
-        /*
-         * Optional groups are omitted when not selected.
-         */
-
-        /*
-         * Send only quantities for currently
-         * selected groups.
-         */
-        const selectedQuantities = {};
-
-        for (const [group, option] of Object.entries(selectedPricingOptions)) {
-          if (!option) {
-            continue;
-          }
-
-          const rules = getQuantityRules(selectedService, option);
-
-          const rawQuantity = pricingQuantities[group];
-
-          selectedQuantities[group] =
-            rawQuantity !== undefined && rawQuantity !== null
-              ? Number(rawQuantity)
-              : rules.minQuantity;
-        }
-
-        groupedFormData.pricingQuantities = selectedQuantities;
-
-        /*
-         * Replace the normal clean form data
-         * with grouped form data.
-         */
-        Object.keys(cleanFormData).forEach((key) => {
-          delete cleanFormData[key];
-        });
-
-        Object.assign(cleanFormData, groupedFormData);
-      }
-
-      /*
-      |--------------------------------------------------------------------------
-      | Create order
-      |--------------------------------------------------------------------------
-      */
+        formData: buildCleanFormData(item),
+      }));
 
       const orderResponse = await orderService.createOrder({
-        serviceId: selectedService._id,
-
-        /*
-         * Normal services continue using
-         * pricingOptionId.
-         *
-         * Grouped services resolve their pricing
-         * options from formData.
-         */
-        pricingOptionId: !isGroupedPricing
-          ? selectedPricingOption?._id || undefined
-          : undefined,
-
-        /*
-         * Grouped services always use top-level
-         * quantity = 1.
-         *
-         * Their actual quantities are sent through:
-         *
-         * formData.pricingQuantities
-         */
-        quantity: isGroupedPricing ? 1 : hasQuantity ? quantity : 1,
-
-        formData: cleanFormData,
-
+        services: servicesPayload,
         additionalRequirements: additionalRequirements.trim(),
-
         paymentMethod,
       });
 
@@ -1867,13 +2665,12 @@ const NewOrder = () => {
 
       if (paymentMethod === "cod") {
         setOrderSuccess(createdOrder);
-
         return;
       }
 
       /*
       |--------------------------------------------------------------------------
-      | Online Payment
+      | Razorpay
       |--------------------------------------------------------------------------
       */
 
@@ -1892,6 +2689,22 @@ const NewOrder = () => {
           throw new Error("Razorpay Checkout failed to load.");
         }
 
+        const serviceNames =
+          Array.isArray(createdOrder.items) && createdOrder.items.length > 0
+            ? createdOrder.items
+                .map(
+                  (item) =>
+                    item?.serviceSnapshot?.name ||
+                    item?.service?.name ||
+                    "Content Service",
+                )
+                .filter(Boolean)
+                .join(", ")
+            : orderItems
+                .map((item) => item.service?.name)
+                .filter(Boolean)
+                .join(", ");
+
         const options = {
           key: import.meta.env.VITE_RAZORPAY_KEY_ID,
 
@@ -1901,9 +2714,10 @@ const NewOrder = () => {
 
           name: "Glow Ventures",
 
-          description: createdOrder.service?.name
-            ? `${createdOrder.service.name} Order`
-            : "Content Service Order",
+          description:
+            serviceNames.length > 90
+              ? `${serviceNames.slice(0, 87)}...`
+              : serviceNames || "Content Service Order",
 
           order_id: razorpayOrder.id,
 
@@ -1927,11 +2741,12 @@ const NewOrder = () => {
               } else {
                 setError("Payment verification failed.");
               }
-            } catch (error) {
-              console.error("Payment verification error:", error);
+            } catch (verificationError) {
+              console.error("Payment verification error:", verificationError);
 
               setError(
-                error.response?.data?.message || "Payment verification failed.",
+                verificationError.response?.data?.message ||
+                  "Payment verification failed.",
               );
             } finally {
               setSubmitting(false);
@@ -1963,10 +2778,10 @@ const NewOrder = () => {
 
         razorpay.open();
       }
-    } catch (error) {
-      console.error("Create order/payment error:", error);
+    } catch (submitError) {
+      console.error("Create order/payment error:", submitError);
 
-      const responseData = error.response?.data;
+      const responseData = submitError.response?.data;
 
       if (responseData?.errors) {
         const firstError = Object.values(responseData.errors)[0];
@@ -1979,7 +2794,7 @@ const NewOrder = () => {
       } else {
         setError(
           responseData?.message ||
-            error.message ||
+            submitError.message ||
             "Unable to process your order.",
         );
       }
@@ -2006,7 +2821,7 @@ const NewOrder = () => {
 
   if (loadingServices) {
     return (
-      <div className="mx-auto flex min-h-[60vh] w-full max-w-[1180px] items-center justify-center">
+      <div className="mx-auto flex min-h-[60vh] w-full max-w-[1180px] items-center justify-center px-5">
         <div className="flex flex-col items-center gap-3">
           <Loader2 size={22} className="animate-spin text-zinc-400" />
 
@@ -2022,7 +2837,7 @@ const NewOrder = () => {
   |--------------------------------------------------------------------------
   */
 
-  if (!selectedService) {
+  if (!services.length) {
     return (
       <div className="mx-auto flex min-h-[60vh] w-full max-w-[1180px] items-center justify-center px-5">
         <div className="max-w-md text-center">
@@ -2044,891 +2859,1147 @@ const NewOrder = () => {
     );
   }
 
+  const selectedServiceIds = getSelectedServiceIds();
+
   /*
   |--------------------------------------------------------------------------
-  | Steps
+  | Render
   |--------------------------------------------------------------------------
   */
 
-  const pricingOptions = getPricingOptions(selectedService);
-
-  const pricingGroups = getPricingGroups(selectedService);
-
-  const serviceStep = 1;
-  const pricingStep = 2;
-  const quantityStep = pricingOptions.length ? 3 : 2;
-  const detailsStep = quantityStep + 1;
-  const paymentStep = detailsStep + 1;
-
   return (
-    <div className="mx-auto w-full max-w-[1180px] px-5 py-8 sm:py-10">
+    <div className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-5 sm:py-10">
       <form onSubmit={handleSubmit}>
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="min-w-0 space-y-6">
-            {/* ==========================================================
-                SERVICE
-            =========================================================== */}
+          {/* ================================================================
+              LEFT COLUMN
+          ================================================================= */}
 
-            <section
-              className="
-                relative
-                z-20
-                rounded-[24px]
-                border
-                border-zinc-200
-                bg-white
-                p-5
-                shadow-[0_10px_35px_rgba(0,0,0,0.04)]
-                sm:p-7
-              "
-            >
+          <div className="min-w-0 space-y-6">
+            {/* ==============================================================
+                SERVICE CHECKLIST
+            ============================================================== */}
+
+            <section className="relative z-30 rounded-[24px] border border-zinc-200 bg-white p-5 shadow-[0_10px_35px_rgba(0,0,0,0.04)] sm:p-7">
               <div>
                 <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
-                  Step {serviceStep}
+                  Step 1
                 </p>
 
-                <h2 className="mt-1.5 text-lg font-semibold text-zinc-900">
-                  Choose a service
-                </h2>
+                <div className="mt-1.5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h1 className="text-xl font-semibold tracking-tight text-zinc-900">
+                      Build your order
+                    </h1>
 
-                <p className="mt-1.5 text-sm leading-6 text-zinc-500">
-                  Select the service you would like to order.
-                </p>
+                    <p className="mt-1.5 text-sm leading-6 text-zinc-500">
+                      Select one or more services. Each selected service can be
+                      configured independently.
+                    </p>
+                  </div>
+
+                  <div className="shrink-0 rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs font-medium text-zinc-500">
+                    {orderItems.length} selected
+                  </div>
+                </div>
               </div>
 
-              <div className="mt-5">
-                <CustomSelect
-                  value={selectedService?._id || ""}
-                  onChange={handleServiceChange}
-                  options={services.map((service) => ({
-                    label: service.name,
-                    value: service._id,
-                  }))}
-                  placeholder="Select a service"
-                  disabled={loadingService || submitting}
-                />
-              </div>
+              <div className="mt-6 space-y-4">
+                {services.map((service) => {
+                  const serviceId = String(service._id);
 
-              {selectedService.description && (
-                <div className="mt-4 rounded-2xl border border-zinc-100 bg-zinc-50 px-4 py-3.5">
-                  <p className="text-xs leading-5 text-zinc-500">
-                    {selectedService.description}
-                  </p>
-                </div>
-              )}
-            </section>
+                  const selectedIndex = orderItems.findIndex(
+                    (item) => String(item?.service?._id) === serviceId,
+                  );
 
-            {/* ==========================================================
-                PRICING OPTIONS
-            =========================================================== */}
+                  const selected = selectedIndex >= 0;
 
-            {pricingOptions.length > 0 && (
-              <section
-                className="
-                  rounded-[24px]
-                  border
-                  border-zinc-200
-                  bg-white
-                  p-5
-                  shadow-[0_10px_35px_rgba(0,0,0,0.04)]
-                  animate-fade-up
-                  sm:p-7
-                "
-              >
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
-                    Step {pricingStep}
-                  </p>
+                  const item = selected ? orderItems[selectedIndex] : null;
 
-                  <h2 className="mt-1.5 text-lg font-semibold text-zinc-900">
-                    {isGroupedPricing
-                      ? "Configure your content"
-                      : "Choose an option"}
-                  </h2>
+                  const quantityInfo = item ? getQuantityInfo(item) : null;
 
-                  <p className="mt-1.5 text-sm leading-6 text-zinc-500">
-                    {isGroupedPricing
-                      ? "Choose the options you need for your project."
-                      : "Select the service package that best fits your project."}
-                  </p>
-                </div>
+                  const pricingOptions = item
+                    ? getPricingOptions(item.service)
+                    : [];
 
-                {isGroupedPricing ? (
-                  <div className="mt-7 space-y-8">
-                    {pricingGroups.map((group, groupIndex) => {
-                      const groupKey = group.key;
+                  const pricingGroups = item
+                    ? getPricingGroups(item.service)
+                    : [];
 
-                      const selectedOption = selectedPricingOptions[groupKey];
+                  const isGroupedPricing = Boolean(item?.isGroupedPricing);
 
-                      /*
-                       * Existing UI behavior is
-                       * preserved here.
-                       *
-                       * These values only control
-                       * display labels.
-                       */
-                      const title = group.name
-                        ? group.name.charAt(0).toUpperCase() +
-                          group.name.slice(1)
-                        : "Options";
+                  const activeFields = item ? getActiveFieldsForItem(item) : [];
 
-                      const helper = "Optional · Select ONE";
-                      return (
-                        <div
-                          key={group.key}
-                          className={
-                            groupIndex > 0
-                              ? "border-t border-zinc-100 pt-7"
-                              : ""
-                          }
-                        >
-                          <div className="mb-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-sm font-medium text-zinc-900">
-                                {title}
+                  const repeatableGroups = item
+                    ? getRepeatableGroups(item.service)
+                    : [];
+
+                  const requiredFields = activeFields.filter(
+                    (field) => field.required,
+                  );
+
+                  const optionalFields = activeFields.filter(
+                    (field) => !field.required,
+                  );
+
+                  const itemAmount = selected
+                    ? itemEstimates[selectedIndex] || 0
+                    : 0;
+
+                  return (
+                    <div
+                      key={serviceId}
+                      className={`
+                        overflow-hidden rounded-[22px] border
+                        transition-all duration-300
+                        ${
+                          selected
+                            ? "border-zinc-900 bg-white shadow-[0_14px_40px_rgba(0,0,0,0.06)]"
+                            : "border-zinc-200 bg-white hover:border-zinc-300"
+                        }
+                      `}
+                    >
+                      {/* Service header */}
+
+                      <div
+                        className={`
+                          flex flex-col gap-3 p-4
+                          sm:flex-row sm:items-center sm:justify-between
+                          sm:p-5
+                          ${selected ? "bg-zinc-50/70" : ""}
+                        `}
+                      >
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                          <button
+                            type="button"
+                            disabled={submitting || Boolean(loadingServiceId)}
+                            onClick={() => handleToggleService(serviceId)}
+                            aria-label={
+                              selected
+                                ? `Remove ${service.name} from order`
+                                : `Add ${service.name} to order`
+                            }
+                            className={`
+                              flex h-6 w-6 shrink-0
+                              items-center justify-center
+                              rounded-md border
+                              transition-all duration-200
+                              ${
+                                selected
+                                  ? "border-zinc-900 bg-zinc-900 text-white"
+                                  : "border-zinc-300 bg-white text-transparent"
+                              }
+                            `}
+                          >
+                            {loadingServiceId === serviceId ? (
+                              <Loader2
+                                size={14}
+                                className="animate-spin text-zinc-400"
+                              />
+                            ) : (
+                              <Check size={14} strokeWidth={2.5} />
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={!selected}
+                            onClick={() => handleServiceNameClick(serviceId)}
+                            className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
+                          >
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold text-zinc-900 sm:text-[15px]">
+                                {service.name}
+                              </span>
+                              {/* 
+                              {service.description && (
+                                <span className="mt-0.5 line-clamp-1 block text-xs text-zinc-400">
+                                  {
+                                    service.description
+                                  }
+                                </span>
+                              )} */}
+                            </span>
+
+                            {selected &&
+                              (openServiceIds[serviceId] ? (
+                                <ChevronUp
+                                  size={16}
+                                  className="shrink-0 text-zinc-400"
+                                />
+                              ) : (
+                                <ChevronDown
+                                  size={16}
+                                  className="shrink-0 text-zinc-400"
+                                />
+                              ))}
+                          </button>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3 sm:justify-end">
+                          {selected && quantityInfo?.hasQuantity && (
+                            <div className="flex items-center gap-2">
+                              <span className="hidden text-[10px] font-medium uppercase tracking-wide text-zinc-400 sm:block">
+                                Qty
+                              </span>
+
+                              <QuantityControl
+                                quantity={quantityInfo.quantity}
+                                minQuantity={quantityInfo.rules.minQuantity}
+                                maxQuantity={quantityInfo.rules.maxQuantity}
+                                unit={quantityInfo.unit}
+                                onChange={(nextQuantity) =>
+                                  updateItem(selectedIndex, (current) => ({
+                                    ...current,
+                                    formData: {
+                                      ...(current.formData || {}),
+                                      quantity: nextQuantity,
+                                    },
+                                  }))
+                                }
+                                dark={false}
+                              />
+                            </div>
+                          )}
+
+                          {selected && (
+                            <div className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-right">
+                              <p className="text-[9px] uppercase tracking-wide text-zinc-400">
+                                Estimated
                               </p>
 
-                              <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
-                                "Optional"
-                              </span>
+                              <p className="mt-0.5 text-sm font-semibold text-zinc-900">
+                                {isCustomUnpricedItem(item)
+                                  ? "Custom"
+                                  : itemAmount > 0
+                                    ? formatCurrency(itemAmount)
+                                    : "Configure"}
+                              </p>
                             </div>
+                          )}
+                        </div>
+                      </div>
 
-                            <p className="mt-1 text-xs text-zinc-400">
-                              {helper}
-                            </p>
-                          </div>
+                      {/* ======================================================
+                          SELECTED SERVICE CONFIGURATION
+                      ======================================================= */}
 
-                          <div className="grid gap-3 sm:grid-cols-2">
-                            {group.options.map((option) => {
-                              const selected =
-                                selectedOption?._id === option._id;
+                      {selected && item && openServiceIds[serviceId] && (
+                        <div className="border-t border-zinc-200 p-4 sm:p-6">
+                          {/* Service description */}
 
-                              const rules = getQuantityRules(
-                                selectedService,
-                                option,
-                              );
+                          {service.description && (
+                            <div className="mb-6 rounded-2xl border border-zinc-100 bg-zinc-50 px-4 py-3.5">
+                              <p className="text-sm leading-6 text-zinc-500">
+                                {service.description}
+                              </p>
+                            </div>
+                          )}
 
-                              const optionQuantity = selected
-                                ? Number(
-                                    pricingQuantities[groupKey] ??
-                                      rules.minQuantity,
-                                  )
-                                : rules.minQuantity;
+                          {/* Pricing */}
 
-                              return (
-                                <div
-                                  key={option._id}
-                                  className={`
-                                        relative
-                                        rounded-2xl
-                                        border
-                                        p-4
-                                        transition-all
-                                        duration-200
-                                        ${
-                                          selected
-                                            ? "border-zinc-900 bg-zinc-900 shadow-[0_12px_30px_rgba(0,0,0,0.08)]"
-                                            : "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50"
-                                        }
-                                      `}
-                                >
-                                  <button
-                                    type="button"
-                                    disabled={submitting || loadingService}
-                                    onClick={() =>
-                                      handleGroupedPricingOptionChange(
-                                        groupKey,
-                                        option,
-                                      )
-                                    }
-                                    className="w-full text-left disabled:cursor-not-allowed"
-                                  >
-                                    <div className="flex items-start gap-3.5">
-                                      <span
-                                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-                                          selected
-                                            ? "border-white bg-white text-zinc-900"
-                                            : "border-zinc-300 bg-white"
-                                        }`}
-                                      >
-                                        {selected && (
-                                          <Check size={12} strokeWidth={2.5} />
-                                        )}
-                                      </span>
+                          {pricingOptions.length > 0 && (
+                            <div>
+                              <div>
+                                <p className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-400">
+                                  Service options
+                                </p>
 
-                                      <span className="min-w-0 flex-1 pr-1">
-                                        <span
-                                          className={`block text-sm font-semibold ${
-                                            selected
-                                              ? "text-white"
-                                              : "text-zinc-900"
-                                          }`}
-                                        >
-                                          {option.name}
-                                        </span>
+                                <h3 className="mt-1 text-base font-semibold text-zinc-900">
+                                  {isGroupedPricing
+                                    ? "Configure your content"
+                                    : "Choose an option"}
+                                </h3>
 
-                                        {option.description && (
-                                          <span
-                                            className={`mt-1 block text-xs leading-5 ${
-                                              selected
-                                                ? "text-white/50"
-                                                : "text-zinc-500"
-                                            }`}
-                                          >
-                                            {option.description}
-                                          </span>
-                                        )}
+                                <p className="mt-1 text-xs leading-5 text-zinc-500">
+                                  {isGroupedPricing
+                                    ? "Choose the options you need for this service."
+                                    : "Select the service package that best fits your project."}
+                                </p>
+                              </div>
 
-                                        <span
-                                          className={`mt-1.5 block text-xs font-medium ${
-                                            selected
-                                              ? "text-white/70"
-                                              : "text-zinc-500"
-                                          }`}
-                                        >
-                                          {formatCurrency(option.price)} /{" "}
-                                          {option.unit || "unit"}
-                                        </span>
-                                      </span>
-                                    </div>
-                                  </button>
+                              {isGroupedPricing ? (
+                                <div className="mt-5 space-y-6">
+                                  {pricingGroups.map((group) => {
+                                    const selectedOption =
+                                      item.selectedPricingOptions?.[group.key];
 
-                                  {selected && (
-                                    <div className="mt-4 border-t border-white/10 pt-3">
-                                      <div className="flex items-center justify-between gap-3">
-                                        <div>
-                                          <p className="text-[11px] font-medium text-white/50">
-                                            Quantity
-                                          </p>
+                                    const title = group.name
+                                      ? group.name.charAt(0).toUpperCase() +
+                                        group.name.slice(1)
+                                      : "Options";
 
-                                          <p className="mt-0.5 text-[11px] text-white/35">
-                                            Minimum: {rules.minQuantity}{" "}
-                                            {option.unit || "units"}
-                                          </p>
-
-                                          {rules.maxQuantity !== undefined && (
-                                            <p className="mt-0.5 text-[11px] text-white/35">
-                                              Maximum: {rules.maxQuantity}
+                                    return (
+                                      <div key={group.key}>
+                                        <div className="mb-3">
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <p className="text-sm font-medium text-zinc-900">
+                                              {title}
                                             </p>
+
+                                            <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+                                              Optional
+                                            </span>
+                                          </div>
+
+                                          <p className="mt-1 text-xs text-zinc-400">
+                                            Optional · Select ONE
+                                          </p>
+                                        </div>
+
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                          {group.options.map((option) => {
+                                            const optionSelected =
+                                              selectedOption?._id ===
+                                              option._id;
+
+                                            const rules = getQuantityRules(
+                                              service,
+                                              option,
+                                            );
+
+                                            const optionQuantity =
+                                              optionSelected
+                                                ? getGroupedOptionQuantity(
+                                                    item,
+                                                    group.key,
+                                                    option,
+                                                  )
+                                                : rules.minQuantity;
+
+                                            return (
+                                              <div
+                                                key={option._id}
+                                                className={`
+                                                      relative rounded-2xl border p-4
+                                                      transition-all duration-200
+                                                      ${
+                                                        optionSelected
+                                                          ? "border-zinc-900 bg-zinc-900 shadow-[0_12px_30px_rgba(0,0,0,0.08)]"
+                                                          : "border-zinc-200 bg-white hover:-translate-y-0.5 hover:border-zinc-300 hover:bg-zinc-50"
+                                                      }
+                                                    `}
+                                              >
+                                                <button
+                                                  type="button"
+                                                  disabled={submitting}
+                                                  onClick={() =>
+                                                    handleGroupedPricingOptionChange(
+                                                      selectedIndex,
+                                                      group.key,
+                                                      option,
+                                                    )
+                                                  }
+                                                  className="w-full text-left disabled:cursor-not-allowed"
+                                                >
+                                                  <div className="flex items-start gap-3">
+                                                    <span
+                                                      className={`
+                                                            mt-0.5 flex h-5 w-5 shrink-0
+                                                            items-center justify-center
+                                                            rounded-full border
+                                                            ${
+                                                              optionSelected
+                                                                ? "border-white bg-white text-zinc-900"
+                                                                : "border-zinc-300 bg-white"
+                                                            }
+                                                          `}
+                                                    >
+                                                      {optionSelected && (
+                                                        <Check
+                                                          size={12}
+                                                          strokeWidth={2.5}
+                                                        />
+                                                      )}
+                                                    </span>
+
+                                                    <span className="min-w-0 flex-1">
+                                                      <span
+                                                        className={`block text-sm font-semibold ${
+                                                          optionSelected
+                                                            ? "text-white"
+                                                            : "text-zinc-900"
+                                                        }`}
+                                                      >
+                                                        {option.name}
+                                                      </span>
+
+                                                      {option.description && (
+                                                        <span
+                                                          className={`mt-1 block text-xs leading-5 ${
+                                                            optionSelected
+                                                              ? "text-white/50"
+                                                              : "text-zinc-500"
+                                                          }`}
+                                                        >
+                                                          {option.description}
+                                                        </span>
+                                                      )}
+
+                                                      <span
+                                                        className={`mt-1.5 block text-xs font-medium ${
+                                                          optionSelected
+                                                            ? "text-white/70"
+                                                            : "text-zinc-500"
+                                                        }`}
+                                                      >
+                                                        {formatCurrency(
+                                                          option.price,
+                                                        )}{" "}
+                                                        /{" "}
+                                                        {option.unit || "unit"}
+                                                      </span>
+                                                    </span>
+                                                  </div>
+                                                </button>
+
+                                                {optionSelected && (
+                                                  <div className="mt-4 border-t border-white/10 pt-3">
+                                                    <div className="flex items-center justify-between gap-3">
+                                                      <div>
+                                                        <p className="text-[11px] font-medium text-white/50">
+                                                          Quantity
+                                                        </p>
+
+                                                        <p className="mt-0.5 text-[11px] text-white/35">
+                                                          Minimum:{" "}
+                                                          {rules.minQuantity}
+                                                        </p>
+                                                      </div>
+
+                                                      <QuantityControl
+                                                        quantity={
+                                                          optionQuantity
+                                                        }
+                                                        minQuantity={
+                                                          rules.minQuantity
+                                                        }
+                                                        maxQuantity={
+                                                          rules.maxQuantity
+                                                        }
+                                                        unit={
+                                                          option.unit || "unit"
+                                                        }
+                                                        dark
+                                                        onChange={(
+                                                          nextQuantity,
+                                                        ) =>
+                                                          handleGroupedQuantityChange(
+                                                            selectedIndex,
+                                                            group.key,
+                                                            nextQuantity,
+                                                          )
+                                                        }
+                                                      />
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <div className="mt-5 space-y-3">
+                                  {pricingOptions.map((option) => {
+                                    const optionSelected =
+                                      item.selectedPricingOption?._id ===
+                                      option._id;
+
+                                    return (
+                                      <button
+                                        key={option._id}
+                                        type="button"
+                                        disabled={submitting}
+                                        onClick={() =>
+                                          handlePricingOptionChange(
+                                            selectedIndex,
+                                            option,
+                                          )
+                                        }
+                                        className={`
+                                            relative flex w-full items-start gap-4 rounded-2xl
+                                            border p-4 text-left transition-all duration-200
+                                            sm:p-5
+                                            ${
+                                              optionSelected
+                                                ? "border-zinc-900 bg-zinc-900 shadow-[0_12px_30px_rgba(0,0,0,0.08)]"
+                                                : "border-zinc-200 bg-white hover:-translate-y-0.5 hover:border-zinc-300 hover:bg-zinc-50"
+                                            }
+                                          `}
+                                      >
+                                        <div
+                                          className={`
+                                              mt-0.5 flex h-5 w-5 shrink-0
+                                              items-center justify-center rounded-full border
+                                              ${
+                                                optionSelected
+                                                  ? "border-white bg-white text-zinc-900"
+                                                  : "border-zinc-300 bg-white"
+                                              }
+                                            `}
+                                        >
+                                          {optionSelected && (
+                                            <Check
+                                              size={12}
+                                              strokeWidth={2.5}
+                                            />
                                           )}
                                         </div>
 
-                                        <div className="flex items-center rounded-xl border border-white/10 bg-white/5 p-1">
-                                          <button
-                                            type="button"
-                                            disabled={
-                                              submitting ||
-                                              optionQuantity <=
-                                                rules.minQuantity
-                                            }
-                                            onClick={() =>
-                                              handleGroupedQuantityChange(
-                                                groupKey,
-                                                optionQuantity - 1,
-                                              )
-                                            }
-                                            className="flex h-8 w-8 items-center justify-center rounded-lg text-white/60 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
-                                          >
-                                            <Minus size={14} />
-                                          </button>
+                                        <div className="min-w-0 flex-1">
+                                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                            <p
+                                              className={`text-sm font-semibold ${
+                                                optionSelected
+                                                  ? "text-white"
+                                                  : "text-zinc-900"
+                                              }`}
+                                            >
+                                              {option.name}
+                                            </p>
 
-                                          <div className="min-w-[48px] text-center">
-                                            <p className="text-sm font-semibold text-white">
-                                              {optionQuantity}
+                                            <p
+                                              className={`shrink-0 text-sm font-semibold ${
+                                                optionSelected
+                                                  ? "text-white"
+                                                  : "text-zinc-900"
+                                              }`}
+                                            >
+                                              {formatCurrency(option.price)}
+                                              {option.unit
+                                                ? ` / ${option.unit}`
+                                                : ""}
                                             </p>
                                           </div>
 
-                                          <button
-                                            type="button"
-                                            disabled={
-                                              submitting ||
-                                              (rules.maxQuantity !==
-                                                undefined &&
-                                                optionQuantity >=
-                                                  rules.maxQuantity)
-                                            }
-                                            onClick={() =>
-                                              handleGroupedQuantityChange(
-                                                groupKey,
-                                                optionQuantity + 1,
-                                              )
-                                            }
-                                            className="flex h-8 w-8 items-center justify-center rounded-lg text-white/60 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
-                                          >
-                                            <Plus size={14} />
-                                          </button>
+                                          {option.description && (
+                                            <p
+                                              className={`mt-1.5 text-xs leading-5 ${
+                                                optionSelected
+                                                  ? "text-white/50"
+                                                  : "text-zinc-500"
+                                              }`}
+                                            >
+                                              {option.description}
+                                            </p>
+                                          )}
                                         </div>
-                                      </div>
-                                    </div>
-                                  )}
+                                      </button>
+                                    );
+                                  })}
                                 </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="mt-5 space-y-3">
-                    {pricingOptions.map((option) => {
-                      const selected =
-                        selectedPricingOption?._id === option._id;
+                              )}
+                            </div>
+                          )}
 
-                      return (
-                        <button
-                          key={option._id}
-                          type="button"
-                          onClick={() => handlePricingOptionChange(option)}
-                          className={`
-                              relative
-                              flex
-                              w-full
-                              items-start
-                              gap-4
-                              rounded-2xl
-                              border
-                              p-4
-                              text-left
-                              transition-all
-                              duration-200
-                              sm:p-5
-                              ${
-                                selected
-                                  ? "border-zinc-900 bg-zinc-900 shadow-[0_12px_30px_rgba(0,0,0,0.08)]"
-                                  : "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50"
-                              }
-                            `}
-                        >
-                          <div
-                            className={`
-                                mt-0.5
-                                flex
-                                h-5
-                                w-5
-                                shrink-0
-                                items-center
-                                justify-center
-                                rounded-full
-                                border
-                                ${
-                                  selected
-                                    ? "border-white bg-white text-zinc-900"
-                                    : "border-zinc-300 bg-white"
+                          {/* ==================================================
+                              REQUIRED FIELDS
+                          =================================================== */}
+
+                          {requiredFields.length > 0 && (
+                            <div
+                              className={`${
+                                pricingOptions.length > 0
+                                  ? "mt-7 border-t border-zinc-100 pt-7"
+                                  : ""
+                              }`}
+                            >
+                              <div>
+                                <p className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-400">
+                                  Required details
+                                </p>
+
+                                <p className="mt-1 text-xs leading-5 text-zinc-500">
+                                  Complete these fields before placing the
+                                  order.
+                                </p>
+                              </div>
+
+                              <div className="mt-6 space-y-6">
+                                {requiredFields.map((field) => (
+                                  <div key={field.name}>
+                                    <DynamicField
+                                      field={field}
+                                      value={item.formData?.[field.name]}
+                                      onChange={(fieldName, value) =>
+                                        handleFieldChange(
+                                          selectedIndex,
+                                          fieldName,
+                                          value,
+                                        )
+                                      }
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* ==================================================
+                              OPTIONAL FIELDS
+                          =================================================== */}
+
+                          {optionalFields.length > 0 && (
+                            <div
+                              className={`${
+                                pricingOptions.length > 0 ||
+                                requiredFields.length > 0
+                                  ? "mt-7 border-t border-zinc-100 pt-7"
+                                  : ""
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  toggleOptionalField(`service:${serviceId}`)
                                 }
-                              `}
-                          >
-                            {selected && <Check size={12} strokeWidth={2.5} />}
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <p
-                                className={`
-                                    text-sm
-                                    font-semibold
-                                    ${selected ? "text-white" : "text-zinc-900"}
-                                  `}
+                                className="flex w-full items-center justify-between gap-4 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3.5 text-left transition hover:border-zinc-300 hover:bg-white"
                               >
-                                {option.name}
+                                <div>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="text-sm font-medium text-zinc-900">
+                                      Optional details
+                                    </p>
+
+                                    <span className="rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+                                      {optionalFields.length} fields
+                                    </span>
+                                  </div>
+
+                                  <p className="mt-1 text-xs leading-5 text-zinc-400">
+                                    These fields are optional and closed by
+                                    default.
+                                  </p>
+                                </div>
+
+                                {openOptionalFields[`service:${serviceId}`] ? (
+                                  <ChevronUp
+                                    size={17}
+                                    className="shrink-0 text-zinc-400"
+                                  />
+                                ) : (
+                                  <ChevronDown
+                                    size={17}
+                                    className="shrink-0 text-zinc-400"
+                                  />
+                                )}
+                              </button>
+
+                              {openOptionalFields[`service:${serviceId}`] && (
+                                <div className="mt-6 space-y-6 rounded-2xl border border-zinc-100 bg-zinc-50/40 p-4 sm:p-5">
+                                  {optionalFields.map((field) => (
+                                    <div key={field.name}>
+                                      <DynamicField
+                                        field={field}
+                                        value={item.formData?.[field.name]}
+                                        onChange={(fieldName, value) =>
+                                          handleFieldChange(
+                                            selectedIndex,
+                                            fieldName,
+                                            value,
+                                          )
+                                        }
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* ==================================================
+                              REPEATABLE GROUPS
+                          =================================================== */}
+
+                          {repeatableGroups.length > 0 && (
+                            <div
+                              className={`${
+                                pricingOptions.length > 0 ||
+                                requiredFields.length > 0 ||
+                                optionalFields.length > 0
+                                  ? "mt-7 border-t border-zinc-100 pt-7"
+                                  : ""
+                              }`}
+                            >
+                              <div>
+                                <p className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-400">
+                                  Repeated configurations
+                                </p>
+
+                                <p className="mt-1 text-xs leading-5 text-zinc-500">
+                                  Add multiple independent configurations where
+                                  required.
+                                </p>
+                              </div>
+
+                              <div className="mt-5 space-y-5">
+                                {repeatableGroups.map((group) => (
+                                  <RepeatableGroup
+                                    key={group.name}
+                                    group={group}
+                                    service={item.service}
+                                    entries={item.formData?.[group.name]}
+                                    disabled={submitting}
+                                    onAdd={() =>
+                                      handleRepeatableAdd(selectedIndex, group)
+                                    }
+                                    onRemove={(entryIndex) =>
+                                      handleRepeatableRemove(
+                                        selectedIndex,
+                                        group,
+                                        entryIndex,
+                                      )
+                                    }
+                                    onFieldChange={(
+                                      entryIndex,
+                                      fieldName,
+                                      value,
+                                    ) =>
+                                      handleRepeatableFieldChange(
+                                        selectedIndex,
+                                        group,
+                                        entryIndex,
+                                        fieldName,
+                                        value,
+                                      )
+                                    }
+                                    onPricingOptionChange={(
+                                      entryIndex,
+                                      pricingGroupName,
+                                      option,
+                                    ) =>
+                                      handleRepeatableEntryPricingOptionChange(
+                                        selectedIndex,
+                                        group,
+                                        entryIndex,
+                                        pricingGroupName,
+                                        option,
+                                      )
+                                    }
+                                    onPricingQuantityChange={(
+                                      entryIndex,
+                                      pricingGroupName,
+                                      nextQuantity,
+                                    ) =>
+                                      handleRepeatableEntryPricingQuantityChange(
+                                        selectedIndex,
+                                        group,
+                                        entryIndex,
+                                        pricingGroupName,
+                                        nextQuantity,
+                                      )
+                                    }
+                                    openOptionalFields={openOptionalFields}
+                                    toggleOptionalField={toggleOptionalField}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* No configuration */}
+
+                          {!pricingOptions.length &&
+                            !requiredFields.length &&
+                            !optionalFields.length &&
+                            !repeatableGroups.length && (
+                              <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 px-5 py-8 text-center">
+                                <p className="text-sm text-zinc-500">
+                                  No additional configuration is required for
+                                  this service.
+                                </p>
+                              </div>
+                            )}
+
+                          {/* Selected service amount */}
+
+                          <div className="mt-7 flex items-center justify-between gap-4 border-t border-zinc-100 pt-5">
+                            <div>
+                              <p className="text-xs text-zinc-400">
+                                Service estimate
                               </p>
 
-                              <p
-                                className={`
-                                    shrink-0
-                                    text-sm
-                                    font-semibold
-                                    ${selected ? "text-white" : "text-zinc-900"}
-                                  `}
-                              >
-                                {formatCurrency(option.price)}
-                                {option.unit ? ` / ${option.unit}` : ""}
+                              <p className="mt-1 text-sm text-zinc-500">
+                                {isCustomUnpricedItem(item)
+                                  ? "Final pricing will be confirmed."
+                                  : "Based on your current selections."}
                               </p>
                             </div>
 
-                            {option.description && (
-                              <p
-                                className={`
-                                    mt-1.5
-                                    text-xs
-                                    leading-5
-                                    ${
-                                      selected
-                                        ? "text-white/50"
-                                        : "text-zinc-500"
-                                    }
-                                  `}
-                              >
-                                {option.description}
-                              </p>
-                            )}
+                            <p className="shrink-0 text-lg font-semibold text-zinc-900">
+                              {isCustomUnpricedItem(item)
+                                ? "Custom"
+                                : formatCurrency(itemAmount)}
+                            </p>
                           </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-            )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
 
-            {/* ==========================================================
-                QUANTITY
-            =========================================================== */}
+              {loadingServiceId && (
+                <div className="mt-4 flex items-center gap-2 text-xs text-zinc-400">
+                  <Loader2 size={13} className="animate-spin" />
+                  Loading service configuration...
+                </div>
+              )}
+            </section>
 
-            {hasQuantity && !isGroupedPricing && (
-              <section
-                className="
-                    rounded-[24px]
-                    border
-                    border-zinc-200
-                    bg-white
-                    p-5
-                    shadow-[0_10px_35px_rgba(0,0,0,0.04)]
-                    animate-fade-up
-                    sm:p-7
-                  "
-              >
-                <div>
+            {/* ==============================================================
+                GLOBAL ADDITIONAL REQUIREMENTS
+            ============================================================== */}
+
+            {orderItems.length > 0 && (
+              <>
+                <section className="rounded-[24px] border border-zinc-200 bg-white p-5 shadow-[0_10px_35px_rgba(0,0,0,0.04)] sm:p-7">
                   <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
-                    Step {quantityStep}
+                    Step 2
                   </p>
 
                   <h2 className="mt-1.5 text-lg font-semibold text-zinc-900">
-                    Quantity
+                    Additional requirements
                   </h2>
 
                   <p className="mt-1.5 text-sm leading-6 text-zinc-500">
-                    Select how many units you need.
+                    Optional instructions that apply to the complete order.
                   </p>
-                </div>
 
-                <div className="mt-5">
-                  <QuantityControl
-                    quantity={quantity}
-                    minQuantity={quantityRules.minQuantity}
-                    maxQuantity={quantityRules.maxQuantity}
-                    unit={quantityPricingOption?.unit || selectedService.unit}
-                    onChange={(nextQuantity) =>
-                      setFormData((current) => ({
-                        ...current,
-                        quantity: nextQuantity,
-                      }))
+                  <textarea
+                    value={additionalRequirements}
+                    onChange={(event) =>
+                      setAdditionalRequirements(event.target.value)
                     }
+                    rows={5}
+                    placeholder="Is there anything else you'd like us to know?"
+                    className="mt-5 w-full resize-y rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3.5 text-sm leading-6 text-zinc-900 outline-none transition-all duration-200 placeholder:text-zinc-400 hover:border-zinc-300 focus:border-zinc-400 focus:bg-white focus:ring-4 focus:ring-zinc-900/[0.04]"
                   />
-                </div>
-              </section>
+
+                  <p className="mt-2 text-xs text-zinc-400">
+                    Mention special instructions, references, deadlines,
+                    preferences or anything else relevant to your order.
+                  </p>
+                </section>
+
+                {/* ==========================================================
+                    PAYMENT
+                =========================================================== */}
+
+                <section className="rounded-[24px] border border-zinc-200 bg-white p-5 shadow-[0_10px_35px_rgba(0,0,0,0.04)] sm:p-7">
+                  <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
+                    Step 3
+                  </p>
+
+                  <h2 className="mt-1.5 text-lg font-semibold text-zinc-900">
+                    Payment method
+                  </h2>
+
+                  <p className="mt-1.5 text-sm leading-6 text-zinc-500">
+                    Choose how you'd like to complete the payment.
+                  </p>
+
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    <PaymentOption
+                      selected={paymentMethod === "cod"}
+                      onClick={() => setPaymentMethod("cod")}
+                      icon={Banknote}
+                      title="Cash on Delivery"
+                      description="Pay after your order is processed."
+                    />
+
+                    <PaymentOption
+                      selected={paymentMethod === "online"}
+                      onClick={() => setPaymentMethod("online")}
+                      icon={CreditCard}
+                      title="Online Payment"
+                      description={
+                        hasCustomUnpricedService
+                          ? "Available when the order has a payable amount."
+                          : `Secure Razorpay payment · ${ONLINE_GST_RATE}% GST`
+                      }
+                      disabled={hasCustomUnpricedService && subtotal <= 0}
+                    />
+                  </div>
+
+                  {paymentMethod === "online" && (
+                    <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-zinc-100 bg-zinc-50 px-4 py-3.5">
+                      <Info
+                        size={15}
+                        className="mt-0.5 shrink-0 text-zinc-400"
+                      />
+
+                      <p className="text-xs leading-5 text-zinc-500">
+                        Online payments include {ONLINE_GST_RATE}% GST on the
+                        order subtotal. Cash on Delivery currently uses 0% GST
+                        in the order calculation.
+                      </p>
+                    </div>
+                  )}
+                </section>
+              </>
             )}
-
-            {/* ==========================================================
-                PROJECT CONFIGURATION
-            =========================================================== */}
-
-            <section
-              className="
-                rounded-[24px]
-                border
-                border-zinc-200
-                bg-white
-                p-5
-                shadow-[0_10px_35px_rgba(0,0,0,0.04)]
-                animate-fade-up
-                sm:p-7
-              "
-            >
-              <div>
-                <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
-                  Step {detailsStep}
-                </p>
-
-                <h2 className="mt-1.5 text-lg font-semibold text-zinc-900">
-                  Project configuration
-                </h2>
-
-                <p className="mt-1.5 text-sm leading-6 text-zinc-500">
-                  Configure the options and provide any additional information
-                  for your project.
-                </p>
-              </div>
-
-              {activeFields.length > 0 ? (
-                <div className="mt-7 space-y-7">
-                  {activeFields.map((field) => {
-                    const type = normalizeFieldType(field);
-
-                    const isSelection = type === "radio" || type === "checkbox";
-
-                    return (
-                      <div
-                        key={field.name}
-                        className={
-                          isSelection
-                            ? ""
-                            : "border-t border-zinc-100 pt-7 first:border-t-0 first:pt-0"
-                        }
-                      >
-                        <DynamicField
-                          field={field}
-                          value={formData[field.name]}
-                          onChange={handleFieldChange}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="mt-5 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 px-5 py-8 text-center">
-                  <p className="text-sm text-zinc-500">
-                    No additional configuration is required for this service.
-                  </p>
-                </div>
-              )}
-
-              <div className="mt-7 border-t border-zinc-100 pt-7">
-                <div>
-                  <p className="text-sm font-medium text-zinc-900">
-                    Additional requirements
-                  </p>
-
-                  <p className="mt-1 text-xs text-zinc-400">Optional</p>
-                </div>
-
-                <textarea
-                  value={additionalRequirements}
-                  onChange={(event) =>
-                    setAdditionalRequirements(event.target.value)
-                  }
-                  rows={4}
-                  placeholder="Is there anything else you'd like us to know?"
-                  className="
-                    mt-3
-                    w-full
-                    resize-y
-                    rounded-xl
-                    border
-                    border-zinc-200
-                    bg-zinc-50
-                    px-4
-                    py-3.5
-                    text-sm
-                    leading-6
-                    text-zinc-900
-                    outline-none
-                    transition-all
-                    duration-200
-                    placeholder:text-zinc-400
-                    hover:border-zinc-300
-                    focus:border-zinc-400
-                    focus:bg-white
-                    focus:ring-4
-                    focus:ring-zinc-900/[0.04]
-                  "
-                />
-
-                <p className="mt-2 text-xs text-zinc-400">
-                  Mention special instructions, references, deadlines,
-                  preferences or anything else relevant to your project.
-                </p>
-              </div>
-            </section>
-
-            {/* ==========================================================
-                PAYMENT
-            =========================================================== */}
-
-            <section
-              className="
-                rounded-[24px]
-                border
-                border-zinc-200
-                bg-white
-                p-5
-                shadow-[0_10px_35px_rgba(0,0,0,0.04)]
-                animate-fade-up
-                sm:p-7
-              "
-            >
-              <div>
-                <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
-                  Step {paymentStep}
-                </p>
-
-                <h2 className="mt-1.5 text-lg font-semibold text-zinc-900">
-                  Payment method
-                </h2>
-
-                <p className="mt-1.5 text-sm leading-6 text-zinc-500">
-                  Choose how you'd like to complete the payment.
-                </p>
-              </div>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <PaymentOption
-                  selected={paymentMethod === "cod"}
-                  onClick={() => setPaymentMethod("cod")}
-                  icon={Banknote}
-                  title="Cash on Delivery"
-                  description="Pay after your order is processed."
-                />
-
-                <PaymentOption
-                  selected={paymentMethod === "online"}
-                  onClick={() => setPaymentMethod("online")}
-                  icon={CreditCard}
-                  title="Online Payment"
-                  description="Pay securely using Razorpay."
-                />
-              </div>
-            </section>
           </div>
 
-          {/* ============================================================
-              ORDER SUMMARY
-          ============================================================= */}
+          {/* ================================================================
+              RIGHT SUMMARY
+          ================================================================= */}
 
           <aside className="min-w-0">
             <div className="sticky top-6">
-              <section
-                className="
-                  overflow-hidden
-                  rounded-[24px]
-                  border
-                  border-zinc-800
-                  bg-zinc-950
-                  shadow-[0_20px_60px_rgba(0,0,0,0.12)]
-                "
-              >
-                <div className="p-5 sm:p-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-[0.16em] text-white/35">
-                        Order summary
-                      </p>
-
-                      <h2 className="mt-1.5 text-lg font-semibold text-white">
-                        {selectedService.name}
-                      </h2>
+              {orderItems.length === 0 ? (
+                <section className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-6 sm:p-7">
+                  <div className="flex min-h-[280px] flex-col items-center justify-center text-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-zinc-200 bg-white text-zinc-300">
+                      <CreditCard size={20} />
                     </div>
+
+                    <h2 className="mt-4 text-base font-semibold text-zinc-800">
+                      Your order summary
+                    </h2>
+
+                    <p className="mt-2 max-w-[260px] text-sm leading-6 text-zinc-400">
+                      Select one or more services to see your configuration and
+                      pricing summary here.
+                    </p>
                   </div>
-
-                  <div className="mt-6 space-y-4">
+                </section>
+              ) : (
+                <section className="overflow-hidden rounded-[24px] border border-zinc-800 bg-zinc-950 shadow-[0_20px_60px_rgba(0,0,0,0.12)]">
+                  <div className="p-5 sm:p-6">
                     <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <p className="text-xs text-white/40">Service</p>
-
-                        <p className="mt-1 text-sm font-medium text-white">
-                          {selectedService.name}
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-[0.16em] text-white/35">
+                          Order summary
                         </p>
+
+                        <h2 className="mt-1.5 text-lg font-semibold text-white">
+                          {orderItems.length}{" "}
+                          {orderItems.length === 1 ? "service" : "services"}
+                        </h2>
+                      </div>
+
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/60">
+                        <CreditCard size={16} />
                       </div>
                     </div>
 
-                    {/* Grouped pricing summary */}
-                    {isGroupedPricing &&
-                      selectedGroupedPricingOptions.length > 0 && (
-                        <div className="space-y-2 border-t border-white/10 pt-4">
-                          {selectedGroupedPricingOptions.map((option) => {
-                            const rules = getQuantityRules(
-                              selectedService,
-                              option,
-                            );
+                    <div className="mt-6 space-y-3">
+                      {orderItems.map((item, index) => {
+                        const itemAmount = itemEstimates[index] || 0;
 
-                            const optionQuantity = Number(
-                              pricingQuantities[option.group] ??
-                                rules.minQuantity,
-                            );
+                        const selectedOptions = item.isGroupedPricing
+                          ? Object.values(
+                              item.selectedPricingOptions || {},
+                            ).filter(Boolean)
+                          : item.selectedPricingOption
+                            ? [item.selectedPricingOption]
+                            : [];
 
-                            const optionTotal =
-                              Number(option.price || 0) * optionQuantity;
+                        const quantityInfo = getQuantityInfo(item);
 
-                            return (
-                              <div
-                                key={option._id}
-                                className="flex items-start justify-between gap-4"
-                              >
-                                <div className="min-w-0">
-                                  <p className="text-xs text-white/40">
-                                    {option.group
-                                      ? option.group.charAt(0).toUpperCase() +
-                                        option.group.slice(1)
-                                      : "Option"}
+                        return (
+                          <button
+                            type="button"
+                            key={item.service._id}
+                            onClick={() => setActiveServiceIndex(index)}
+                            className={`
+                                w-full rounded-2xl border p-3.5 text-left
+                                transition-all duration-200
+                                ${
+                                  index === activeServiceIndex
+                                    ? "border-white/20 bg-white/10"
+                                    : "border-white/5 bg-white/[0.03] hover:bg-white/[0.06]"
+                                }
+                              `}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-[10px] uppercase tracking-wide text-white/35">
+                                  Service {index + 1}
+                                </p>
+
+                                <p className="mt-1 truncate text-sm font-medium text-white">
+                                  {item.service.name}
+                                </p>
+
+                                {quantityInfo.hasQuantity && (
+                                  <p className="mt-1 text-[10px] text-white/30">
+                                    Qty {quantityInfo.quantity}
                                   </p>
-
-                                  <p className="mt-0.5 text-sm text-white/80">
-                                    {option.name}
-                                  </p>
-                                </div>
-
-                                <div className="shrink-0 text-right">
-                                  <p className="text-sm font-medium text-white">
-                                    {formatCurrency(optionTotal)}
-                                  </p>
-
-                                  <p className="mt-0.5 text-[10px] text-white/35">
-                                    {optionQuantity} ×{" "}
-                                    {formatCurrency(option.price)}
-                                  </p>
-                                </div>
+                                )}
                               </div>
-                            );
-                          })}
-                        </div>
-                      )}
 
-                    {/* Normal pricing summary */}
-                    {!isGroupedPricing && selectedPricingOption && (
-                      <div className="border-t border-white/10 pt-4">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="min-w-0">
-                            <p className="text-xs text-white/40">Option</p>
+                              <p className="shrink-0 text-sm font-medium text-white">
+                                {isCustomUnpricedItem(item)
+                                  ? "Custom"
+                                  : formatCurrency(itemAmount)}
+                              </p>
+                            </div>
 
-                            <p className="mt-1 text-sm text-white/80">
-                              {selectedPricingOption.name}
-                            </p>
-                          </div>
+                            {selectedOptions.length > 0 && (
+                              <div className="mt-3 space-y-1.5 border-t border-white/10 pt-3">
+                                {selectedOptions.map((option) => {
+                                  const groupKey =
+                                    String(option.group || "").trim() ||
+                                    "__ungrouped__";
 
-                          <p className="shrink-0 text-sm font-medium text-white">
-                            {formatCurrency(
-                              Number(selectedPricingOption.price || 0) *
-                                quantity,
+                                  const optionQuantity = item.isGroupedPricing
+                                    ? getGroupedOptionQuantity(
+                                        item,
+                                        groupKey,
+                                        option,
+                                      )
+                                    : getItemQuantity(item);
+
+                                  return (
+                                    <div
+                                      key={option._id}
+                                      className="flex items-center justify-between gap-3"
+                                    >
+                                      <p className="min-w-0 truncate text-xs text-white/50">
+                                        {option.name}
+                                      </p>
+
+                                      <p className="shrink-0 text-[11px] text-white/35">
+                                        {optionQuantity} ×{" "}
+                                        {formatCurrency(option.price)}
+                                      </p>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             )}
-                          </p>
-                        </div>
-                      </div>
-                    )}
 
-                    {hasQuantity && (
-                      <div className="flex items-start justify-between gap-4 border-t border-white/10 pt-4">
-                        <div>
-                          <p className="text-xs text-white/40">Quantity</p>
+                            {getSelectedFieldsPrice(item) > 0 && (
+                              <div className="mt-2 flex items-center justify-between gap-3">
+                                <p className="text-[11px] text-white/35">
+                                  Selected add-ons
+                                </p>
 
-                          <p className="mt-1 text-sm text-white/80">
-                            {quantity}
-                          </p>
-                        </div>
+                                <p className="text-[11px] text-white/50">
+                                  +
+                                  {formatCurrency(getSelectedFieldsPrice(item))}
+                                </p>
+                              </div>
+                            )}
 
-                        {pricingLabel && (
-                          <p className="text-xs text-white/40">
-                            {pricingLabel}
-                          </p>
-                        )}
-                      </div>
-                    )}
+                            {getRepeatableGroupsPrice(item) > 0 && (
+                              <div className="mt-2 flex items-center justify-between gap-3">
+                                <p className="text-[11px] text-white/35">
+                                  Repeated add-ons
+                                </p>
 
-                    {selectedFieldsPrice > 0 && (
-                      <div className="flex items-start justify-between gap-4 border-t border-white/10 pt-4">
-                        <div>
-                          <p className="text-xs text-white/40">
-                            Additional options
-                          </p>
+                                <p className="text-[11px] text-white/50">
+                                  +
+                                  {formatCurrency(
+                                    getRepeatableGroupsPrice(item),
+                                  )}
+                                </p>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
 
-                          <p className="mt-1 text-sm text-white/80">
-                            Selected add-ons
-                          </p>
-                        </div>
+                    <div className="mt-5 space-y-3 border-t border-white/10 pt-5">
+                      <div className="flex items-center justify-between gap-4">
+                        <p className="text-xs text-white/40">Subtotal</p>
 
-                        <p className="shrink-0 text-sm font-medium text-white">
-                          +{formatCurrency(selectedFieldsPrice)}
+                        <p className="text-sm font-medium text-white">
+                          {formatCurrency(subtotal)}
                         </p>
                       </div>
-                    )}
 
-                    <div className="border-t border-white/10 pt-5">
-                      <div className="flex items-end justify-between gap-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-xs text-white/40">GST</p>
+
+                          <p className="mt-0.5 text-[10px] text-white/25">
+                            {paymentMethod === "online"
+                              ? `${ONLINE_GST_RATE}% on subtotal`
+                              : "0% for COD"}
+                          </p>
+                        </div>
+
+                        <p className="text-sm font-medium text-white">
+                          {formatCurrency(gstAmount)}
+                        </p>
+                      </div>
+
+                      <div className="flex items-end justify-between gap-4 border-t border-white/10 pt-5">
                         <div>
                           <p className="text-xs text-white/40">
                             Estimated total
                           </p>
 
-                          {selectedService.pricingType === "custom" &&
-                            !selectedPricingOption &&
-                            selectedGroupedPricingOptions.length === 0 && (
-                              <p className="mt-1 text-[11px] text-white/30">
-                                Final pricing will be confirmed by our team.
-                              </p>
-                            )}
+                          {hasCustomUnpricedService && (
+                            <p className="mt-1 text-[11px] leading-4 text-white/30">
+                              Final pricing will be confirmed by our team.
+                            </p>
+                          )}
                         </div>
 
                         <p className="shrink-0 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-                          {pricingDisplay}
+                          {hasCustomUnpricedService
+                            ? "Custom"
+                            : formatCurrency(estimatedTotal)}
                         </p>
                       </div>
                     </div>
-                  </div>
 
-                  {error && (
-                    <div className="mt-5 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3">
-                      <p className="text-xs leading-5 text-red-300">{error}</p>
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={
-                      submitting ||
-                      loadingService ||
-                      !selectedService ||
-                      (isGroupedPricing
-                        ? false
-                        : pricingOptions.length > 0 && !selectedPricingOption)
-                    }
-                    className="
-                      group
-                      mt-6
-                      flex
-                      w-full
-                      items-center
-                      justify-center
-                      gap-2
-                      rounded-xl
-                      border
-                      border-white
-                      bg-white
-                      px-5
-                      py-3.5
-                      text-sm
-                      font-semibold
-                      text-zinc-900
-                      shadow-[0_8px_25px_rgba(255,255,255,0.08)]
-                      transition-[transform,background-color,box-shadow]
-                      duration-300
-                      ease-out
-                      hover:cursor-pointer
-                      hover:bg-zinc-100
-                      active:translate-y-0
-                      disabled:cursor-not-allowed
-                      disabled:opacity-60
-                    "
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader2 size={17} className="animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-zinc-900">
-                          {paymentMethod === "online"
-                            ? "Continue to payment"
-                            : "Place order"}
-                        </span>
-
-                        <ArrowRight
-                          size={17}
-                          className="
-                            text-zinc-900
-                            transition-transform
-                            duration-200
-                            group-hover:translate-x-0.5
-                          "
-                        />
-                      </>
+                    {error && (
+                      <div className="mt-5 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3">
+                        <p className="text-xs leading-5 text-red-300">
+                          {error}
+                        </p>
+                      </div>
                     )}
-                  </button>
 
-                  <p className="mt-3 text-center text-[11px] leading-5 text-white/30">
-                    Your order details will be reviewed and processed securely.
-                  </p>
-                </div>
-              </section>
+                    <button
+                      type="submit"
+                      disabled={
+                        submitting ||
+                        Boolean(loadingServiceId) ||
+                        !orderItems.length ||
+                        (paymentMethod === "online" && estimatedTotal <= 0)
+                      }
+                      className="group mt-6 flex w-full items-center justify-center gap-2 rounded-xl border border-white bg-white px-5 py-3.5 text-sm font-semibold text-zinc-900 shadow-[0_8px_25px_rgba(255,255,255,0.08)] transition-all duration-300 ease-out hover:bg-zinc-100 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {submitting ? (
+                        <>
+                          <Loader2 size={17} className="animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <span>
+                            {paymentMethod === "online"
+                              ? "Continue to payment"
+                              : "Place order"}
+                          </span>
+
+                          <ArrowRight
+                            size={17}
+                            className="transition-transform duration-200 group-hover:translate-x-0.5"
+                          />
+                        </>
+                      )}
+                    </button>
+
+                    <p className="mt-3 text-center text-[11px] leading-5 text-white/30">
+                      {paymentMethod === "online"
+                        ? "You will be redirected to secure Razorpay Checkout."
+                        : "Your order details will be reviewed and processed securely."}
+                    </p>
+                  </div>
+                </section>
+              )}
             </div>
           </aside>
         </div>

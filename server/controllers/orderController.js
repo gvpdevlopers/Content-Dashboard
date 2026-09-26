@@ -2,15 +2,12 @@ const Order = require("../models/Order");
 const Service = require("../models/Service");
 const generateOrderNumber = require("../utils/generateOrderNumber");
 
-/*
-|--------------------------------------------------------------------------
-| Helpers
-|--------------------------------------------------------------------------
-*/
+const ONLINE_GST_RATE = 18;
 
-/**
- * Check whether a value should be treated as empty.
- */
+/* =========================================================
+   BASIC HELPERS
+========================================================= */
+
 const isEmptyValue = (value) => {
   return (
     value === undefined ||
@@ -19,9 +16,6 @@ const isEmptyValue = (value) => {
   );
 };
 
-/**
- * Convert a value to a string safely.
- */
 const normalizeString = (value) => {
   if (value === undefined || value === null) {
     return "";
@@ -30,28 +24,39 @@ const normalizeString = (value) => {
   return String(value).trim();
 };
 
-/**
- * Validate one dynamic service field.
- */
+const roundCurrency = (value) => {
+  return (
+    Math.round(
+      (Number(value) + Number.EPSILON) * 100
+    ) / 100
+  );
+};
+
+const isPlainObject = (value) => {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value)
+  );
+};
+
+/* =========================================================
+   FIELD VALIDATION
+========================================================= */
+
 const validateFieldValue = (field, value) => {
-  /*
-   * Checkbox fields can legitimately be false.
-   */
+  if (!field) {
+    return null;
+  }
+
   if (field.type === "checkbox") {
-    /*
-     * Support both:
-     *
-     * true / false
-     *
-     * and arrays for future multi-select checkbox fields.
-     */
     if (Array.isArray(value)) {
       if (field.required && value.length === 0) {
         return `${field.label} is required.`;
       }
 
-      const allowedValues = (field.options || []).map((option) =>
-        String(option.value),
+      const allowedValues = (field.options || []).map(
+        (option) => String(option.value),
       );
 
       const invalidValue = value.some(
@@ -80,9 +85,6 @@ const validateFieldValue = (field, value) => {
     return `${field.label} is required.`;
   }
 
-  /*
-   * Optional empty field is valid.
-   */
   if (isEmptyValue(value)) {
     return null;
   }
@@ -98,7 +100,7 @@ const validateFieldValue = (field, value) => {
       if (
         field.min !== undefined &&
         field.min !== null &&
-        numberValue < field.min
+        numberValue < Number(field.min)
       ) {
         return `${field.label} must be at least ${field.min}.`;
       }
@@ -106,13 +108,18 @@ const validateFieldValue = (field, value) => {
       if (
         field.max !== undefined &&
         field.max !== null &&
-        numberValue > field.max
+        numberValue > Number(field.max)
       ) {
         return `${field.label} must not exceed ${field.max}.`;
       }
 
-      if (field.step !== undefined && field.step !== null && field.step > 0) {
-        const remainder = numberValue % field.step;
+      if (
+        field.step !== undefined &&
+        field.step !== null &&
+        Number(field.step) > 0
+      ) {
+        const remainder =
+          numberValue % Number(field.step);
 
         if (Math.abs(remainder) > 0.000001) {
           return `${field.label} must use increments of ${field.step}.`;
@@ -124,8 +131,8 @@ const validateFieldValue = (field, value) => {
 
     case "select":
     case "radio": {
-      const allowedValues = (field.options || []).map((option) =>
-        String(option.value),
+      const allowedValues = (field.options || []).map(
+        (option) => String(option.value),
       );
 
       if (!allowedValues.includes(String(value))) {
@@ -166,16 +173,21 @@ const validateFieldValue = (field, value) => {
   return null;
 };
 
-/**
- * Validate dynamic fields.
- */
-const validateFormData = (serviceFields = [], formData = {}) => {
+const validateFormData = (
+  serviceFields = [],
+  formData = {},
+) => {
   const errors = {};
 
   for (const field of serviceFields) {
-    const value = formData[field.name];
+    if (!field?.name) {
+      continue;
+    }
 
-    const error = validateFieldValue(field, value);
+    const error = validateFieldValue(
+      field,
+      formData[field.name],
+    );
 
     if (error) {
       errors[field.name] = error;
@@ -185,301 +197,92 @@ const validateFormData = (serviceFields = [], formData = {}) => {
   return errors;
 };
 
-/**
- * Keep only fields configured by the service.
- */
-const cleanFormData = (serviceFields = [], formData = {}) => {
-  const cleaned = {};
+/* =========================================================
+   PRICING HELPERS
+========================================================= */
 
-  for (const field of serviceFields) {
-    if (formData[field.name] !== undefined && formData[field.name] !== null) {
-      cleaned[field.name] = formData[field.name];
-    }
-  }
-
-  return cleaned;
+const getActivePricingOptions = (service) => {
+  return Array.isArray(service?.pricingOptions)
+    ? service.pricingOptions.filter(
+        (option) => option && option.isActive !== false,
+      )
+    : [];
 };
 
-/**
- * Merge fields from:
- *
- * 1. Service
- * 2. All selected pricing options
- *
- * If the same field name exists in multiple places,
- * the later pricing-option field takes precedence.
- */
-/**
- * Merge fields from:
- *
- * 1. Service
- * 2. Selected pricing options
- *
- * Pricing-option fields are included only for the pricing options
- * that were actually selected for the order.
- *
- * This works for both:
- *
- * - Normal pricing:
- *     Service
- *       └── Selected Pricing Option
- *             └── Option-specific fields
- *
- * - Grouped pricing:
- *     Service
- *       ├── Shoot
- *       │     └── Selected Shoot Option
- *       │           └── Option-specific fields
- *       ├── Drone
- *       │     └── Selected Drone Option
- *       │           └── Option-specific fields
- *       └── Host
- *             └── Selected Host Option
- *                   └── Option-specific fields
- *
- * Only fields belonging to selected pricing options are included.
- *
- * If the same field name exists in multiple places, the selected
- * pricing-option field takes precedence over the service-level field.
- */
-const getApplicableFields = (
+const findPricingOption = (
   service,
-  pricingOptions = [],
-  isGroupedPricing = false,
+  pricingOptionId,
 ) => {
-  const fields = new Map();
-
-  // ---------------------------------------------------------
-  // SERVICE-LEVEL FIELDS
-  // ---------------------------------------------------------
-  //
-  // These are common fields for the entire service and should
-  // always be available.
-  //
-  // Example:
-  // - Shoot Location
-  // - Preferred Shoot Date
-  // - Reference / Inspiration Link
-  //
-  for (const field of service.fields || []) {
-    if (!field?.name) continue;
-
-    const fieldName = String(field.name).trim();
-
-    if (!fieldName) continue;
-
-    fields.set(fieldName, field);
-  }
-
-  // ---------------------------------------------------------
-  // SELECTED PRICING-OPTION FIELDS
-  // ---------------------------------------------------------
-  //
-  // pricingOptions contains ONLY the pricing options that were
-  // selected for this order.
-  //
-  // For normal pricing this is normally one selected option.
-  //
-  // For grouped pricing this can contain multiple selected
-  // options, for example:
-  //
-  // - Shoot
-  // - Drone
-  // - Host
-  //
-  // Therefore grouped pricing must also include fields from
-  // each selected option.
-  //
-  // The isGroupedPricing argument is intentionally retained for
-  // compatibility with the existing callers. It no longer
-  // changes field resolution because selected pricing options
-  // should work consistently in both pricing modes.
-  //
-  for (const pricingOption of pricingOptions || []) {
-    if (!pricingOption) continue;
-
-    for (const field of pricingOption.fields || []) {
-      if (!field?.name) continue;
-
-      const fieldName = String(field.name).trim();
-
-      if (!fieldName) continue;
-
-      // Pricing-option-specific fields override a service-level
-      // field with the same name.
-      fields.set(fieldName, field);
-    }
-  }
-
-  return Array.from(fields.values()).sort(
-    (a, b) => Number(a.order || 0) - Number(b.order || 0),
-  );
-};
-
-/**
- * Validate and normalize quantity.
- */
-const validateQuantity = (quantity) => {
-  const parsedQuantity = Number(quantity);
-
-  if (
-    !Number.isFinite(parsedQuantity) ||
-    !Number.isInteger(parsedQuantity) ||
-    parsedQuantity < 1
-  ) {
-    return null;
-  }
-
-  return parsedQuantity;
-};
-
-/*
-|--------------------------------------------------------------------------
-| Pricing Option Helpers
-|--------------------------------------------------------------------------
-*/
-
-/**
- * Find an active pricing option by ID.
- */
-const findPricingOption = (service, pricingOptionId) => {
   if (!pricingOptionId) {
     return null;
   }
 
-  if (!Array.isArray(service.pricingOptions)) {
-    return null;
-  }
-
   return (
-    service.pricingOptions.find(
+    getActivePricingOptions(service).find(
       (option) =>
         option._id &&
-        option._id.toString() === pricingOptionId.toString() &&
-        option.isActive,
+        String(option._id) === String(pricingOptionId),
     ) || null
   );
 };
 
-/**
- * Find an active pricing option by group and submitted value.
- *
- * Pricing options currently have:
- *
- * - name
- * - group
- *
- * They do not have a separate "value" property.
- *
- * Therefore the submitted value can match:
- *
- * - option name
- * - option _id
- */
-const findPricingOptionByGroupValue = (service, group, value) => {
+const findPricingOptionByGroupValue = (
+  service,
+  group,
+  value,
+) => {
   if (isEmptyValue(group) || isEmptyValue(value)) {
     return null;
   }
 
-  if (!Array.isArray(service.pricingOptions)) {
-    return null;
-  }
+  const normalizedGroup =
+    normalizeString(group).toLowerCase();
 
-  const normalizedGroup = normalizeString(group).toLowerCase();
-  const normalizedValue = normalizeString(value).toLowerCase();
+  const normalizedValue =
+    normalizeString(value).toLowerCase();
 
   return (
-    service.pricingOptions.find((option) => {
-      if (!option.isActive) {
-        return false;
-      }
+    getActivePricingOptions(service).find(
+      (option) => {
+        if (
+          normalizeString(option.group).toLowerCase() !==
+          normalizedGroup
+        ) {
+          return false;
+        }
 
-      if (normalizeString(option.group).toLowerCase() !== normalizedGroup) {
-        return false;
-      }
+        const optionName =
+          normalizeString(option.name).toLowerCase();
 
-      const optionName = normalizeString(option.name).toLowerCase();
+        const optionId = String(
+          option._id || "",
+        ).toLowerCase();
 
-      const optionId = option._id?.toString().toLowerCase();
-
-      return optionName === normalizedValue || optionId === normalizedValue;
-    }) || null
+        return (
+          optionName === normalizedValue ||
+          optionId === normalizedValue
+        );
+      },
+    ) || null
   );
 };
 
-/**
- * Get all active pricing groups.
- */
-const getPricingGroups = (service) => {
-  const groups = new Map();
+/* =========================================================
+   NORMAL GROUPED PRICING
+========================================================= */
 
-  for (const option of service.pricingOptions || []) {
-    if (!option.isActive) {
-      continue;
-    }
+const resolveGroupedPricingOptions = (
+  service,
+  formData = {},
+) => {
+  const groups = {};
+  const selectedOptions = [];
 
+  for (const option of getActivePricingOptions(service)) {
     const group = normalizeString(option.group);
 
     if (!group) {
       continue;
-    }
-
-    if (!groups.has(group)) {
-      groups.set(group, []);
-    }
-
-    groups.get(group).push(option);
-  }
-
-  return groups;
-};
-
-/**
- * Resolve grouped pricing selections from formData.
- *
- * Generic supported examples:
- *
- * {
- *   shoot: "iPhone Shoot",
- *   drone: true,
- *   host: "Exclusive Host"
- * }
- *
- * or:
- *
- * {
- *   camera: "Professional",
- *   extras: ["Drone", "Lighting"]
- * }
- *
- * Boolean groups:
- *
- * true  -> first active option in that group
- * false -> no option selected
- *
- * String groups:
- *
- * value is matched against pricing option name or id.
- *
- * Array groups:
- *
- * every value is resolved to an active pricing option.
- */
-
-const getPricingOptions = (service) => {
-  return Array.isArray(service.pricingOptions)
-    ? service.pricingOptions.filter((option) => option.isActive)
-    : [];
-};
-
-const resolveGroupedPricingOptions = (service, formData = {}) => {
-  const activeOptions = getPricingOptions(service);
-
-  const groupedOptions = activeOptions.reduce((groups, option) => {
-    const group = normalizeString(option.group);
-
-    if (!group) {
-      return groups;
     }
 
     if (!groups[group]) {
@@ -487,44 +290,46 @@ const resolveGroupedPricingOptions = (service, formData = {}) => {
     }
 
     groups[group].push(option);
+  }
 
-    return groups;
-  }, {});
-
-  const selectedOptions = [];
-
-  Object.entries(groupedOptions).forEach(([group, options]) => {
+  for (const [group, options] of Object.entries(groups)) {
     const selectedValue = formData[group];
 
-    // Optional group not selected.
     if (
       selectedValue === undefined ||
       selectedValue === null ||
       selectedValue === "" ||
       selectedValue === false
     ) {
-      return;
+      continue;
     }
 
-    // Multiple selections are supported for checkbox-style payloads.
     const values = Array.isArray(selectedValue)
       ? selectedValue
       : [selectedValue];
 
-    values.forEach((value) => {
-      if (value === undefined || value === null || value === "") {
-        return;
+    for (const value of values) {
+      if (isEmptyValue(value)) {
+        continue;
       }
 
-      const normalizedValue = normalizeString(value).toLowerCase();
+      const normalizedValue =
+        normalizeString(value).toLowerCase();
 
-      const matchedOption = options.find((option) => {
-        const optionName = normalizeString(option.name).toLowerCase();
+      const matchedOption = options.find(
+        (option) => {
+          const optionName =
+            normalizeString(option.name).toLowerCase();
 
-        const optionId = String(option._id);
+          const optionId =
+            String(option._id || "").toLowerCase();
 
-        return optionName === normalizedValue || optionId === String(value);
-      });
+          return (
+            optionName === normalizedValue ||
+            optionId === normalizedValue
+          );
+        },
+      );
 
       if (!matchedOption) {
         throw new Error(
@@ -532,51 +337,65 @@ const resolveGroupedPricingOptions = (service, formData = {}) => {
         );
       }
 
-      const alreadySelected = selectedOptions.some(
-        (option) => String(option._id) === String(matchedOption._id),
-      );
-
-      if (!alreadySelected) {
+      if (
+        !selectedOptions.some(
+          (option) =>
+            String(option._id) ===
+            String(matchedOption._id),
+        )
+      ) {
         selectedOptions.push(matchedOption);
       }
-    });
-  });
+    }
+  }
 
   return selectedOptions;
 };
 
-const resolveGroupedPricingQuantities = (selectedOptions, formData = {}) => {
-  const pricingQuantities = formData.pricingQuantities || {};
+const resolveGroupedPricingQuantities = (
+  selectedOptions,
+  formData = {},
+) => {
+  const source =
+    formData.pricingQuantities || {};
 
-  if (pricingQuantities !== null && typeof pricingQuantities !== "object") {
-    throw new Error("Pricing quantities must be an object.");
+  if (!isPlainObject(source)) {
+    throw new Error(
+      "Pricing quantities must be an object.",
+    );
   }
 
   const resolved = {};
 
-  selectedOptions.forEach((option) => {
+  for (const option of selectedOptions) {
     const group = normalizeString(option.group);
 
     if (!group) {
-      return;
+      continue;
     }
 
-    const rawQuantity = pricingQuantities[group];
+    const rawQuantity = source[group];
 
-    // If no quantity was supplied, use the option's minimum quantity.
     const quantity =
-      rawQuantity === undefined || rawQuantity === null || rawQuantity === ""
+      rawQuantity === undefined ||
+      rawQuantity === null ||
+      rawQuantity === ""
         ? Number(option.minQuantity || 1)
         : Number(rawQuantity);
 
     if (!Number.isInteger(quantity)) {
-      throw new Error(`Quantity for "${option.name}" must be a whole number.`);
+      throw new Error(
+        `Quantity for "${option.name}" must be a whole number.`,
+      );
     }
 
-    const minQuantity = Number(option.minQuantity || 1);
+    const minQuantity = Number(
+      option.minQuantity || 1,
+    );
 
     const maxQuantity =
-      option.maxQuantity !== undefined && option.maxQuantity !== null
+      option.maxQuantity !== undefined &&
+      option.maxQuantity !== null
         ? Number(option.maxQuantity)
         : undefined;
 
@@ -586,44 +405,42 @@ const resolveGroupedPricingQuantities = (selectedOptions, formData = {}) => {
       );
     }
 
-    if (maxQuantity !== undefined && quantity > maxQuantity) {
+    if (
+      maxQuantity !== undefined &&
+      quantity > maxQuantity
+    ) {
       throw new Error(
         `"${option.name}" allows a maximum quantity of ${maxQuantity}.`,
       );
     }
 
     resolved[group] = quantity;
-  });
+  }
 
   return resolved;
 };
 
-/**
- * Resolve all pricing selections.
- *
- * There are two supported modes:
- *
- * 1. Explicit pricingOptionId
- *    - Existing single pricing-option flow.
- *
- * 2. Grouped pricing
- *    - Pricing options have group values.
- *    - Selections come from formData.
- */
-const resolvePricingSelections = ({ service, pricingOptionId, formData }) => {
+/* =========================================================
+   PRICING SELECTION RESOLUTION
+========================================================= */
+
+const resolvePricingSelections = ({
+  service,
+  pricingOptionId,
+  formData,
+}) => {
   const errors = [];
 
-  /*
-  |--------------------------------------------------------------------------
-  | Explicit single pricing option
-  |--------------------------------------------------------------------------
-  */
-
   if (pricingOptionId) {
-    const pricingOption = findPricingOption(service, pricingOptionId);
+    const pricingOption = findPricingOption(
+      service,
+      pricingOptionId,
+    );
 
     if (!pricingOption) {
-      errors.push("Selected pricing option is not available.");
+      errors.push(
+        "Selected pricing option is not available.",
+      );
 
       return {
         errors,
@@ -639,89 +456,129 @@ const resolvePricingSelections = ({ service, pricingOptionId, formData }) => {
     };
   }
 
-  /*
-  |--------------------------------------------------------------------------
-  | Grouped pricing
-  |--------------------------------------------------------------------------
-  */
-
   const hasGroupedPricing =
-    Array.isArray(service.pricingOptions) &&
-    service.pricingOptions.some(
-      (option) => option.isActive && normalizeString(option.group) !== "",
+    getActivePricingOptions(service).some(
+      (option) =>
+        normalizeString(option.group) !== "",
     );
 
-  if (hasGroupedPricing) {
-    try {
-      const selectedOptions = resolveGroupedPricingOptions(service, formData);
+  if (!hasGroupedPricing) {
+    return {
+      errors,
+      pricingOption: null,
+      selectedOptions: [],
+    };
+  }
 
-      return {
-        errors,
-        pricingOption: null,
-        selectedOptions,
-      };
-    } catch (error) {
-      return {
-        errors: [error.message],
-        pricingOption: null,
-        selectedOptions: [],
-      };
+  try {
+    return {
+      errors,
+      pricingOption: null,
+      selectedOptions:
+        resolveGroupedPricingOptions(
+          service,
+          formData,
+        ),
+    };
+  } catch (error) {
+    return {
+      errors: [error.message],
+      pricingOption: null,
+      selectedOptions: [],
+    };
+  }
+};
+
+/* =========================================================
+   APPLICABLE FIELDS
+========================================================= */
+
+const getApplicableFields = (
+  service,
+  selectedOptions = [],
+) => {
+  const fields = new Map();
+
+  for (const field of service.fields || []) {
+    if (!field?.name) {
+      continue;
+    }
+
+    fields.set(
+      String(field.name).trim(),
+      field,
+    );
+  }
+
+  for (const option of selectedOptions) {
+    for (const field of option.fields || []) {
+      if (!field?.name) {
+        continue;
+      }
+
+      fields.set(
+        String(field.name).trim(),
+        field,
+      );
     }
   }
 
-  /*
-  |--------------------------------------------------------------------------
-  | No pricing option
-  |--------------------------------------------------------------------------
-  */
-
-  return {
-    errors,
-    pricingOption: null,
-    selectedOptions: [],
-  };
+  return Array.from(fields.values()).sort(
+    (a, b) =>
+      Number(a.order || 0) -
+      Number(b.order || 0),
+  );
 };
 
-/*
-|--------------------------------------------------------------------------
-| Quantity Rules
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   QUANTITY
+========================================================= */
 
-/**
- * Validate service/pricing option quantity rules.
- *
- * For multiple pricing options, every selected option's
- * quantity rules are checked.
- */
+const validateQuantity = (quantity) => {
+  const parsed = Number(quantity);
+
+  if (
+    !Number.isFinite(parsed) ||
+    !Number.isInteger(parsed) ||
+    parsed < 1
+  ) {
+    return null;
+  }
+
+  return parsed;
+};
+
 const validateQuantityRules = ({
   service,
-  pricingOptions,
+  selectedOptions,
   quantity,
-  groupedQuantities = {},
-  isGroupedPricing = false,
+  groupedQuantities,
+  isGroupedPricing,
 }) => {
   if (isGroupedPricing) {
-    for (const option of pricingOptions) {
+    for (const option of selectedOptions) {
       const group = normalizeString(option.group);
 
       if (!group) {
         continue;
       }
 
-      const optionQuantity = groupedQuantities[group];
+      const optionQuantity =
+        groupedQuantities[group];
 
-      // Selected options should always have a resolved quantity.
       if (optionQuantity === undefined) {
         throw new Error(
           `Quantity is missing for pricing option "${option.name}".`,
         );
       }
 
-      const minQuantity = Number(option.minQuantity || 1);
+      const minQuantity = Number(
+        option.minQuantity || 1,
+      );
 
       const maxQuantity =
-        option.maxQuantity !== undefined && option.maxQuantity !== null
+        option.maxQuantity !== undefined &&
+        option.maxQuantity !== null
           ? Number(option.maxQuantity)
           : undefined;
 
@@ -737,7 +594,10 @@ const validateQuantityRules = ({
         );
       }
 
-      if (maxQuantity !== undefined && optionQuantity > maxQuantity) {
+      if (
+        maxQuantity !== undefined &&
+        optionQuantity > maxQuantity
+      ) {
         throw new Error(
           `"${option.name}" allows a maximum quantity of ${maxQuantity}.`,
         );
@@ -747,33 +607,50 @@ const validateQuantityRules = ({
     return;
   }
 
-  // Existing normal-service quantity validation.
   const parsedQuantity = Number(quantity);
 
-  if (!Number.isInteger(parsedQuantity) || parsedQuantity < 1) {
-    throw new Error("Quantity must be a whole number greater than 0.");
+  if (
+    !Number.isInteger(parsedQuantity) ||
+    parsedQuantity < 1
+  ) {
+    throw new Error(
+      "Quantity must be a whole number greater than 0.",
+    );
   }
 
-  const serviceMin = Number(service.minQuantity || 1);
+  const serviceMin = Number(
+    service.minQuantity || 1,
+  );
 
   const serviceMax =
-    service.maxQuantity !== undefined && service.maxQuantity !== null
+    service.maxQuantity !== undefined &&
+    service.maxQuantity !== null
       ? Number(service.maxQuantity)
       : undefined;
 
   if (parsedQuantity < serviceMin) {
-    throw new Error(`Minimum quantity for this service is ${serviceMin}.`);
+    throw new Error(
+      `Minimum quantity for this service is ${serviceMin}.`,
+    );
   }
 
-  if (serviceMax !== undefined && parsedQuantity > serviceMax) {
-    throw new Error(`Maximum quantity for this service is ${serviceMax}.`);
+  if (
+    serviceMax !== undefined &&
+    parsedQuantity > serviceMax
+  ) {
+    throw new Error(
+      `Maximum quantity for this service is ${serviceMax}.`,
+    );
   }
 
-  for (const option of pricingOptions) {
-    const minQuantity = Number(option.minQuantity || 1);
+  for (const option of selectedOptions) {
+    const minQuantity = Number(
+      option.minQuantity || 1,
+    );
 
     const maxQuantity =
-      option.maxQuantity !== undefined && option.maxQuantity !== null
+      option.maxQuantity !== undefined &&
+      option.maxQuantity !== null
         ? Number(option.maxQuantity)
         : undefined;
 
@@ -783,7 +660,10 @@ const validateQuantityRules = ({
       );
     }
 
-    if (maxQuantity !== undefined && parsedQuantity > maxQuantity) {
+    if (
+      maxQuantity !== undefined &&
+      parsedQuantity > maxQuantity
+    ) {
       throw new Error(
         `"${option.name}" allows a maximum quantity of ${maxQuantity}.`,
       );
@@ -791,96 +671,1186 @@ const validateQuantityRules = ({
   }
 };
 
-/*
-|--------------------------------------------------------------------------
-| Dynamic Field Pricing
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   FIELD OPTION PRICING
+========================================================= */
 
-/**
- * Get the price contributed by one field value.
- *
- * Pricing is configured on:
- *
- * field.options[].price
- */
-const calculateFieldOptionPrice = (field, value) => {
-  if (!field || !Array.isArray(field.options)) {
+const calculateFieldOptionPrice = (
+  field,
+  value,
+) => {
+  if (
+    !field ||
+    !Array.isArray(field.options) ||
+    isEmptyValue(value)
+  ) {
     return 0;
   }
 
-  if (isEmptyValue(value)) {
-    return 0;
-  }
-
-  /*
-   * Checkbox multiple selection.
-   */
   if (Array.isArray(value)) {
-    return value.reduce((total, selectedValue) => {
-      const option = field.options.find(
-        (item) => String(item.value) === String(selectedValue),
-      );
+    return value.reduce(
+      (total, selectedValue) => {
+        const option = field.options.find(
+          (item) =>
+            String(item.value) ===
+            String(selectedValue),
+        );
 
-      return total + Number(option?.price || 0);
-    }, 0);
+        return (
+          total +
+          Number(option?.price || 0)
+        );
+      },
+      0,
+    );
   }
 
-  /*
-   * Boolean checkbox.
-   *
-   * If true, use the matching true option when
-   * one exists.
-   */
-  if (field.type === "checkbox" && typeof value === "boolean") {
+  if (
+    field.type === "checkbox" &&
+    typeof value === "boolean"
+  ) {
     if (!value) {
       return 0;
     }
 
-    const trueOption = field.options.find(
-      (option) => String(option.value).toLowerCase() === "true",
+    const option = field.options.find(
+      (item) =>
+        String(item.value).toLowerCase() ===
+        "true",
     );
 
-    return Number(trueOption?.price || 0);
+    return Number(option?.price || 0);
   }
 
-  /*
-   * Select / radio / other single selection.
-   */
   const option = field.options.find(
-    (item) => String(item.value) === String(value),
+    (item) =>
+      String(item.value) ===
+      String(value),
   );
 
   return Number(option?.price || 0);
 };
 
-/**
- * Calculate all dynamic field option pricing.
- */
-const calculateFieldOptionsAmount = (applicableFields, formData) => {
-  return applicableFields.reduce((total, field) => {
-    return total + calculateFieldOptionPrice(field, formData[field.name]);
-  }, 0);
+const calculateFieldOptionsAmount = (
+  fields,
+  formData = {},
+) => {
+  return (fields || []).reduce(
+    (total, field) =>
+      total +
+      calculateFieldOptionPrice(
+        field,
+        formData[field.name],
+      ),
+    0,
+  );
 };
 
-/*
-|--------------------------------------------------------------------------
-| Order Amount
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   REPEATABLE GROUP HELPERS
+========================================================= */
 
-/**
- * Calculate the order amount on the SERVER.
- *
- * The frontend amount must never be trusted.
- *
- * Pricing calculation:
- *
- * 1. Multiple selected pricing options
- * 2. Single selected pricing option
- * 3. Service pricing type
- * 4. Dynamic field option prices
- */
+const getRepeatableGroups = (service) => {
+  return Array.isArray(service?.repeatableGroups)
+    ? service.repeatableGroups.filter(
+        (group) =>
+          group &&
+          group.isActive !== false,
+      )
+    : [];
+};
+
+const getRepeatableGroup = (
+  service,
+  groupName,
+) => {
+  const normalizedName =
+    normalizeString(groupName).toLowerCase();
+
+  return (
+    getRepeatableGroups(service).find(
+      (group) =>
+        normalizeString(group.name).toLowerCase() ===
+        normalizedName,
+    ) || null
+  );
+};
+
+const getRepeatablePricingSelections = (
+  item,
+  group,
+) => {
+  if (!isPlainObject(item)) {
+    throw new Error(
+      `"${group.label || group.name}" item must be an object.`,
+    );
+  }
+
+  if (
+    item.pricingOptions !== undefined &&
+    item.pricingOptions !== null &&
+    !isPlainObject(item.pricingOptions)
+  ) {
+    throw new Error(
+      `"${group.label || group.name}" pricingOptions must be an object.`,
+    );
+  }
+
+  return item.pricingOptions || {};
+};
+
+/* =========================================================
+   REPEATABLE PRICING RESOLUTION
+========================================================= */
+
+const resolveRepeatablePricingOptions = (
+  service,
+  group,
+  item,
+) => {
+  const selectedPricing =
+    getRepeatablePricingSelections(
+      item,
+      group,
+    );
+
+  const selectedOptions = [];
+  const errors = [];
+
+  const pricingGroups = Array.isArray(
+    group.pricingGroups,
+  )
+    ? group.pricingGroups
+    : [];
+
+  const requiredPricingGroups =
+    Array.isArray(group.requiredPricingGroups)
+      ? group.requiredPricingGroups
+      : [];
+
+  const configuredGroups = new Set(
+    pricingGroups
+      .map((value) =>
+        normalizeString(value).toLowerCase(),
+      )
+      .filter(Boolean),
+  );
+
+  /*
+  |--------------------------------------------------------------------------
+  | Validate requiredPricingGroups configuration
+  |--------------------------------------------------------------------------
+  */
+
+  for (const requiredGroupRaw of requiredPricingGroups) {
+    const requiredGroup =
+      normalizeString(requiredGroupRaw);
+
+    if (!requiredGroup) {
+      errors.push(
+        `"${group.label || group.name}" contains an empty required pricing group.`,
+      );
+      continue;
+    }
+
+    if (
+      !configuredGroups.has(
+        requiredGroup.toLowerCase(),
+      )
+    ) {
+      errors.push(
+        `"${group.label || group.name}" required pricing group "${requiredGroup}" must also be included in pricingGroups.`,
+      );
+    }
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Resolve each configured pricing group
+  |--------------------------------------------------------------------------
+  */
+
+  for (const pricingGroupRaw of pricingGroups) {
+    const pricingGroup =
+      normalizeString(pricingGroupRaw);
+
+    if (!pricingGroup) {
+      continue;
+    }
+
+    const normalizedGroup =
+      pricingGroup.toLowerCase();
+
+    const selectedValue =
+      selectedPricing[pricingGroup] ??
+      item[pricingGroup];
+
+    const isRequired =
+      requiredPricingGroups.some(
+        (requiredGroup) =>
+          normalizeString(requiredGroup).toLowerCase() ===
+          normalizedGroup,
+      );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Required group missing
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      selectedValue === undefined ||
+      selectedValue === null ||
+      selectedValue === "" ||
+      selectedValue === false
+    ) {
+      if (isRequired) {
+        errors.push(
+          `Pricing selection for required group "${pricingGroup}" is required for ${group.label || group.name}.`,
+        );
+      }
+
+      continue;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Only one pricing option per pricing group
+    |--------------------------------------------------------------------------
+    */
+
+    if (Array.isArray(selectedValue)) {
+      if (selectedValue.length > 1) {
+        errors.push(
+          `Only one pricing option can be selected for pricing group "${pricingGroup}".`,
+        );
+        continue;
+      }
+
+      if (selectedValue.length === 0) {
+        if (isRequired) {
+          errors.push(
+            `Pricing selection for required group "${pricingGroup}" is required.`,
+          );
+        }
+
+        continue;
+      }
+    }
+
+    const value = Array.isArray(selectedValue)
+      ? selectedValue[0]
+      : selectedValue;
+
+    const option =
+      findPricingOptionByGroupValue(
+        service,
+        pricingGroup,
+        value,
+      );
+
+    if (!option) {
+      errors.push(
+        `Invalid pricing option selected for group "${pricingGroup}".`,
+      );
+      continue;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Ensure selected option actually belongs to group
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+      normalizeString(option.group).toLowerCase() !==
+      normalizedGroup
+    ) {
+      errors.push(
+        `Selected pricing option does not belong to group "${pricingGroup}".`,
+      );
+      continue;
+    }
+
+    selectedOptions.push(option);
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Final required-group verification
+  |--------------------------------------------------------------------------
+  */
+
+  for (const requiredGroupRaw of requiredPricingGroups) {
+    const requiredGroup =
+      normalizeString(requiredGroupRaw);
+
+    if (!requiredGroup) {
+      continue;
+    }
+
+    const hasSelection =
+      selectedOptions.some(
+        (option) =>
+          normalizeString(option.group).toLowerCase() ===
+          requiredGroup.toLowerCase(),
+      );
+
+    if (!hasSelection) {
+      errors.push(
+        `Pricing selection for required group "${requiredGroup}" is required.`,
+      );
+    }
+  }
+
+  return {
+    selectedOptions,
+    errors,
+  };
+};
+
+/* =========================================================
+   REPEATABLE PRICING QUANTITIES
+========================================================= */
+
+const resolveRepeatablePricingQuantities = (
+  selectedOptions,
+  item,
+) => {
+  const source =
+    item?.pricingQuantities || {};
+
+  if (!isPlainObject(source)) {
+    throw new Error(
+      "Repeatable pricing quantities must be an object.",
+    );
+  }
+
+  const resolved = {};
+
+  for (const option of selectedOptions) {
+    const group =
+      normalizeString(option.group);
+
+    if (!group) {
+      continue;
+    }
+
+    const rawQuantity =
+      source[group];
+
+    const quantity =
+      rawQuantity === undefined ||
+      rawQuantity === null ||
+      rawQuantity === ""
+        ? Number(option.minQuantity || 1)
+        : Number(rawQuantity);
+
+    if (!Number.isInteger(quantity)) {
+      throw new Error(
+        `Quantity for "${option.name}" must be a whole number.`,
+      );
+    }
+
+    const minQuantity = Number(
+      option.minQuantity || 1,
+    );
+
+    const maxQuantity =
+      option.maxQuantity !== undefined &&
+      option.maxQuantity !== null
+        ? Number(option.maxQuantity)
+        : undefined;
+
+    if (quantity < minQuantity) {
+      throw new Error(
+        `"${option.name}" requires a minimum quantity of ${minQuantity}.`,
+      );
+    }
+
+    if (
+      maxQuantity !== undefined &&
+      quantity > maxQuantity
+    ) {
+      throw new Error(
+        `"${option.name}" allows a maximum quantity of ${maxQuantity}.`,
+      );
+    }
+
+    resolved[group] = quantity;
+  }
+
+  return resolved;
+};
+
+/* =========================================================
+   REPEATABLE ITEM FIELDS
+========================================================= */
+
+const getRepeatableItemFields = (
+  group,
+  selectedOptions = [],
+) => {
+  const fields = new Map();
+
+  for (const field of group.fields || []) {
+    if (!field?.name) {
+      continue;
+    }
+
+    fields.set(
+      String(field.name).trim(),
+      field,
+    );
+  }
+
+  for (const option of selectedOptions) {
+    for (const field of option.fields || []) {
+      if (!field?.name) {
+        continue;
+      }
+
+      fields.set(
+        String(field.name).trim(),
+        field,
+      );
+    }
+  }
+
+  return Array.from(fields.values()).sort(
+    (a, b) =>
+      Number(a.order || 0) -
+      Number(b.order || 0),
+  );
+};
+
+/* =========================================================
+   REPEATABLE GROUP VALIDATION
+========================================================= */
+
+const validateRepeatableGroups = (
+  service,
+  formData = {},
+) => {
+  const errors = {};
+  const groups = getRepeatableGroups(service);
+
+  for (const group of groups) {
+    const groupName =
+      normalizeString(group.name);
+
+    if (!groupName) {
+      continue;
+    }
+
+    const items =
+      formData[groupName];
+
+    const minItems = Number(
+      group.minItems ?? 0,
+    );
+
+    const maxItems =
+      group.maxItems !== undefined &&
+      group.maxItems !== null
+        ? Number(group.maxItems)
+        : undefined;
+
+    if (items === undefined) {
+      if (minItems > 0) {
+        errors[groupName] =
+          `${group.label || groupName} requires at least ${minItems} item(s).`;
+      }
+
+      continue;
+    }
+
+    if (!Array.isArray(items)) {
+      errors[groupName] =
+        `${group.label || groupName} must be an array.`;
+      continue;
+    }
+
+    if (items.length < minItems) {
+      errors[groupName] =
+        `${group.label || groupName} requires at least ${minItems} item(s).`;
+      continue;
+    }
+
+    if (
+      maxItems !== undefined &&
+      items.length > maxItems
+    ) {
+      errors[groupName] =
+        `${group.label || groupName} allows a maximum of ${maxItems} item(s).`;
+      continue;
+    }
+
+    const itemErrors = {};
+
+    for (
+      let index = 0;
+      index < items.length;
+      index += 1
+    ) {
+      const item = items[index];
+
+      if (!isPlainObject(item)) {
+        itemErrors[index] =
+          "Repeatable item must be an object.";
+        continue;
+      }
+
+      let resolved;
+
+      try {
+        resolved =
+          resolveRepeatablePricingOptions(
+            service,
+            group,
+            item,
+          );
+      } catch (error) {
+        itemErrors[index] =
+          error.message;
+        continue;
+      }
+
+      if (resolved.errors.length > 0) {
+        itemErrors[index] =
+          resolved.errors.join(" ");
+        continue;
+      }
+
+      let pricingQuantities;
+
+      try {
+        pricingQuantities =
+          resolveRepeatablePricingQuantities(
+            resolved.selectedOptions,
+            item,
+          );
+      } catch (error) {
+        itemErrors[index] =
+          error.message;
+        continue;
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Validate repeatable fields
+      |--------------------------------------------------------------------------
+      */
+
+      const sourceFields =
+        isPlainObject(item.fields)
+          ? item.fields
+          : item;
+
+      const applicableFields =
+        getRepeatableItemFields(
+          group,
+          resolved.selectedOptions,
+        );
+
+      const fieldErrors =
+        validateFormData(
+          applicableFields,
+          sourceFields,
+        );
+
+      if (Object.keys(fieldErrors).length > 0) {
+        itemErrors[index] = {
+          ...(itemErrors[index] || {}),
+          fields: fieldErrors,
+        };
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | Keep resolved quantities referenced so validation
+      | is performed even if no field errors exist.
+      |--------------------------------------------------------------------------
+      */
+
+      if (
+        pricingQuantities &&
+        Object.keys(pricingQuantities).length === 0 &&
+        resolved.selectedOptions.length > 0
+      ) {
+        itemErrors[index] =
+          itemErrors[index] ||
+          "Unable to resolve repeatable pricing quantities.";
+      }
+    }
+
+    if (Object.keys(itemErrors).length > 0) {
+      errors[groupName] = itemErrors;
+    }
+  }
+
+  return errors;
+};
+
+/* =========================================================
+   CLEAN NORMAL FORM DATA
+========================================================= */
+
+const cleanNormalFormData = (
+  fields,
+  formData = {},
+) => {
+  const cleaned = {};
+
+  for (const field of fields || []) {
+    if (!field?.name) {
+      continue;
+    }
+
+    const name =
+      String(field.name).trim();
+
+    if (!name) {
+      continue;
+    }
+
+    const value =
+      formData[name];
+
+    if (
+      value !== undefined &&
+      value !== null
+    ) {
+      cleaned[name] = value;
+    }
+  }
+
+  return cleaned;
+};
+
+/* =========================================================
+   CLEAN REPEATABLE DATA
+========================================================= */
+
+const cleanRepeatableGroupData = (
+  service,
+  formData = {},
+) => {
+  const cleaned = {};
+
+  for (const group of getRepeatableGroups(service)) {
+    const groupName =
+      normalizeString(group.name);
+
+    if (!groupName) {
+      continue;
+    }
+
+    const items =
+      formData[groupName];
+
+    if (!Array.isArray(items)) {
+      continue;
+    }
+
+    cleaned[groupName] =
+      items.map((item) => {
+        const resolved =
+          resolveRepeatablePricingOptions(
+            service,
+            group,
+            item,
+          );
+
+        const selectedOptions =
+          resolved.selectedOptions;
+
+        const cleanedItem = {};
+
+        /*
+        |--------------------------------------------------------------------------
+        | Pricing options
+        |--------------------------------------------------------------------------
+        */
+
+        const pricingOptions = {};
+
+        for (const groupNameRaw of
+          group.pricingGroups || []) {
+          const pricingGroup =
+            normalizeString(groupNameRaw);
+
+          if (!pricingGroup) {
+            continue;
+          }
+
+          const selectedValue =
+            item?.pricingOptions?.[
+              pricingGroup
+            ] ??
+            item?.[
+              pricingGroup
+            ];
+
+          if (
+            selectedValue !== undefined &&
+            selectedValue !== null &&
+            selectedValue !== ""
+          ) {
+            pricingOptions[
+              pricingGroup
+            ] = Array.isArray(
+              selectedValue,
+            )
+              ? selectedValue[0]
+              : selectedValue;
+          }
+        }
+
+        if (
+          Object.keys(pricingOptions).length > 0
+        ) {
+          cleanedItem.pricingOptions =
+            pricingOptions;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Pricing quantities
+        |--------------------------------------------------------------------------
+        */
+
+        const pricingQuantities =
+          resolveRepeatablePricingQuantities(
+            selectedOptions,
+            item,
+          );
+
+        if (
+          Object.keys(pricingQuantities).length > 0
+        ) {
+          cleanedItem.pricingQuantities =
+            pricingQuantities;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Fields
+        |--------------------------------------------------------------------------
+        */
+
+        const sourceFields =
+          isPlainObject(item?.fields)
+            ? item.fields
+            : item;
+
+        const applicableFields =
+          getRepeatableItemFields(
+            group,
+            selectedOptions,
+          );
+
+        const cleanedFields = {};
+
+        for (const field of applicableFields) {
+          if (!field?.name) {
+            continue;
+          }
+
+          const name =
+            String(field.name).trim();
+
+          if (
+            sourceFields[name] !== undefined &&
+            sourceFields[name] !== null
+          ) {
+            cleanedFields[name] =
+              sourceFields[name];
+          }
+        }
+
+        if (
+          Object.keys(cleanedFields).length > 0
+        ) {
+          cleanedItem.fields =
+            cleanedFields;
+        }
+
+        return cleanedItem;
+      });
+  }
+
+  return cleaned;
+};
+
+/* =========================================================
+   CLEAN COMPLETE FORM DATA
+========================================================= */
+
+const cleanFormData = (
+  service,
+  applicableFields,
+  formData = {},
+) => {
+  const cleaned = cleanNormalFormData(
+    applicableFields,
+    formData,
+  );
+
+  const repeatableData =
+    cleanRepeatableGroupData(
+      service,
+      formData,
+    );
+
+  Object.assign(
+    cleaned,
+    repeatableData,
+  );
+
+  return cleaned;
+};
+
+/* =========================================================
+   REPEATABLE GROUP AMOUNT
+========================================================= */
+
+const calculateRepeatableGroupsAmount = (
+  service,
+  formData = {},
+) => {
+  let total = 0;
+
+  for (const group of getRepeatableGroups(service)) {
+    const groupName =
+      normalizeString(group.name);
+
+    const items =
+      formData[groupName];
+
+    if (!Array.isArray(items)) {
+      continue;
+    }
+
+    for (const item of items) {
+      const {
+        selectedOptions,
+        errors,
+      } = resolveRepeatablePricingOptions(
+        service,
+        group,
+        item,
+      );
+
+      if (errors.length > 0) {
+        throw new Error(
+          errors.join(" "),
+        );
+      }
+
+      const pricingQuantities =
+        resolveRepeatablePricingQuantities(
+          selectedOptions,
+          item,
+        );
+
+      for (const option of selectedOptions) {
+        const pricingGroup =
+          normalizeString(option.group);
+
+        const quantity =
+          pricingQuantities[
+            pricingGroup
+          ] ??
+          Number(
+            option.minQuantity || 1,
+          );
+
+        total +=
+          Number(option.price || 0) *
+          Number(quantity);
+      }
+
+      const sourceFields =
+        isPlainObject(item.fields)
+          ? item.fields
+          : item;
+
+      const applicableFields =
+        getRepeatableItemFields(
+          group,
+          selectedOptions,
+        );
+
+      total +=
+        calculateFieldOptionsAmount(
+          applicableFields,
+          sourceFields,
+        );
+    }
+  }
+
+  return roundCurrency(total);
+};
+
+/* =========================================================
+   REPEATABLE SNAPSHOT
+========================================================= */
+
+const createRepeatableGroupSnapshot = (
+  service,
+  formData = {},
+) => {
+  const snapshots = [];
+
+  for (const group of getRepeatableGroups(service)) {
+    const groupName =
+      normalizeString(group.name);
+
+    const items =
+      formData[groupName];
+
+    if (!Array.isArray(items)) {
+      continue;
+    }
+
+    const snapshotItems =
+      items.map((item) => {
+        const {
+          selectedOptions,
+          errors,
+        } =
+          resolveRepeatablePricingOptions(
+            service,
+            group,
+            item,
+          );
+
+        if (errors.length > 0) {
+          throw new Error(
+            errors.join(" "),
+          );
+        }
+
+        const pricingQuantities =
+          resolveRepeatablePricingQuantities(
+            selectedOptions,
+            item,
+          );
+
+        const pricingSnapshots = {};
+
+        for (const option of selectedOptions) {
+          const pricingGroup =
+            normalizeString(
+              option.group,
+            );
+
+          pricingSnapshots[
+            pricingGroup
+          ] = {
+            id: option._id,
+            name: option.name,
+            description:
+              option.description || "",
+            price: Number(
+              option.price || 0,
+            ),
+            unit:
+              option.unit || "",
+            group:
+              option.group || "",
+            quantity:
+              pricingQuantities[
+                pricingGroup
+              ] ??
+              Number(
+                option.minQuantity || 1,
+              ),
+            minQuantity:
+              option.minQuantity,
+            maxQuantity:
+              option.maxQuantity,
+            isActive:
+              option.isActive,
+          };
+        }
+
+        const pricingOptions = {};
+
+        for (const pricingGroupRaw of
+          group.pricingGroups || []) {
+          const pricingGroup =
+            normalizeString(
+              pricingGroupRaw,
+            );
+
+          if (!pricingGroup) {
+            continue;
+          }
+
+          const value =
+            item?.pricingOptions?.[
+              pricingGroup
+            ] ??
+            item?.[
+              pricingGroup
+            ];
+
+          if (
+            value !== undefined &&
+            value !== null &&
+            value !== ""
+          ) {
+            pricingOptions[
+              pricingGroup
+            ] = Array.isArray(value)
+              ? value[0]
+              : value;
+          }
+        }
+
+        const sourceFields =
+          isPlainObject(item.fields)
+            ? item.fields
+            : item;
+
+        const applicableFields =
+          getRepeatableItemFields(
+            group,
+            selectedOptions,
+          );
+
+        const fields = {};
+
+        for (const field of applicableFields) {
+          if (!field?.name) {
+            continue;
+          }
+
+          const name =
+            String(field.name).trim();
+
+          if (
+            sourceFields[name] !== undefined &&
+            sourceFields[name] !== null
+          ) {
+            fields[name] =
+              sourceFields[name];
+          }
+        }
+
+        return {
+          pricingOptions,
+          pricingQuantities,
+          pricingSnapshots,
+          fields,
+        };
+      });
+
+    snapshots.push({
+      name: groupName,
+      label:
+        group.label || groupName,
+      description:
+        group.description || "",
+      minItems:
+        Number(group.minItems ?? 0),
+      maxItems:
+        group.maxItems !== undefined &&
+        group.maxItems !== null
+          ? Number(group.maxItems)
+          : undefined,
+      pricingGroups:
+        Array.isArray(group.pricingGroups)
+          ? [...group.pricingGroups]
+          : [],
+      requiredPricingGroups:
+        Array.isArray(
+          group.requiredPricingGroups,
+        )
+          ? [...group.requiredPricingGroups]
+          : [],
+      isActive:
+        group.isActive !== false,
+      order:
+        Number(group.order || 0),
+      items: snapshotItems,
+    });
+  }
+
+  return snapshots;
+};
+
+/* =========================================================
+   SERVICE SNAPSHOT
+========================================================= */
+
+const createServiceSnapshot = ({
+  service,
+  selectedOptions = [],
+  groupedQuantities = {},
+  repeatableGroups = [],
+}) => {
+  const selectedOptionSnapshots =
+    selectedOptions.map(
+      (option) => {
+        const group =
+          normalizeString(option.group);
+
+        return {
+          id: option._id,
+          name: option.name,
+          description:
+            option.description || "",
+          price:
+            Number(option.price || 0),
+          unit:
+            option.unit || "",
+          group:
+            option.group || "",
+          quantity:
+            groupedQuantities[group] ??
+            Number(
+              option.minQuantity || 1,
+            ),
+          minQuantity:
+            option.minQuantity,
+          maxQuantity:
+            option.maxQuantity,
+          isActive:
+            option.isActive,
+        };
+      },
+    );
+
+  return {
+    id: service._id,
+    name: service.name,
+    description:
+      service.description || "",
+    category:
+      service.category || "",
+    pricingType:
+      service.pricingType,
+    basePrice:
+      Number(service.basePrice || 0),
+    minQuantity:
+      service.minQuantity,
+    maxQuantity:
+      service.maxQuantity,
+
+    pricingOptions:
+      selectedOptionSnapshots,
+
+    repeatableGroups,
+  };
+};
+
+/* =========================================================
+   NORMAL SERVICE AMOUNT
+========================================================= */
+
 const calculateOrderAmount = ({
   service,
   selectedOptions,
@@ -888,104 +1858,322 @@ const calculateOrderAmount = ({
   fieldAmount = 0,
   groupedQuantities = {},
   isGroupedPricing = false,
+  repeatableAmount = 0,
 }) => {
   let amount = 0;
 
   if (isGroupedPricing) {
     for (const option of selectedOptions) {
-      const group = normalizeString(option.group);
+      const group =
+        normalizeString(option.group);
 
       const optionQuantity =
-        groupedQuantities[group] ?? Number(option.minQuantity || 1);
+        groupedQuantities[group] ??
+        Number(option.minQuantity || 1);
 
-      amount += Number(option.price || 0) * optionQuantity;
+      amount +=
+        Number(option.price || 0) *
+        Number(optionQuantity);
     }
   } else if (selectedOptions.length > 0) {
-    const option = selectedOptions[0];
+    const option =
+      selectedOptions[0];
 
-    amount = Number(option.price || 0) * Number(quantity);
+    amount =
+      Number(option.price || 0) *
+      Number(quantity);
   } else {
-    const pricingType = service.pricingType;
+    switch (service.pricingType) {
+      case "per_unit":
+        amount =
+          Number(service.basePrice || 0) *
+          Number(quantity);
+        break;
 
-    if (pricingType === "per_unit") {
-      amount = Number(service.basePrice || 0) * Number(quantity);
-    } else {
-      amount = Number(service.basePrice || 0);
+      case "fixed":
+      case "starting_from":
+      case "custom":
+      default:
+        amount =
+          Number(service.basePrice || 0);
+        break;
     }
   }
 
   amount += Number(fieldAmount || 0);
+  amount += Number(repeatableAmount || 0);
 
-  return amount;
+  return roundCurrency(amount);
 };
 
-/*
-|--------------------------------------------------------------------------
-| Service Snapshot
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   PROCESS ONE SERVICE ITEM
+========================================================= */
 
-/**
- * Create immutable service snapshot.
- *
- * The snapshot stores the configuration actually used
- * when the order was created.
- */
-const createServiceSnapshot = ({
-  service,
-  selectedOptions = [],
-  groupedQuantities = {},
+const processOrderServiceItem = async ({
+  serviceId,
+  pricingOptionId,
+  quantity = 1,
+  formData = {},
 }) => {
-  const selectedOptionSnapshots = selectedOptions.map((option) => {
-    const group = normalizeString(option.group);
+  const service =
+    await Service.findOne({
+      _id: serviceId,
+      isActive: true,
+    });
 
-    const selectedQuantity =
-      groupedQuantities[group] ?? Number(option.minQuantity || 1);
-
+  if (!service) {
     return {
-      id: option._id,
-      name: option.name,
-      description: option.description,
-      price: option.price,
-      unit: option.unit,
-      group: option.group,
-      quantity: selectedQuantity,
-      minQuantity: option.minQuantity,
-      maxQuantity: option.maxQuantity,
-      isActive: option.isActive,
+      success: false,
+      message:
+        "Selected service is not available.",
     };
-  });
+  }
+
+  if (!isPlainObject(formData)) {
+    return {
+      success: false,
+      message:
+        "Service formData must be an object.",
+    };
+  }
+
+  const parsedQuantity =
+    validateQuantity(quantity);
+
+  if (!parsedQuantity) {
+    return {
+      success: false,
+      message:
+        "Quantity must be a whole number greater than 0.",
+    };
+  }
+
+  let pricingSelection;
+
+  try {
+    pricingSelection =
+      resolvePricingSelections({
+        service,
+        pricingOptionId,
+        formData,
+      });
+  } catch (error) {
+    return {
+      success: false,
+      message: error.message,
+    };
+  }
+
+  if (pricingSelection.errors.length > 0) {
+    return {
+      success: false,
+      message:
+        pricingSelection.errors.join(" "),
+    };
+  }
+
+  const selectedOptions =
+    pricingSelection.selectedOptions;
+
+  const isGroupedPricing =
+    selectedOptions.some(
+      (option) =>
+        normalizeString(option.group) !== "",
+    );
+
+  let groupedQuantities = {};
+
+  if (isGroupedPricing) {
+    try {
+      groupedQuantities =
+        resolveGroupedPricingQuantities(
+          selectedOptions,
+          formData,
+        );
+
+      validateQuantityRules({
+        service,
+        selectedOptions,
+        quantity: parsedQuantity,
+        groupedQuantities,
+        isGroupedPricing: true,
+      });
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  } else {
+    try {
+      validateQuantityRules({
+        service,
+        selectedOptions,
+        quantity: parsedQuantity,
+        groupedQuantities: {},
+        isGroupedPricing: false,
+      });
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+      };
+    }
+  }
+
+  const applicableFields =
+    getApplicableFields(
+      service,
+      selectedOptions,
+    );
+
+  const normalFieldErrors =
+    validateFormData(
+      applicableFields,
+      formData,
+    );
+
+  const repeatableFieldErrors =
+    validateRepeatableGroups(
+      service,
+      formData,
+    );
+
+  const allFieldErrors = {
+    ...normalFieldErrors,
+    ...repeatableFieldErrors,
+  };
+
+  if (Object.keys(allFieldErrors).length > 0) {
+    return {
+      success: false,
+      message:
+        "Please correct the service details.",
+      errors: allFieldErrors,
+    };
+  }
+
+  let cleanedFormData;
+
+  try {
+    cleanedFormData =
+      cleanFormData(
+        service,
+        applicableFields,
+        formData,
+      );
+  } catch (error) {
+    return {
+      success: false,
+      message: error.message,
+    };
+  }
+
+  const normalFieldAmount =
+    calculateFieldOptionsAmount(
+      applicableFields,
+      cleanedFormData,
+    );
+
+  let repeatableAmount = 0;
+
+  try {
+    repeatableAmount =
+      calculateRepeatableGroupsAmount(
+        service,
+        cleanedFormData,
+      );
+  } catch (error) {
+    return {
+      success: false,
+      message: error.message,
+    };
+  }
+
+  let repeatableSnapshot = [];
+
+  try {
+    repeatableSnapshot =
+      createRepeatableGroupSnapshot(
+        service,
+        cleanedFormData,
+      );
+  } catch (error) {
+    return {
+      success: false,
+      message: error.message,
+    };
+  }
+
+  const fieldAmount =
+    roundCurrency(
+      normalFieldAmount,
+    );
+
+  const amount =
+    calculateOrderAmount({
+      service,
+      selectedOptions,
+      quantity: parsedQuantity,
+      fieldAmount,
+      groupedQuantities,
+      isGroupedPricing,
+      repeatableAmount,
+    });
+
+  const serviceSnapshot =
+    createServiceSnapshot({
+      service,
+      selectedOptions,
+      groupedQuantities,
+      repeatableGroups:
+        repeatableSnapshot,
+    });
+
+  /*
+  |--------------------------------------------------------------------------
+  | Important:
+  | Repeatable item count is represented inside
+  | formData[group.name]. Service quantity remains
+  | independent from repeatable item count.
+  |--------------------------------------------------------------------------
+  */
+
+  const item = {
+    service: service._id,
+    serviceSnapshot,
+
+    quantity:
+      isGroupedPricing
+        ? 1
+        : parsedQuantity,
+
+    formData:
+      cleanedFormData,
+
+    amount,
+  };
 
   return {
-    serviceId: service._id,
-    name: service.name,
-    slug: service.slug,
-    category: service.category,
-    description: service.description,
-    pricingType: service.pricingType,
-    basePrice: service.basePrice,
-    unit: service.unit,
-    minQuantity: service.minQuantity,
-    maxQuantity: service.maxQuantity,
-
-    // Keep existing backwards-compatible field.
-    selectedOption:
-      selectedOptionSnapshots.length === 1 ? selectedOptionSnapshots[0] : null,
-
-    // New complete selection snapshot.
-    selectedOptions: selectedOptionSnapshots,
+    success: true,
+    item,
+    service,
+    amount,
   };
 };
 
-/*
-|--------------------------------------------------------------------------
-| Create Order
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   CREATE ORDER
+========================================================= */
 
-const createOrder = async (req, res) => {
+const createOrder = async (
+  req,
+  res,
+) => {
   try {
     const {
+      services,
       serviceId,
       pricingOptionId,
       quantity = 1,
@@ -994,464 +2182,382 @@ const createOrder = async (req, res) => {
       paymentMethod,
     } = req.body;
 
-    /*
-    |--------------------------------------------------------------------------
-    | 1. Basic request validation
-    |--------------------------------------------------------------------------
-    */
-
-    if (!serviceId) {
-      return res.status(400).json({
-        success: false,
-        message: "Service is required.",
-      });
-    }
-
     if (!paymentMethod) {
       return res.status(400).json({
         success: false,
-        message: "Payment method is required.",
-      });
-    }
-
-    if (!["cod", "online"].includes(paymentMethod)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid payment method.",
+        message:
+          "Payment method is required.",
       });
     }
 
     if (
-      formData === null ||
-      typeof formData !== "object" ||
-      Array.isArray(formData)
+      !["cod", "online"].includes(
+        paymentMethod,
+      )
     ) {
       return res.status(400).json({
         success: false,
-        message: "Invalid form data.",
+        message:
+          "Invalid payment method.",
       });
     }
 
     if (
       additionalRequirements !== undefined &&
       additionalRequirements !== null &&
-      typeof additionalRequirements !== "string"
+      typeof additionalRequirements !==
+        "string"
     ) {
       return res.status(400).json({
         success: false,
-        message: "Additional requirements must be a string.",
+        message:
+          "Additional requirements must be a string.",
       });
     }
 
     /*
     |--------------------------------------------------------------------------
-    | 2. Find active service
+    | New multi-service format
     |--------------------------------------------------------------------------
     */
 
-    const service = await Service.findOne({
-      _id: serviceId,
-      isActive: true,
-    });
+    let serviceRequests = [];
 
-    if (!service) {
-      return res.status(404).json({
+    if (Array.isArray(services)) {
+      serviceRequests = services;
+    } else if (serviceId) {
+      /*
+      |--------------------------------------------------------------------------
+      | Legacy single-service compatibility
+      |--------------------------------------------------------------------------
+      */
+
+      serviceRequests = [
+        {
+          serviceId,
+          pricingOptionId,
+          quantity,
+          formData,
+        },
+      ];
+    }
+
+    if (serviceRequests.length === 0) {
+      return res.status(400).json({
         success: false,
-        message: "Selected service is not available.",
+        message:
+          "At least one service is required.",
+      });
+    }
+
+    if (serviceRequests.length > 50) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Too many services in one order.",
       });
     }
 
     /*
     |--------------------------------------------------------------------------
-    | 3. Determine whether this is grouped pricing
+    | Prevent duplicate service IDs
     |--------------------------------------------------------------------------
     */
 
-    const isGroupedPricing =
-      Array.isArray(service.pricingOptions) &&
-      service.pricingOptions.some(
-        (option) => option.isActive && normalizeString(option.group) !== "",
+    const serviceIds = new Set();
+
+    for (const request of serviceRequests) {
+      if (!request?.serviceId) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Each service must contain a serviceId.",
+        });
+      }
+
+      const normalizedId =
+        String(request.serviceId);
+
+      if (serviceIds.has(normalizedId)) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "The same service cannot be added more than once to an order.",
+        });
+      }
+
+      serviceIds.add(normalizedId);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Process all services
+    |--------------------------------------------------------------------------
+    */
+
+    const items = [];
+    const serviceResults = [];
+
+    for (const request of serviceRequests) {
+      const result =
+        await processOrderServiceItem({
+          serviceId:
+            request.serviceId,
+          pricingOptionId:
+            request.pricingOptionId,
+          quantity:
+            request.quantity ?? 1,
+          formData:
+            request.formData || {},
+        });
+
+      if (!result.success) {
+        return res.status(400).json({
+          success: false,
+          message:
+            result.message ||
+            "Unable to process service.",
+          errors:
+            result.errors || undefined,
+        });
+      }
+
+      items.push(result.item);
+
+      serviceResults.push(result);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Calculate subtotal
+    |--------------------------------------------------------------------------
+    */
+
+    const subtotal =
+      roundCurrency(
+        items.reduce(
+          (total, item) =>
+            total +
+            Number(item.amount || 0),
+          0,
+        ),
       );
 
     /*
     |--------------------------------------------------------------------------
-    | 4. Prepare form data
+    | GST
     |--------------------------------------------------------------------------
     |
-    | pricingQuantities is internal pricing information.
-    | It should be used for calculation/validation but should NOT
-    | be treated as a dynamic service field.
-    |
+    | Online payment = 18%
+    | COD = 0%
+    |--------------------------------------------------------------------------
     */
 
-    const submittedFormData = {
-      ...formData,
-    };
+    const gstRate =
+      paymentMethod === "online"
+        ? ONLINE_GST_RATE
+        : 0;
 
-    let pricingQuantities = {};
+    const gstAmount =
+      roundCurrency(
+        subtotal *
+          (gstRate / 100),
+      );
 
-    if (isGroupedPricing) {
-      pricingQuantities = submittedFormData.pricingQuantities || {};
-
-      if (
-        pricingQuantities === null ||
-        typeof pricingQuantities !== "object" ||
-        Array.isArray(pricingQuantities)
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "Pricing quantities must be an object.",
-        });
-      }
-
-      /*
-       * Remove pricingQuantities before dynamic-field validation.
-       */
-      delete submittedFormData.pricingQuantities;
-    }
+    const totalAmount =
+      roundCurrency(
+        subtotal +
+          gstAmount,
+      );
 
     /*
     |--------------------------------------------------------------------------
-    | 5. Validate normal-service quantity
+    | Legacy main service fields
     |--------------------------------------------------------------------------
     |
-    | Grouped services use per-group quantities instead.
-    |
-    */
-
-    let parsedQuantity = 1;
-
-    if (!isGroupedPricing) {
-      parsedQuantity = validateQuantity(quantity);
-
-      if (!parsedQuantity) {
-        return res.status(400).json({
-          success: false,
-          message: "Quantity must be a valid positive whole number.",
-        });
-      }
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | 6. Resolve pricing selections
+    | Existing Order schema contains legacy single-service
+    | fields. Keep them populated for compatibility.
     |--------------------------------------------------------------------------
     */
 
-    const {
-      errors: pricingErrors,
-      pricingOption,
-      selectedOptions,
-    } = resolvePricingSelections({
-      service,
-      pricingOptionId,
-      formData: submittedFormData,
-    });
+    const firstItem =
+      items[0];
 
-    if (pricingErrors.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Please correct the pricing selections.",
-        errors: pricingErrors,
-      });
-    }
+    const orderNumber =
+      await generateOrderNumber();
 
-    /*
-    |--------------------------------------------------------------------------
-    | 7. Resolve per-group quantities
-    |--------------------------------------------------------------------------
-    */
+    const orderData = {
+      client: req.user._id,
 
-    let groupedQuantities = {};
-
-    if (isGroupedPricing) {
-      try {
-        groupedQuantities = resolveGroupedPricingQuantities(
-          selectedOptions,
-          pricingQuantities,
-        );
-      } catch (error) {
-        return res.status(400).json({
-          success: false,
-          message: error.message,
-        });
-      }
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | 8. Validate quantity rules
-    |--------------------------------------------------------------------------
-    */
-
-    try {
-      validateQuantityRules({
-        service,
-        pricingOptions: selectedOptions,
-        quantity: parsedQuantity,
-        groupedQuantities,
-        isGroupedPricing,
-      });
-    } catch (error) {
-      return res.status(400).json({
-        success: false,
-        message: error.message,
-      });
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | 9. Determine applicable dynamic fields
-    |--------------------------------------------------------------------------
-    |
-    | This includes:
-    |
-    | - service.fields
-    | - selected pricing option fields
-    |
-    | For Reels, selecting Camera will therefore include:
-    |
-    | - shootLocation
-    | - preferredShootDate
-    | - referenceLink
-    | - requirements
-    |
-    */
-
-    const applicableFields = getApplicableFields(
-      service,
-      selectedOptions,
-      isGroupedPricing,
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | 10. Validate dynamic fields
-    |--------------------------------------------------------------------------
-    */
-
-    const validationErrors = validateFormData(
-      applicableFields,
-      submittedFormData,
-    );
-
-    if (Object.keys(validationErrors).length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Please correct the form fields.",
-        errors: validationErrors,
-      });
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | 11. Clean dynamic form data
-    |--------------------------------------------------------------------------
-    */
-
-    const cleanFormDataResult = cleanFormData(
-      applicableFields,
-      submittedFormData,
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | 12. Calculate dynamic field pricing
-    |--------------------------------------------------------------------------
-    */
-
-    const fieldAmount = calculateFieldOptionsAmount(
-      applicableFields,
-      cleanFormDataResult,
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | 13. Calculate final amount server-side
-    |--------------------------------------------------------------------------
-    */
-
-    const amount = calculateOrderAmount({
-      service,
-      selectedOptions,
-      quantity: parsedQuantity,
-      fieldAmount,
-      groupedQuantities,
-      isGroupedPricing,
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | 14. Generate unique order number
-    |--------------------------------------------------------------------------
-    */
-
-    let orderNumber;
-    let orderNumberExists = true;
-
-    while (orderNumberExists) {
-      orderNumber = generateOrderNumber();
-
-      const existingOrder = await Order.findOne({
-        orderNumber,
-      });
-
-      orderNumberExists = !!existingOrder;
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | 15. Create immutable service snapshot
-    |--------------------------------------------------------------------------
-    */
-
-    const serviceSnapshot = createServiceSnapshot({
-      service,
-      pricingOption,
-      selectedOptions,
-      groupedQuantities,
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | 16. Create order
-    |--------------------------------------------------------------------------
-    */
-
-    const order = await Order.create({
       orderNumber,
 
-      // Client comes from authenticated JWT.
-      client: req.user.userId,
+      service:
+        firstItem.service,
 
-      service: service._id,
+      serviceSnapshot:
+        firstItem.serviceSnapshot,
 
-      serviceSnapshot,
+      quantity:
+        firstItem.quantity,
 
-      /*
-       * Normal services:
-       *
-       * quantity = selected quantity
-       *
-       * Grouped services:
-       *
-       * quantity = 1
-       * Actual quantities are stored inside
-       * serviceSnapshot.selectedOptions[].quantity
-       */
-      quantity: isGroupedPricing ? 1 : parsedQuantity,
+      formData:
+        firstItem.formData,
 
-      formData: cleanFormDataResult,
+      items,
 
       additionalRequirements:
-        typeof additionalRequirements === "string"
+        typeof additionalRequirements ===
+        "string"
           ? additionalRequirements.trim()
           : "",
 
-      amount,
+      subtotal,
+
+      gstRate,
+
+      gstAmount,
+
+      amount:
+        totalAmount,
 
       paymentMethod,
 
-      paymentStatus: "pending",
+      paymentStatus:
+        "pending",
 
-      orderStatus: "pending",
-    });
+      orderStatus:
+        "pending",
+    };
 
     /*
     |--------------------------------------------------------------------------
-    | 17. Response
+    | Create order
     |--------------------------------------------------------------------------
     */
 
+    const order =
+      await Order.create(
+        orderData,
+      );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Return populated order
+    |--------------------------------------------------------------------------
+    */
+
+    const populatedOrder =
+      await Order.findById(
+        order._id,
+      )
+        .populate(
+          "client",
+          "name email username",
+        )
+        .populate(
+          "service",
+          "name category",
+        )
+        .populate(
+          "items.service",
+          "name category",
+        );
+
     return res.status(201).json({
       success: true,
-
-      message: "Order created successfully.",
-
-      order: {
-        id: order._id,
-
-        orderNumber: order.orderNumber,
-
-        service: order.serviceSnapshot,
-
-        quantity: order.quantity,
-
-        amount: order.amount,
-
-        paymentMethod: order.paymentMethod,
-
-        paymentStatus: order.paymentStatus,
-
-        orderStatus: order.orderStatus,
-
-        formData: Object.fromEntries(order.formData),
-
-        additionalRequirements: order.additionalRequirements,
-
-        createdAt: order.createdAt,
-      },
+      message:
+        "Order created successfully.",
+      order:
+        populatedOrder,
     });
   } catch (error) {
-    console.error("Create order error:", error);
+    console.error(
+      "Create order error:",
+      error,
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to create order.",
+      message:
+        error.message ||
+        "Unable to create order.",
     });
   }
 };
 
-/*
-|--------------------------------------------------------------------------
-| Client - Get My Orders
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   USER - GET MY ORDERS
+========================================================= */
 
-const getMyOrders = async (req, res) => {
+const getMyOrders = async (
+  req,
+  res,
+) => {
   try {
-    const orders = await Order.find({
-      client: req.user.userId,
-    })
-      .select("-codPin")
-      .populate("service", "name category")
-      .sort({
-        createdAt: -1,
-      });
+    const orders =
+      await Order.find({
+        client: req.user._id,
+      })
+        .select("-codPin")
+        .populate(
+          "service",
+          "name category",
+        )
+        .populate(
+          "items.service",
+          "name category",
+        )
+        .sort({
+          createdAt: -1,
+        });
 
     return res.status(200).json({
       success: true,
       orders,
     });
   } catch (error) {
-    console.error("Get orders error:", error);
+    console.error(
+      "Get my orders error:",
+      error,
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to fetch orders.",
+      message:
+        "Unable to fetch orders.",
     });
   }
 };
 
-/*
-|--------------------------------------------------------------------------
-| Client - Get Single Order
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   USER - GET SINGLE ORDER
+========================================================= */
 
-const getOrderById = async (req, res) => {
+const getOrderById = async (
+  req,
+  res,
+) => {
   try {
-    const order = await Order.findOne({
-      _id: req.params.id,
-      client: req.user.userId,
-    })
-      .select("-codPin")
-      .populate("service", "name category");
+    const order =
+      await Order.findOne({
+        _id: req.params.id,
+        client: req.user._id,
+      })
+        .select("-codPin")
+        .populate(
+          "service",
+          "name category",
+        )
+        .populate(
+          "items.service",
+          "name category",
+        );
 
     if (!order) {
       return res.status(404).json({
         success: false,
-        message: "Order not found.",
+        message:
+          "Order not found.",
       });
     }
 
@@ -1460,62 +2566,97 @@ const getOrderById = async (req, res) => {
       order,
     });
   } catch (error) {
-    console.error("Get order error:", error);
+    console.error(
+      "Get order error:",
+      error,
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to fetch order.",
+      message:
+        "Unable to fetch order.",
     });
   }
 };
 
-/*
-|--------------------------------------------------------------------------
-| Admin - Get All Orders
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   ADMIN - GET ALL ORDERS
+========================================================= */
 
-const getAdminOrders = async (req, res) => {
+const getAdminOrders = async (
+  req,
+  res,
+) => {
   try {
-    const orders = await Order.find({})
-      .select("-codPin")
-      .populate("client", "name email username")
-      .populate("service", "name category")
-      .sort({
-        createdAt: -1,
-      });
+    const orders =
+      await Order.find({})
+        .select("-codPin")
+        .populate(
+          "client",
+          "name email username",
+        )
+        .populate(
+          "service",
+          "name category",
+        )
+        .populate(
+          "items.service",
+          "name category",
+        )
+        .sort({
+          createdAt: -1,
+        });
 
     return res.status(200).json({
       success: true,
       orders,
     });
   } catch (error) {
-    console.error("Get admin orders error:", error);
+    console.error(
+      "Get admin orders error:",
+      error,
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to fetch orders.",
+      message:
+        "Unable to fetch orders.",
     });
   }
 };
 
-/*
-|--------------------------------------------------------------------------
-| Admin - Get Single Order
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   ADMIN - GET SINGLE ORDER
+========================================================= */
 
-const getAdminOrderById = async (req, res) => {
+const getAdminOrderById = async (
+  req,
+  res,
+) => {
   try {
-    const order = await Order.findById(req.params.id)
-      .select("-codPin")
-      .populate("client", "name email username")
-      .populate("service", "name category");
+    const order =
+      await Order.findById(
+        req.params.id,
+      )
+        .select("-codPin")
+        .populate(
+          "client",
+          "name email username",
+        )
+        .populate(
+          "service",
+          "name category",
+        )
+        .populate(
+          "items.service",
+          "name category",
+        );
 
     if (!order) {
       return res.status(404).json({
         success: false,
-        message: "Order not found.",
+        message:
+          "Order not found.",
       });
     }
 
@@ -1524,24 +2665,30 @@ const getAdminOrderById = async (req, res) => {
       order,
     });
   } catch (error) {
-    console.error("Get admin order error:", error);
+    console.error(
+      "Get admin order error:",
+      error,
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to fetch order.",
+      message:
+        "Unable to fetch order.",
     });
   }
 };
 
-/*
-|--------------------------------------------------------------------------
-| Admin - Update Order Status
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   ADMIN - UPDATE ORDER STATUS
+========================================================= */
 
-const updateOrderStatus = async (req, res) => {
+const updateOrderStatus = async (
+  req,
+  res,
+) => {
   try {
-    const { status } = req.body;
+    const { status } =
+      req.body;
 
     const allowedStatuses = [
       "pending",
@@ -1554,211 +2701,320 @@ const updateOrderStatus = async (req, res) => {
     if (!status) {
       return res.status(400).json({
         success: false,
-        message: "Order status is required.",
+        message:
+          "Order status is required.",
       });
     }
 
-    if (!allowedStatuses.includes(status)) {
+    if (
+      !allowedStatuses.includes(
+        status,
+      )
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Invalid order status.",
+        message:
+          "Invalid order status.",
       });
     }
 
-    const order = await Order.findById(req.params.id);
+    const order =
+      await Order.findById(
+        req.params.id,
+      );
 
     if (!order) {
       return res.status(404).json({
         success: false,
-        message: "Order not found.",
+        message:
+          "Order not found.",
       });
     }
 
-    order.orderStatus = status;
+    order.orderStatus =
+      status;
 
     await order.save();
 
-    const updatedOrder = await Order.findById(order._id)
-      .select("-codPin")
-      .populate("client", "name email username")
-      .populate("service", "name category");
+    const updatedOrder =
+      await Order.findById(
+        order._id,
+      )
+        .select("-codPin")
+        .populate(
+          "client",
+          "name email username",
+        )
+        .populate(
+          "service",
+          "name category",
+        )
+        .populate(
+          "items.service",
+          "name category",
+        );
 
     return res.status(200).json({
       success: true,
-      message: "Order status updated successfully.",
-      order: updatedOrder,
+      message:
+        "Order status updated successfully.",
+      order:
+        updatedOrder,
     });
   } catch (error) {
-    console.error("Update order status error:", error);
+    console.error(
+      "Update order status error:",
+      error,
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to update order status.",
+      message:
+        "Unable to update order status.",
     });
   }
 };
 
-/*
-|--------------------------------------------------------------------------
-| Admin - Update Payment Status
-|--------------------------------------------------------------------------
-*/
+/* =========================================================
+   ADMIN - UPDATE PAYMENT STATUS
+========================================================= */
 
-const updatePaymentStatus = async (req, res) => {
-  try {
-    const { paymentStatus } = req.body;
+const updatePaymentStatus =
+  async (
+    req,
+    res,
+  ) => {
+    try {
+      const {
+        paymentStatus,
+      } = req.body;
 
-    const allowedStatuses = [
-      "pending",
-      "processing",
-      "paid",
-      "failed",
-      "collected",
-    ];
+      const allowedStatuses = [
+        "pending",
+        "processing",
+        "paid",
+        "failed",
+        "collected",
+      ];
 
-    if (!paymentStatus || !allowedStatuses.includes(paymentStatus)) {
-      return res.status(400).json({
+      if (
+        !paymentStatus ||
+        !allowedStatuses.includes(
+          paymentStatus,
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid payment status.",
+        });
+      }
+
+      const order =
+        await Order.findById(
+          req.params.id,
+        );
+
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Order not found.",
+        });
+      }
+
+      if (
+        order.paymentMethod ===
+          "cod" &&
+        paymentStatus ===
+          "collected"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "COD payment must be completed through COD PIN verification.",
+        });
+      }
+
+      if (
+        order.paymentMethod ===
+          "cod" &&
+        order.paymentStatus ===
+          "collected"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "COD payment has already been collected.",
+        });
+      }
+
+      order.paymentStatus =
+        paymentStatus;
+
+      await order.save();
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Payment status updated successfully.",
+        order: {
+          id: order._id,
+          orderNumber:
+            order.orderNumber,
+          paymentMethod:
+            order.paymentMethod,
+          paymentStatus:
+            order.paymentStatus,
+          orderStatus:
+            order.orderStatus,
+          subtotal:
+            order.subtotal,
+          gstRate:
+            order.gstRate,
+          gstAmount:
+            order.gstAmount,
+          amount:
+            order.amount,
+        },
+      });
+    } catch (error) {
+      console.error(
+        "Update payment status error:",
+        error,
+      );
+
+      return res.status(500).json({
         success: false,
-        message: "Invalid payment status.",
+        message:
+          "Unable to update payment status.",
       });
     }
+  };
 
-    const order = await Order.findById(req.params.id);
+/* =========================================================
+   ADMIN - UPDATE NOTES
+========================================================= */
 
-    if (!order) {
-      return res.status(404).json({
+const updateAdminNotes =
+  async (
+    req,
+    res,
+  ) => {
+    try {
+      const {
+        notes,
+      } = req.body;
+
+      if (
+        notes !== undefined &&
+        typeof notes !== "string"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Notes must be a string.",
+        });
+      }
+
+      const order =
+        await Order.findById(
+          req.params.id,
+        );
+
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Order not found.",
+        });
+      }
+
+      order.notes =
+        typeof notes === "string"
+          ? notes.trim()
+          : "";
+
+      await order.save();
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Admin notes updated successfully.",
+        order: {
+          id: order._id,
+          orderNumber:
+            order.orderNumber,
+          notes:
+            order.notes,
+        },
+      });
+    } catch (error) {
+      console.error(
+        "Update admin notes error:",
+        error,
+      );
+
+      return res.status(500).json({
         success: false,
-        message: "Order not found.",
+        message:
+          "Unable to update admin notes.",
       });
     }
+  };
 
-    /*
-     * COD payment must go through
-     * the COD verification flow.
-     */
-    if (order.paymentMethod === "cod" && paymentStatus === "collected") {
-      return res.status(400).json({
+/* =========================================================
+   ADMIN - GET COD ORDERS
+========================================================= */
+
+const getAdminCodOrders =
+  async (
+    req,
+    res,
+  ) => {
+    try {
+      const orders =
+        await Order.find({
+          paymentMethod: "cod",
+        })
+          .select("-codPin")
+          .populate(
+            "client",
+            "name email username",
+          )
+          .populate(
+            "service",
+            "name category",
+          )
+          .populate(
+            "items.service",
+            "name category",
+          )
+          .sort({
+            createdAt: -1,
+          });
+
+      return res.status(200).json({
+        success: true,
+        orders,
+      });
+    } catch (error) {
+      console.error(
+        "Get admin COD orders error:",
+        error,
+      );
+
+      return res.status(500).json({
         success: false,
-        message: "COD payment must be completed through COD PIN verification.",
+        message:
+          "Unable to fetch COD orders.",
       });
     }
+  };
 
-    /*
-     * Prevent changing an already
-     * collected COD payment.
-     */
-    if (order.paymentMethod === "cod" && order.paymentStatus === "collected") {
-      return res.status(400).json({
-        success: false,
-        message: "COD payment has already been collected.",
-      });
-    }
-
-    order.paymentStatus = paymentStatus;
-
-    await order.save();
-
-    return res.status(200).json({
-      success: true,
-      message: "Payment status updated successfully.",
-      order: {
-        id: order._id,
-        orderNumber: order.orderNumber,
-        paymentMethod: order.paymentMethod,
-        paymentStatus: order.paymentStatus,
-        orderStatus: order.orderStatus,
-      },
-    });
-  } catch (error) {
-    console.error("Update payment status error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Unable to update payment status.",
-    });
-  }
-};
-
-/*
-|--------------------------------------------------------------------------
-| Admin - Update Notes
-|--------------------------------------------------------------------------
-*/
-
-const updateAdminNotes = async (req, res) => {
-  try {
-    const { notes } = req.body;
-
-    if (notes !== undefined && typeof notes !== "string") {
-      return res.status(400).json({
-        success: false,
-        message: "Notes must be a string.",
-      });
-    }
-
-    const order = await Order.findById(req.params.id);
-
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: "Order not found.",
-      });
-    }
-
-    order.notes = typeof notes === "string" ? notes.trim() : "";
-
-    await order.save();
-
-    return res.status(200).json({
-      success: true,
-      message: "Admin notes updated successfully.",
-      order: {
-        id: order._id,
-        orderNumber: order.orderNumber,
-        notes: order.notes,
-      },
-    });
-  } catch (error) {
-    console.error("Update admin notes error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Unable to update admin notes.",
-    });
-  }
-};
-
-/*
-|--------------------------------------------------------------------------
-| Admin - Get All COD Orders
-|--------------------------------------------------------------------------
-*/
-
-const getAdminCodOrders = async (req, res) => {
-  try {
-    const orders = await Order.find({
-      paymentMethod: "cod",
-    })
-      .select("-codPin")
-      .populate("client", "name email username")
-      .populate("service", "name category")
-      .sort({
-        createdAt: -1,
-      });
-
-    return res.status(200).json({
-      success: true,
-      orders,
-    });
-  } catch (error) {
-    console.error("Get admin COD orders error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Unable to fetch COD orders.",
-    });
-  }
-};
+/* =========================================================
+   EXPORTS
+========================================================= */
 
 module.exports = {
   createOrder,

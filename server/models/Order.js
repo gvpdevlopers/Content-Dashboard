@@ -1,5 +1,615 @@
 const mongoose = require("mongoose");
 
+/*
+|--------------------------------------------------------------------------
+| Pricing Option Snapshot Schema
+|--------------------------------------------------------------------------
+|
+| Stores the exact pricing option configuration used when the order
+| was created. This prevents future admin pricing changes from
+| modifying historical orders.
+|
+*/
+
+const selectedOptionSnapshotSchema = new mongoose.Schema(
+  {
+    id: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    description: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    price: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    unit: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    group: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    quantity: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+
+    minQuantity: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
+
+    maxQuantity: {
+      type: Number,
+      default: undefined,
+      min: 1,
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
+/*
+|--------------------------------------------------------------------------
+| Repeatable Pricing Snapshot Schema
+|--------------------------------------------------------------------------
+|
+| Stores the selected pricing configuration for one repeatable item.
+|
+| Example:
+|
+| pricingSnapshots: {
+|   shoot: {
+|     id: "...",
+|     name: "Camera",
+|     price: 5000,
+|     quantity: 1
+|   },
+|   host: {
+|     id: "...",
+|     name: "Local Host",
+|     price: 2000,
+|     quantity: 1
+|   }
+| }
+|
+*/
+
+const repeatablePricingSnapshotSchema = new mongoose.Schema(
+  {
+    id: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    description: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    price: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    unit: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    group: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    quantity: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+
+    minQuantity: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
+
+    maxQuantity: {
+      type: Number,
+      default: undefined,
+      min: 1,
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
+/*
+|--------------------------------------------------------------------------
+| Repeatable Group Item Snapshot Schema
+|--------------------------------------------------------------------------
+|
+| Stores one repeated configuration.
+|
+| Example:
+|
+| {
+|   pricingOptions: {
+|     shoot: "optionId",
+|     drone: "optionId",
+|     host: "optionId"
+|   },
+|
+|   pricingQuantities: {
+|     shoot: 1,
+|     drone: 1,
+|     host: 1
+|   },
+|
+|   pricingSnapshots: {
+|     shoot: {...},
+|     drone: {...},
+|     host: {...}
+|   },
+|
+|   fields: {
+|     url: "...",
+|     requirements: "..."
+|   }
+| }
+|
+*/
+
+const repeatableGroupItemSnapshotSchema = new mongoose.Schema(
+  {
+    pricingOptions: {
+      type: Map,
+      of: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+
+    pricingQuantities: {
+      type: Map,
+      of: Number,
+      default: {},
+    },
+
+    pricingSnapshots: {
+      type: Map,
+      of: repeatablePricingSnapshotSchema,
+      default: {},
+    },
+
+    fields: {
+      type: Map,
+      of: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
+/*
+|--------------------------------------------------------------------------
+| Repeatable Group Snapshot Schema
+|--------------------------------------------------------------------------
+|
+| Stores the configuration of a repeatable group at the time the
+| order was created.
+|
+| Example:
+|
+| repeatableGroups: [
+|   {
+|     name: "reels",
+|     label: "Reel",
+|     minItems: 1,
+|     maxItems: 10,
+|     pricingGroups: ["shoot", "drone", "host"],
+|     requiredPricingGroups: ["shoot"],
+|     items: [...]
+|   }
+| ]
+|
+*/
+
+const repeatableGroupSnapshotSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    label: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    description: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    minItems: {
+      type: Number,
+      default: 1,
+      min: 0,
+    },
+
+    maxItems: {
+      type: Number,
+      default: undefined,
+      min: 1,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | Available Pricing Groups
+    |--------------------------------------------------------------------------
+    |
+    | Stores all pricing groups that were available for this repeatable
+    | group when the order was created.
+    |
+    | Example:
+    |
+    | ["shoot", "drone", "host"]
+    |
+    */
+
+    pricingGroups: {
+      type: [String],
+      default: [],
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | Required Pricing Groups
+    |--------------------------------------------------------------------------
+    |
+    | Stores which pricing groups were mandatory when the order was
+    | created.
+    |
+    | Example:
+    |
+    | pricingGroups: ["shoot", "drone", "host"]
+    | requiredPricingGroups: ["shoot"]
+    |
+    | This is important for historical accuracy because an admin may
+    | later change which pricing groups are required.
+    |
+    */
+
+    requiredPricingGroups: {
+      type: [String],
+      default: [],
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+
+    order: {
+      type: Number,
+      default: 0,
+    },
+
+    items: {
+      type: [repeatableGroupItemSnapshotSchema],
+      default: [],
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
+/*
+|--------------------------------------------------------------------------
+| Service Snapshot Schema
+|--------------------------------------------------------------------------
+|
+| Stores the complete service configuration used for one order item.
+|
+| This is intentionally embedded so future changes to the Service
+| document do not affect historical orders.
+|
+*/
+
+const serviceSnapshotSchema = new mongoose.Schema(
+  {
+    serviceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    slug: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    category: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    description: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    pricingType: {
+      type: String,
+      enum: ["fixed", "per_unit", "starting_from", "custom"],
+      default: "fixed",
+    },
+
+    basePrice: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    unit: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    minQuantity: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
+
+    maxQuantity: {
+      type: Number,
+      default: undefined,
+      min: 1,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | Backward-compatible single selected option
+    |--------------------------------------------------------------------------
+    |
+    | Existing code may expect serviceSnapshot.selectedOption.
+    | Keep it while selectedOptions remains the complete source.
+    |
+    */
+
+    selectedOption: {
+      type: selectedOptionSnapshotSchema,
+      default: null,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | Complete selected pricing options
+    |--------------------------------------------------------------------------
+    |
+    | Supports:
+    |
+    | 1. Normal pricing
+    | 2. Grouped pricing
+    | 3. Multiple selected pricing options
+    |
+    */
+
+    selectedOptions: {
+      type: [selectedOptionSnapshotSchema],
+      default: [],
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | Repeatable Groups
+    |--------------------------------------------------------------------------
+    |
+    | Supports repeatable configurations such as:
+    |
+    | - Reels
+    | - Multiple videos
+    | - Multiple creatives
+    | - Multiple posts
+    | - Future repeatable service configurations
+    |
+    | Example:
+    |
+    | repeatableGroups: [
+    |   {
+    |     name: "reels",
+    |     label: "Reel",
+    |     pricingGroups: ["shoot", "drone", "host"],
+    |     requiredPricingGroups: ["shoot"],
+    |     items: [
+    |       {...},
+    |       {...}
+    |     ]
+    |   }
+    | ]
+    |
+    */
+
+    repeatableGroups: {
+      type: [repeatableGroupSnapshotSchema],
+      default: [],
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
+/*
+|--------------------------------------------------------------------------
+| Order Item Schema
+|--------------------------------------------------------------------------
+|
+| One Order can contain multiple services.
+|
+| Example:
+|
+| items: [
+|   {
+|     service: "...",
+|     serviceSnapshot: {...},
+|     quantity: 1,
+|     formData: {...},
+|     amount: 8000
+|   },
+|   {
+|     service: "...",
+|     serviceSnapshot: {...},
+|     quantity: 2,
+|     formData: {...},
+|     amount: 5000
+|   }
+| ]
+|
+*/
+
+const orderItemSchema = new mongoose.Schema(
+  {
+    service: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Service",
+      required: true,
+    },
+
+    serviceSnapshot: {
+      type: serviceSnapshotSchema,
+      required: true,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | Quantity
+    |--------------------------------------------------------------------------
+    |
+    | For normal services this is the selected service quantity.
+    |
+    | For grouped pricing, the controller stores 1 here because
+    | each pricing option has its own quantity inside the snapshot.
+    |
+    */
+
+    quantity: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | Dynamic service form data
+    |--------------------------------------------------------------------------
+    |
+    | Supports normal fields as well as repeatable groups.
+    |
+    | Example:
+    |
+    | formData: {
+    |   reels: [
+    |     {
+    |       url: "...",
+    |       requirements: "..."
+    |     },
+    |     {
+    |       url: "...",
+    |       requirements: "..."
+    |     }
+    |   ]
+    | }
+    |
+    */
+
+    formData: {
+      type: Map,
+      of: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | Server-calculated amount for this service
+    |--------------------------------------------------------------------------
+    */
+
+    amount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+  },
+  {
+    _id: true,
+  }
+);
+
+/*
+|--------------------------------------------------------------------------
+| Main Order Schema
+|--------------------------------------------------------------------------
+*/
+
 const orderSchema = new mongoose.Schema(
   {
     orderNumber: {
@@ -15,189 +625,59 @@ const orderSchema = new mongoose.Schema(
       required: true,
     },
 
+    /*
+    |--------------------------------------------------------------------------
+    | MULTI-SERVICE ORDER ITEMS
+    |--------------------------------------------------------------------------
+    |
+    | New orders use this field.
+    |
+    */
+
+    items: {
+      type: [orderItemSchema],
+      default: [],
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | LEGACY SINGLE-SERVICE FIELDS
+    |--------------------------------------------------------------------------
+    |
+    | These are intentionally retained.
+    |
+    | Existing orders already stored:
+    |
+    | - service
+    | - serviceSnapshot
+    | - quantity
+    | - formData
+    |
+    | Keeping them prevents existing historical orders from breaking.
+    |
+    | For new multi-service orders these fields contain the first
+    | selected service for backward compatibility with existing
+    | payment/COD/admin code.
+    |
+    */
+
     service: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Service",
       required: true,
     },
 
-    /*
-     * Snapshot of the service at the time the order was created.
-     *
-     * This prevents future admin service/price changes
-     * from affecting historical orders.
-     */
     serviceSnapshot: {
-      name: {
-        type: String,
-        required: true,
-        trim: true,
-      },
-
-      category: {
-        type: String,
-        required: true,
-        trim: true,
-      },
-
-      description: {
-        type: String,
-        default: "",
-        trim: true,
-      },
-
-      pricingType: {
-        type: String,
-        enum: ["fixed", "per_unit", "starting_from", "custom"],
-        default: "fixed",
-      },
-
-      basePrice: {
-        type: Number,
-        required: true,
-        min: 0,
-      },
-
-      unit: {
-        type: String,
-        default: "",
-        trim: true,
-      },
-
-      /*
-       * Pricing option snapshot.
-       *
-       * This supports both:
-       *
-       * 1. Normal services with one selected pricing option.
-       * 2. Grouped services with multiple independently
-       *    selected pricing options.
-       *
-       * Example:
-       *
-       * [
-       *   {
-       *     id: "...",
-       *     name: "iPhone Shoot",
-       *     price: 3000,
-       *     unit: "per reel",
-       *     group: "shoot",
-       *     quantity: 2
-       *   },
-       *   {
-       *     id: "...",
-       *     name: "Drone",
-       *     price: 3500,
-       *     unit: "per reel",
-       *     group: "drone",
-       *     quantity: 1
-       *   }
-       * ]
-       *
-       * Keeping this as an array also preserves compatibility
-       * with existing orders that contain a single option.
-       */
-      selectedOptions: {
-        type: [
-          {
-            id: {
-              type: mongoose.Schema.Types.ObjectId,
-              default: null,
-            },
-
-            name: {
-              type: String,
-              required: true,
-              trim: true,
-            },
-
-            description: {
-              type: String,
-              default: "",
-              trim: true,
-            },
-
-            price: {
-              type: Number,
-              required: true,
-              min: 0,
-            },
-
-            unit: {
-              type: String,
-              default: "",
-              trim: true,
-            },
-
-            group: {
-              type: String,
-              default: "",
-              trim: true,
-            },
-
-            quantity: {
-              type: Number,
-              required: true,
-              min: 1,
-            },
-
-            minQuantity: {
-              type: Number,
-              default: 1,
-              min: 1,
-            },
-
-            maxQuantity: {
-              type: Number,
-              default: undefined,
-              min: 1,
-            },
-
-            isActive: {
-              type: Boolean,
-              default: true,
-            },
-          },
-        ],
-
-        default: [],
-      },
+      type: serviceSnapshotSchema,
+      required: true,
     },
 
-    /*
-     * Quantity selected by the client.
-     *
-     * For normal services this contains the actual
-     * requested quantity.
-     *
-     * For grouped pricing, the controller uses quantity = 1
-     * because each selected pricing option has its own quantity
-     * inside serviceSnapshot.selectedOptions.
-     */
     quantity: {
       type: Number,
       default: 1,
       min: 1,
     },
 
-    /*
-     * Stores dynamic fields submitted by the client.
-     *
-     * The structure depends on the selected service and
-     * selected pricing options.
-     *
-     * Example:
-     *
-     * {
-     *   projectName: "ABC",
-     *   videoStyle: "cinematic",
-     *   voiceType: "professional",
-     *   pricingQuantities: {
-     *     shoot: 2,
-     *     drone: 1
-     *   }
-     * }
-     */
     formData: {
       type: Map,
       of: mongoose.Schema.Types.Mixed,
@@ -205,8 +685,11 @@ const orderSchema = new mongoose.Schema(
     },
 
     /*
-     * Optional information provided by the client.
-     */
+    |--------------------------------------------------------------------------
+    | Additional requirements
+    |--------------------------------------------------------------------------
+    */
+
     additionalRequirements: {
       type: String,
       default: "",
@@ -214,12 +697,52 @@ const orderSchema = new mongoose.Schema(
     },
 
     /*
-     * Final server-calculated order amount.
-     *
-     * Never trust the amount sent by the frontend.
-     * The order controller calculates this from the
-     * current service configuration.
-     */
+    |--------------------------------------------------------------------------
+    | Pricing
+    |--------------------------------------------------------------------------
+    |
+    | subtotal = sum of all selected service item amounts
+    |
+    | gstRate = 18 for online orders
+    | gstRate = 0 for COD
+    |
+    | gstAmount = calculated GST
+    |
+    | amount = final payable amount
+    |
+    */
+
+    subtotal: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    gstRate: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    gstAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    /*
+    |--------------------------------------------------------------------------
+    | Final server-calculated amount
+    |--------------------------------------------------------------------------
+    |
+    | This remains the final payable amount.
+    |
+    | Razorpay and COD code can continue using:
+    |
+    | order.amount
+    |
+    */
+
     amount: {
       type: Number,
       required: true,
@@ -227,8 +750,11 @@ const orderSchema = new mongoose.Schema(
     },
 
     /*
-     * Payment information
-     */
+    |--------------------------------------------------------------------------
+    | Payment information
+    |--------------------------------------------------------------------------
+    */
+
     paymentMethod: {
       type: String,
       enum: ["cod", "online"],
@@ -242,8 +768,11 @@ const orderSchema = new mongoose.Schema(
     },
 
     /*
-     * Razorpay information
-     */
+    |--------------------------------------------------------------------------
+    | Razorpay information
+    |--------------------------------------------------------------------------
+    */
+
     razorpayOrderId: {
       type: String,
       default: null,
@@ -260,8 +789,11 @@ const orderSchema = new mongoose.Schema(
     },
 
     /*
-     * COD information
-     */
+    |--------------------------------------------------------------------------
+    | COD information
+    |--------------------------------------------------------------------------
+    */
+
     codPin: {
       type: String,
       default: null,
@@ -280,32 +812,44 @@ const orderSchema = new mongoose.Schema(
     },
 
     /*
-     * When the admin generated the COD PIN
-     */
+    |--------------------------------------------------------------------------
+    | When the admin generated the COD PIN
+    |--------------------------------------------------------------------------
+    */
+
     codPinGeneratedAt: {
       type: Date,
       default: null,
     },
 
     /*
-     * When the client successfully verified the COD PIN
-     */
+    |--------------------------------------------------------------------------
+    | When the client successfully verified the COD PIN
+    |--------------------------------------------------------------------------
+    */
+
     codPinVerifiedAt: {
       type: Date,
       default: null,
     },
 
     /*
-     * When COD payment was successfully collected
-     */
+    |--------------------------------------------------------------------------
+    | When COD payment was successfully collected
+    |--------------------------------------------------------------------------
+    */
+
     codCollectedAt: {
       type: Date,
       default: null,
     },
 
     /*
-     * Order workflow status
-     */
+    |--------------------------------------------------------------------------
+    | Order workflow status
+    |--------------------------------------------------------------------------
+    */
+
     orderStatus: {
       type: String,
       enum: [
@@ -319,8 +863,11 @@ const orderSchema = new mongoose.Schema(
     },
 
     /*
-     * Admin notes
-     */
+    |--------------------------------------------------------------------------
+    | Admin notes
+    |--------------------------------------------------------------------------
+    */
+
     notes: {
       type: String,
       default: "",
