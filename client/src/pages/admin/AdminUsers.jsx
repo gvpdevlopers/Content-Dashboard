@@ -8,6 +8,7 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  Trash2,
   UserRound,
   Users,
 } from "lucide-react";
@@ -16,6 +17,8 @@ import { Link, useNavigate } from "react-router-dom";
 
 import adminUserService from "../../services/adminUserService";
 import CustomSelect from "../../components/CustomSelect";
+import ConfirmDialog from "../../components/ConfirmDialog";
+import { toast } from "sonner";
 
 const USERS_PER_BATCH = 20;
 
@@ -23,6 +26,8 @@ const AdminUsers = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [deletingUserId, setDeletingUserId] = useState("");
+  const [userToDelete, setUserToDelete] = useState(null);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -50,6 +55,39 @@ const AdminUsers = () => {
       setError(error.response?.data?.message || "Unable to load users.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteUser = (user) => {
+    if (user.role === "admin") {
+      return;
+    }
+
+    setUserToDelete(user);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) {
+      return;
+    }
+
+    const user = userToDelete;
+    try {
+      setDeletingUserId(user._id);
+      setError("");
+      await adminUserService.deleteUser(user._id);
+      setUsers((current) =>
+        current.filter((entry) => entry._id !== user._id),
+      );
+      toast.success("User deleted successfully.");
+    } catch (deleteError) {
+      console.error("Delete user error:", deleteError);
+      const message =
+        deleteError.response?.data?.message || "Unable to delete user.";
+      toast.error(message);
+    } finally {
+      setDeletingUserId("");
+      setUserToDelete(null);
     }
   };
 
@@ -570,6 +608,10 @@ const AdminUsers = () => {
                   label: "Clients",
                 },
                 {
+                  value: "employee",
+                  label: "Employees",
+                },
+                {
                   value: "admin",
                   label: "Admins",
                 },
@@ -688,13 +730,13 @@ const AdminUsers = () => {
               border border-zinc-200
               bg-white
               shadow-[0_15px_55px_rgba(0,0,0,0.05)]
-              md:block
+              lg:block
             "
           >
             <div
               className="
                 grid
-                grid-cols-[1.5fr_1.4fr_1fr_0.8fr_0.8fr_70px]
+                grid-cols-[minmax(0,1.5fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_92px]
                 border-b
                 border-zinc-200
                 bg-zinc-50
@@ -721,6 +763,8 @@ const AdminUsers = () => {
                   key={user._id}
                   user={user}
                   onStatusChange={loadUsers}
+                  onDelete={handleDeleteUser}
+                  deleting={deletingUserId === user._id}
                 />
               ))}
             </div>
@@ -730,12 +774,14 @@ const AdminUsers = () => {
               MOBILE CARDS
           ================================================== */}
 
-          <div className="space-y-3 md:hidden">
+          <div className="space-y-3 lg:hidden">
             {visibleUsers.map((user) => (
               <UserMobileCard
                 key={user._id}
                 user={user}
                 onStatusChange={loadUsers}
+                onDelete={handleDeleteUser}
+                deleting={deletingUserId === user._id}
               />
             ))}
           </div>
@@ -781,6 +827,16 @@ const AdminUsers = () => {
           )}
         </>
       )}
+      <ConfirmDialog
+        open={Boolean(userToDelete)}
+        title="Delete this user?"
+        description={`Delete ${userToDelete?.name || "this user"}? This action cannot be undone.`}
+        confirmLabel="Delete user"
+        destructive
+        loading={Boolean(deletingUserId)}
+        onConfirm={confirmDeleteUser}
+        onCancel={() => setUserToDelete(null)}
+      />
     </div>
   );
 };
@@ -863,13 +919,13 @@ const StatCard = ({ icon: Icon, label, value, secondary }) => {
    DESKTOP USER ROW
 ========================================================= */
 
-const UserTableRow = ({ user, onStatusChange }) => {
+const UserTableRow = ({ user, onDelete, deleting }) => {
   return (
     <div
       className="
         group
         grid
-        grid-cols-[1.5fr_1.4fr_1fr_0.8fr_0.8fr_70px]
+        grid-cols-[minmax(0,1.5fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_92px]
         items-center
         border-b
         border-zinc-100
@@ -949,38 +1005,34 @@ const UserTableRow = ({ user, onStatusChange }) => {
 
       {/* Action */}
 
-      <Link
-  to={`/admin/users/${user._id}`}
-  className="
-    group/view
-    flex h-9 w-9
-    items-center
-    justify-center
-    justify-self-end
-    rounded-lg
-    border
-    border-zinc-200
-    bg-white
-    text-zinc-400
-    shadow-sm
-    transition-all
-    duration-200
-    hover:border-zinc-900
-    hover:bg-zinc-900
-  "
-  aria-label={`View ${user.name || "user"}`}
->
-  <ChevronRight
-    size={16}
-    strokeWidth={1.8}
-    className="
-      text-zinc-400
-      transition-colors
-      duration-200
-      group-hover/view:text-white
-    "
-  />
-</Link>
+      <div className="flex items-center justify-end gap-2">
+        <Link
+          to={`/admin/users/${user._id}`}
+          className="group/view flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-400 shadow-sm transition-all duration-200 hover:border-zinc-900 hover:bg-zinc-900"
+          aria-label={`View ${user.name || "user"}`}
+        >
+          <ChevronRight
+            size={16}
+            strokeWidth={1.8}
+            className="text-zinc-400 transition-colors duration-200 group-hover/view:text-white"
+          />
+        </Link>
+        {user.role !== "admin" && (
+          <button
+            type="button"
+            onClick={() => onDelete(user)}
+            disabled={deleting}
+            aria-label={`Delete ${user.name || "user"}`}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-400 shadow-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+          >
+            {deleting ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : (
+              <Trash2 size={15} />
+            )}
+          </button>
+        )}
+      </div>
     </div>
   );
 };
@@ -989,7 +1041,7 @@ const UserTableRow = ({ user, onStatusChange }) => {
    MOBILE USER CARD
 ========================================================= */
 
-const UserMobileCard = ({ user, onStatusChange }) => {
+const UserMobileCard = ({ user, onStatusChange, onDelete, deleting }) => {
   const [updating, setUpdating] = useState(false);
 
   const toggleStatus = async () => {
@@ -1225,6 +1277,22 @@ const UserMobileCard = ({ user, onStatusChange }) => {
             ) : (
               "Enable"
             )}
+          </button>
+        )}
+        {user.role !== "admin" && (
+          <button
+            type="button"
+            onClick={() => onDelete(user)}
+            disabled={deleting}
+            className="flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-3 text-sm text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+            aria-label={`Delete ${user.name || "user"}`}
+          >
+            {deleting ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : (
+              <Trash2 size={15} />
+            )}
+            Delete
           </button>
         )}
       </div>

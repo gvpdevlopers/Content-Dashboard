@@ -382,55 +382,10 @@ const AdminDashboard = () => {
       </section>
 
       {/* =====================================================
-          QUICK ACTIONS
-      ===================================================== */}
-
-      <section className="mt-8">
-        <div className="mb-4">
-          <p
-            className="
-              text-[10px]
-              font-medium
-              uppercase
-              tracking-[0.2em]
-              text-zinc-400
-            "
-          >
-            Quick Access
-          </p>
-
-          <h2 className="mt-1 text-xl font-medium text-zinc-900">Manage</h2>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <QuickAction
-            icon={ClipboardList}
-            title="Orders"
-            description="View and manage client orders."
-            to="/admin/orders"
-          />
-
-          <QuickAction
-            icon={Users}
-            title="Users"
-            description="Manage registered clients."
-            to="/admin/users"
-          />
-
-          <QuickAction
-            icon={KeyRound}
-            title="COD Payments"
-            description="Generate COD payment PINs."
-            to="/admin/cod"
-          />
-        </div>
-      </section>
-
-      {/* =====================================================
           RECENT ORDERS
       ===================================================== */}
 
-      <section className="mt-8">
+      <section className="mt-6">
         <div className="mb-4 flex items-end justify-between gap-4">
           <div>
             <p
@@ -654,111 +609,6 @@ const StatCard = ({ icon: Icon, label, value, description }) => {
         <p className="mt-1 text-xs text-zinc-500">{description}</p>
       </div>
     </div>
-  );
-};
-
-/* =========================================================
-   QUICK ACTION
-========================================================= */
-
-const QuickAction = ({ icon: Icon, title, description, to }) => {
-  return (
-    <Link
-      to={to}
-      className="
-        group
-        relative
-        overflow-hidden
-        rounded-[22px]
-        border border-zinc-200
-        bg-white
-        p-5
-        shadow-[0_10px_35px_rgba(0,0,0,0.04)]
-        transition-[border-color,box-shadow,background-color]
-        duration-300
-        ease-out
-        hover:border-zinc-300
-        hover:bg-zinc-50
-        hover:shadow-[0_14px_40px_rgba(0,0,0,0.06)]
-      "
-    >
-      <div
-        className="
-          pointer-events-none
-          absolute
-          -right-12
-          -top-12
-          h-28
-          w-28
-          rounded-full
-          bg-cyan-300/[0.025]
-          blur-3xl
-          opacity-0
-          transition-opacity
-          duration-500
-          ease-out
-          group-hover:opacity-100
-        "
-      />
-
-      <div className="relative flex items-start justify-between">
-        <div
-          className="
-            flex h-10 w-10
-            items-center justify-center
-            rounded-xl
-            border border-zinc-200
-            bg-zinc-50
-            text-zinc-500
-            transition-[border-color,background-color,color,box-shadow]
-            duration-300
-            ease-out
-            group-hover:border-zinc-300
-            group-hover:bg-zinc-100
-            group-hover:text-zinc-800
-            group-hover:shadow-sm
-          "
-        >
-          <Icon size={18} strokeWidth={1.6} />
-        </div>
-
-        <div
-          className="
-            flex h-8 w-8
-            items-center justify-center
-            rounded-lg
-            border border-zinc-200
-            bg-white
-            text-zinc-400
-            shadow-sm
-            transition-[border-color,background-color,color,box-shadow]
-            duration-300
-            ease-out
-            group-hover:border-zinc-800
-            group-hover:bg-zinc-900
-            group-hover:text-white
-          "
-        >
-          <ArrowUpRight
-            size={15}
-            strokeWidth={1.7}
-            className="
-              transition-transform
-              duration-300
-              ease-out
-              group-hover:translate-x-[2px]
-              group-hover:-translate-y-[2px]
-            "
-          />
-        </div>
-      </div>
-
-      <div className="relative mt-5">
-        <h3 className="text-sm font-medium text-zinc-900">{title}</h3>
-
-        <p className="mt-1 text-xs leading-5 text-zinc-500">{description}</p>
-      </div>
-    </Link>
   );
 };
 

@@ -6,6 +6,9 @@ import {
   CheckCircle2,
   ChevronRight,
   CreditCard,
+  Eye,
+  EyeOff,
+  KeyRound,
   Loader2,
   Mail,
   Package,
@@ -18,6 +21,7 @@ import {
 import { Link, useParams } from "react-router-dom";
 
 import adminUserService from "../../services/adminUserService";
+import { toast } from "sonner";
 
 const AdminUserDetails = () => {
   const { id } = useParams();
@@ -33,6 +37,9 @@ const AdminUserDetails = () => {
 
   const [updatingStatus, setUpdatingStatus] =
     useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   const loadUser = async () => {
     try {
@@ -120,18 +127,43 @@ const AdminUserDetails = () => {
           isActive: nextStatus,
         }));
       }
+      toast.success(nextStatus ? "User activated." : "User deactivated.");
     } catch (error) {
       console.error(
         "Update user status error:",
         error
       );
 
-      setError(
-        error.response?.data?.message ||
-          "Unable to update user status."
-      );
+      const message =
+        error.response?.data?.message || "Unable to update user status.";
+      setError(message);
+      toast.error(message);
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const handleResetPassword = async (event) => {
+    event.preventDefault();
+
+    if (!user || newPassword.length < 6) {
+      return;
+    }
+
+    try {
+      setResettingPassword(true);
+      setError("");
+      await adminUserService.resetUserPassword(user._id, newPassword);
+      setNewPassword("");
+      toast.success("Password reset successfully.");
+    } catch (resetError) {
+      console.error("Reset user password error:", resetError);
+      const message =
+        resetError.response?.data?.message ||
+        "Unable to reset user password.";
+      toast.error(message);
+    } finally {
+      setResettingPassword(false);
     }
   };
 
@@ -679,6 +711,55 @@ const AdminUserDetails = () => {
 
         </div>
       </section>
+
+      <form
+        onSubmit={handleResetPassword}
+        className="mt-6 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6"
+      >
+        <div className="flex items-start gap-3">
+          <KeyRound size={18} className="mt-0.5 shrink-0 text-zinc-500" />
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-900">
+              Reset password
+            </h2>
+            <p className="mt-1 text-xs leading-5 text-zinc-500">
+              Set a new password for this account. The current password is not
+              required.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+          <div className="relative min-w-0 flex-1">
+            <input
+              type={showNewPassword ? "text" : "password"}
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+              minLength={6}
+              required
+              autoComplete="new-password"
+              aria-label="New password"
+              placeholder="New password (at least 6 characters)"
+              className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 pr-12 text-sm outline-none transition focus:border-zinc-400 focus:bg-white focus:ring-2 focus:ring-zinc-900/5"
+            />
+            <button
+              type="button"
+              onClick={() => setShowNewPassword((visible) => !visible)}
+              aria-label={showNewPassword ? "Hide password" : "Show password"}
+              className="absolute inset-y-0 right-3 flex items-center text-zinc-400 hover:text-zinc-700"
+            >
+              {showNewPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+            </button>
+          </div>
+          <button
+            type="submit"
+            disabled={resettingPassword || newPassword.length < 6}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-zinc-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {resettingPassword && <Loader2 size={16} className="animate-spin" />}
+            {resettingPassword ? "Resetting..." : "Reset password"}
+          </button>
+        </div>
+      </form>
 
       {/* =====================================================
           STATS

@@ -27,6 +27,9 @@ const AdminLayout = () => {
   };
 
   const userInitial = user?.name?.charAt(0)?.toUpperCase() || "G";
+  const isEmployee = user?.role === "employee";
+  const dashboardPath = isEmployee ? "/staff" : "/admin";
+  const ordersPath = isEmployee ? "/staff/orders" : "/admin/orders";
 
   return (
     <div className="min-h-screen bg-[#f7f7f8] text-zinc-900">
@@ -35,8 +38,8 @@ const AdminLayout = () => {
       ====================================================== */}
 
       <header
-        className="
-          fixed left-0 right-0 top-0 z-40
+  className="
+    fixed left-0 right-0 top-0 z-50
           flex h-16 items-center justify-between
           border-b border-zinc-200/80
           bg-white/90
@@ -71,23 +74,15 @@ const AdminLayout = () => {
 
         {/* Mobile Title */}
         <div className="text-sm font-medium tracking-tight text-zinc-900">
-          Admin Dashboard
+          {isEmployee ? "Order Operations" : "Admin Dashboard"}
         </div>
 
-        {/* Avatar */}
-        <div
-          className="
-            flex h-9 w-9
-            items-center justify-center
-            rounded-full
-            bg-zinc-900
-            text-sm font-semibold
-            text-white
-            shadow-[0_5px_20px_rgba(0,0,0,0.10)]
-          "
-        >
-          {userInitial}
-        </div>
+        {/* User Menu */}
+<AdminUserMenu
+  user={user}
+  userInitial={userInitial}
+  onLogout={handleLogout}
+/>
       </header>
 
       {/* =====================================================
@@ -189,45 +184,45 @@ const AdminLayout = () => {
               text-zinc-400
             "
           >
-            Administration
+            {isEmployee ? "Order Operations" : "Administration"}
           </p>
 
           <div className="space-y-1">
             <AdminSidebarItem
               icon={LayoutDashboard}
               label="Dashboard"
-              to="/admin"
+              to={dashboardPath}
               end
               onClick={closeSidebar}
             />
 
-            <AdminSidebarItem
+            {!isEmployee && <AdminSidebarItem
   icon={Layers3}
   label="Services"
   to="/admin/services"
   onClick={closeSidebar}
-/>
+/>}
 
             <AdminSidebarItem
               icon={ShoppingBag}
               label="Orders"
-              to="/admin/orders"
+              to={ordersPath}
               onClick={closeSidebar}
             />
 
-            <AdminSidebarItem
+            {!isEmployee && <AdminSidebarItem
               icon={Users}
               label="Users"
               to="/admin/users"
               onClick={closeSidebar}
-            />
+            />}
 
-            <AdminSidebarItem
+            {!isEmployee && <AdminSidebarItem
               icon={KeyRound}
               label="COD Payments"
               to="/admin/cod"
               onClick={closeSidebar}
-            />
+            />}
           </div>
         </nav>
 
@@ -317,10 +312,10 @@ const AdminLayout = () => {
         {/* =================================================
             DESKTOP HEADER
         ================================================== */}
-
-        <header
-          className="
-            hidden h-20
+<header
+  className="
+    relative z-50
+    hidden h-20
             items-center justify-between
             border-b border-zinc-200/80
             bg-white/70
@@ -333,32 +328,22 @@ const AdminLayout = () => {
           {/* Page Title */}
           <div>
             <h1 className="text-lg font-medium tracking-tight text-zinc-900">
-              Admin Dashboard
+              {isEmployee ? "Order Operations" : "Admin Dashboard"}
             </h1>
 
             <p className="mt-1 text-xs text-zinc-500">
-              Manage orders, users and payments
+              {isEmployee
+                ? "Review and process customer orders"
+                : "Manage orders, users and payments"}
             </p>
           </div>
 
-          {/* User */}
-          <div className="flex items-center gap-3">
-            <div
-              className="
-                flex h-10 w-10
-                items-center justify-center
-                rounded-full
-                bg-zinc-900
-                text-sm font-semibold
-                text-white
-                shadow-[0_5px_20px_rgba(0,0,0,0.10)]
-                transition-transform duration-200
-                hover:scale-105
-              "
-            >
-              {userInitial}
-            </div>
-          </div>
+          {/* User Menu */}
+<AdminUserMenu
+  user={user}
+  userInitial={userInitial}
+  onLogout={handleLogout}
+/>
         </header>
 
         {/* =================================================
@@ -378,6 +363,111 @@ const AdminLayout = () => {
         >
           <Outlet />
         </main>
+      </div>
+    </div>
+  );
+};
+
+const AdminUserMenu = ({ user, userInitial, onLogout }) => {
+  return (
+    <div className="group relative z-[100]">
+      {/* Avatar */}
+      <button
+        type="button"
+        aria-label="Open account menu"
+        className="
+          flex
+          h-9 w-9
+          cursor-pointer
+          items-center
+          justify-center
+          rounded-full
+          bg-zinc-900
+          text-sm
+          font-semibold
+          text-white
+          shadow-[0_5px_20px_rgba(0,0,0,0.10)]
+          outline-none
+          transition-all
+          duration-200
+          hover:scale-105
+          hover:shadow-[0_8px_25px_rgba(0,0,0,0.14)]
+          focus-visible:ring-2
+          focus-visible:ring-zinc-400
+          focus-visible:ring-offset-2
+        "
+      >
+        {userInitial}
+      </button>
+
+      {/* Dropdown */}
+      <div
+        className="
+          invisible
+          absolute
+          right-0
+          top-full
+          z-[9999]
+          mt-2
+          w-56
+          translate-y-1
+          rounded-xl
+          border
+          border-zinc-200
+          bg-white
+          p-2
+          opacity-0
+          shadow-[0_15px_45px_rgba(0,0,0,0.14)]
+          transition-all
+          duration-150
+          group-hover:visible
+          group-hover:translate-y-0
+          group-hover:opacity-100
+          group-focus-within:visible
+          group-focus-within:translate-y-0
+          group-focus-within:opacity-100
+        "
+      >
+        {/* Email */}
+        <div className="px-3 py-2">
+          <p className="truncate text-xs font-medium text-zinc-700">
+            {user?.email || user?.username || "Administrator"}
+          </p>
+        </div>
+
+        <div className="my-1 h-px bg-zinc-100" />
+
+        {/* Logout */}
+        <button
+          type="button"
+          onClick={onLogout}
+          className="
+            flex
+            w-full
+            cursor-pointer
+            items-center
+            gap-2.5
+            rounded-lg
+            px-3
+            py-2.5
+            text-left
+            text-sm
+            text-zinc-600
+            transition-all
+            duration-200
+            hover:bg-red-50
+            hover:text-red-600
+            active:scale-[0.98]
+          "
+        >
+          <LogOut
+            size={16}
+            strokeWidth={1.8}
+            className="shrink-0"
+          />
+
+          <span>Logout</span>
+        </button>
       </div>
     </div>
   );

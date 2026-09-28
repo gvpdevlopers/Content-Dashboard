@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import serviceService from "../../services/serviceService";
+import { toast } from "sonner";
 
 /* =========================================================
    Constants
@@ -1815,8 +1816,8 @@ const AdminEditService = () => {
   const [saving, setSaving] = useState(false);
 
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
 
-  const [success, setSuccess] = useState("");
 
   const [serviceNotFound, setServiceNotFound] = useState(false);
 
@@ -1840,7 +1841,6 @@ const AdminEditService = () => {
       try {
         setLoading(true);
         setError("");
-        setSuccess("");
         setServiceNotFound(false);
 
         const response = await serviceService.getAdminServiceById(id);
@@ -1923,6 +1923,11 @@ const AdminEditService = () => {
       ...current,
       ...updates,
     }));
+    setFieldErrors((current) => {
+      const next = { ...current };
+      Object.keys(updates).forEach((key) => delete next[key]);
+      return next;
+    });
   };
 
   /* -------------------------------------------------------
@@ -2123,12 +2128,29 @@ const AdminEditService = () => {
     event.preventDefault();
 
     setError("");
-    setSuccess("");
+    setFieldErrors({});
 
     const validationError = validateForm(form);
 
     if (validationError) {
       setError(validationError);
+      const fieldPrefixes = {
+        "Service name": "name",
+        "Service slug": "slug",
+        "Service category": "category",
+        "Base price": "basePrice",
+        "Minimum quantity": "minQuantity",
+        "Maximum quantity": "maxQuantity",
+        "Display order": "displayOrder",
+      };
+      const fieldKey = Object.keys(fieldPrefixes).find((prefix) =>
+        validationError.startsWith(prefix),
+      );
+      if (fieldKey) {
+        setFieldErrors({
+          [fieldPrefixes[fieldKey]]: validationError,
+        });
+      }
 
       window.scrollTo({
         top: 0,
@@ -2149,7 +2171,7 @@ const AdminEditService = () => {
         throw new Error(response?.message || "Unable to update service.");
       }
 
-      setSuccess(response.message || "Service updated successfully.");
+      toast.success(response.message || "Service updated successfully.");
 
       /*
        * Reload the exact server response.
@@ -2171,11 +2193,12 @@ const AdminEditService = () => {
         navigate("/admin/services");
       }, 900);
     } catch (requestError) {
-      setError(
+      const message =
         requestError?.response?.data?.message ||
           requestError?.message ||
-          "Unable to update service.",
-      );
+          "Unable to update service.";
+      setError(message);
+      toast.error(message);
 
       window.scrollTo({
         top: 0,
@@ -2349,24 +2372,6 @@ const AdminEditService = () => {
         </div>
       )}
 
-      {success && (
-        <div className="mt-5 rounded-[22px] border border-emerald-200 bg-emerald-50 p-4">
-          <div className="flex items-start gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600">
-              <Check size={16} />
-            </div>
-
-            <div>
-              <p className="text-sm font-semibold text-emerald-800">
-                Changes saved
-              </p>
-
-              <p className="mt-1 text-sm text-emerald-700">{success}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* =====================================================
           FORM
       ====================================================== */}
@@ -2380,7 +2385,7 @@ const AdminEditService = () => {
             BASIC INFORMATION
         ==================================================== */}
 
-        <section className="rounded-[24px] border border-zinc-200 bg-white p-5 shadow-[0_10px_35px_rgba(0,0,0,0.04)] sm:p-7">
+        <section className="rounded-[24px] border border-zinc-200 bg-white p-5 shadow-[0_10px_35px_rgba(0,0,0,0.04)] sm:p-6">
           <SectionHeader
             icon={Layers3}
             eyebrow="Step 1"
@@ -2393,6 +2398,7 @@ const AdminEditService = () => {
               label="Service Name"
               required
               value={form.name}
+              error={fieldErrors.name}
               onChange={(event) =>
                 updateForm({
                   name: event.target.value,
@@ -2405,6 +2411,7 @@ const AdminEditService = () => {
               label="Slug"
               required
               value={form.slug}
+              error={fieldErrors.slug}
               onChange={(event) =>
                 updateForm({
                   slug: event.target.value.toLowerCase().replace(/\s+/g, "-"),
@@ -2418,6 +2425,7 @@ const AdminEditService = () => {
               label="Category"
               required
               value={form.category}
+              error={fieldErrors.category}
               onChange={(event) =>
                 updateForm({
                   category: event.target.value,
@@ -2432,6 +2440,7 @@ const AdminEditService = () => {
               min="0"
               step="1"
               value={form.displayOrder}
+              error={fieldErrors.displayOrder}
               onChange={(event) =>
                 updateForm({
                   displayOrder: event.target.value,
@@ -2472,7 +2481,7 @@ const AdminEditService = () => {
             PRICING
         ==================================================== */}
 
-        <section className="rounded-[24px] border border-zinc-200 bg-white p-5 shadow-[0_10px_35px_rgba(0,0,0,0.04)] sm:p-7">
+        <section className="rounded-[24px] border border-zinc-200 bg-white p-5 shadow-[0_10px_35px_rgba(0,0,0,0.04)] sm:p-6">
           <SectionHeader
             icon={Settings2}
             eyebrow="Step 2"
@@ -2499,6 +2508,7 @@ const AdminEditService = () => {
               min="0"
               step="0.01"
               value={form.basePrice}
+              error={fieldErrors.basePrice}
               onChange={(event) =>
                 updateForm({
                   basePrice: event.target.value,
@@ -2525,6 +2535,7 @@ const AdminEditService = () => {
               min="1"
               step="1"
               value={form.minQuantity}
+              error={fieldErrors.minQuantity}
               onChange={(event) =>
                 updateForm({
                   minQuantity: event.target.value,
@@ -2538,6 +2549,7 @@ const AdminEditService = () => {
               min="1"
               step="1"
               value={form.maxQuantity}
+              error={fieldErrors.maxQuantity}
               onChange={(event) =>
                 updateForm({
                   maxQuantity: event.target.value,
@@ -2552,7 +2564,7 @@ const AdminEditService = () => {
             SERVICE FIELDS
         ==================================================== */}
 
-        <section className="rounded-[24px] border border-zinc-200 bg-white p-5 shadow-[0_10px_35px_rgba(0,0,0,0.04)] sm:p-7">
+        <section className="rounded-[24px] border border-zinc-200 bg-white p-5 shadow-[0_10px_35px_rgba(0,0,0,0.04)] sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <SectionHeader
               icon={Settings2}
@@ -2626,7 +2638,7 @@ const AdminEditService = () => {
             PRICING OPTIONS
         ==================================================== */}
 
-        <section className="rounded-[24px] border border-zinc-200 bg-white p-5 shadow-[0_10px_35px_rgba(0,0,0,0.04)] sm:p-7">
+        <section className="rounded-[24px] border border-zinc-200 bg-white p-5 shadow-[0_10px_35px_rgba(0,0,0,0.04)] sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <SectionHeader
               icon={Settings2}

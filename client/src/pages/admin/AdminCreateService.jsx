@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 
 import serviceService from "../../services/serviceService";
+import { toast } from "sonner";
 
 // ============================================================
 // CONSTANTS
@@ -628,14 +629,6 @@ const Toggle = ({ checked, onChange, label, description }) => {
       </span>
     </button>
   );
-};
-
-const ErrorText = ({ children }) => {
-  if (!children) {
-    return null;
-  }
-
-  return <p className="mt-1.5 text-xs font-medium text-red-600">{children}</p>;
 };
 
 // ============================================================
@@ -2275,12 +2268,10 @@ const AdminCreateService = () => {
       const payload = buildPayload();
 
       await serviceService.createService(payload);
+      toast.success("Service created successfully.");
 
       navigate("/admin/services", {
         replace: true,
-        state: {
-          success: "Service created successfully.",
-        },
       });
     } catch (err) {
       console.error("Create service error:", err);
@@ -2288,6 +2279,7 @@ const AdminCreateService = () => {
       const message = getApiErrorMessage(err);
 
       setError(message);
+      toast.error(message);
 
       window.scrollTo({
         top: 0,
@@ -2304,7 +2296,7 @@ const AdminCreateService = () => {
 
   return (
     <div className="mx-auto w-full max-w-[1500px] animate-fade-up">
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {/* ====================================================
             HEADER
         ===================================================== */}

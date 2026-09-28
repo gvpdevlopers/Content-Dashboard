@@ -18,6 +18,7 @@ import serviceService from "../services/serviceService";
 import paymentService from "../services/paymentService";
 import CustomSelect from "../components/CustomSelect";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 /*
 |--------------------------------------------------------------------------
@@ -185,6 +186,80 @@ const getRepeatableGroupPricingGroups = (service, group) => {
   );
 };
 
+const isRepeatableOnlyService = (service) => {
+  const repeatableGroups = getRepeatableGroups(service);
+
+  if (!repeatableGroups.length) {
+    return false;
+  }
+
+  const serviceFields = Array.isArray(service?.fields) ? service.fields : [];
+  const repeatablePricingGroupNames = new Set(
+    repeatableGroups.flatMap((group) =>
+      Array.isArray(group.pricingGroups)
+        ? group.pricingGroups.map(String)
+        : [],
+    ),
+  );
+
+  return (
+    serviceFields.length === 0 &&
+    getPricingGroups(service).every((pricingGroup) =>
+      repeatablePricingGroupNames.has(pricingGroup.name),
+    )
+  );
+};
+
+const getActiveFieldsForRepeatableEntry = (service, group, entry) => {
+  const fieldMap = new Map();
+
+  // 1. Common fields defined on the repeatable group
+  const groupFields = Array.isArray(group?.fields) ? group.fields : [];
+
+  for (const field of groupFields) {
+    const fieldName = String(field?.name || "").trim();
+
+    if (fieldName) {
+      fieldMap.set(fieldName, field);
+    }
+  }
+
+  // 2. Fields from selected pricing options
+  const selectedOptionIds = new Set(
+    Object.values(entry?.pricingOptions || {})
+      .filter(Boolean)
+      .map((id) => String(id)),
+  );
+
+  if (selectedOptionIds.size > 0) {
+    const pricingGroups = getRepeatableGroupPricingGroups(service, group);
+
+    for (const pricingGroup of pricingGroups) {
+      const options = Array.isArray(pricingGroup?.options)
+        ? pricingGroup.options
+        : [];
+
+      for (const option of options) {
+        if (!selectedOptionIds.has(String(option?._id))) {
+          continue;
+        }
+
+        const optionFields = Array.isArray(option?.fields) ? option.fields : [];
+
+        for (const field of optionFields) {
+          const fieldName = String(field?.name || "").trim();
+
+          if (fieldName) {
+            fieldMap.set(fieldName, field);
+          }
+        }
+      }
+    }
+  }
+
+  return getSortedItems(Array.from(fieldMap.values()));
+};
+
 const isRequiredRepeatablePricingGroup = (group, pricingGroupName) => {
   const requiredNames = Array.isArray(group?.requiredPricingGroups)
     ? group.requiredPricingGroups.map((name) => String(name))
@@ -203,7 +278,7 @@ const getRepeatableEntryPricingTotal = (service, group, entry) => {
   let total = 0;
 
   for (const pricingGroup of pricingGroups) {
-    const selectedOptionId = entry?.[pricingGroup.name];
+    const selectedOptionId = entry?.pricingOptions?.[pricingGroup.name];
 
     if (!selectedOptionId) {
       continue;
@@ -235,7 +310,11 @@ const getRepeatableEntryPricingTotal = (service, group, entry) => {
 };
 
 const createEmptyRepeatableItem = (group) => {
-  const item = {};
+  const item = {
+    pricingOptions: {},
+    pricingQuantities: {},
+    fields: {},
+  };
 
   if (Array.isArray(group?.fields)) {
     group.fields.forEach((field) => {
@@ -246,14 +325,12 @@ const createEmptyRepeatableItem = (group) => {
       }
 
       if (normalizeFieldType(field) === "checkbox") {
-        item[fieldName] = [];
+        item.fields[fieldName] = [];
       } else {
-        item[fieldName] = "";
+        item.fields[fieldName] = "";
       }
     });
   }
-
-  item.pricingQuantities = {};
 
   return item;
 };
@@ -369,14 +446,20 @@ const getRepeatableGroupsPrice = (item) => {
     }
 
     for (const entry of entries) {
-      for (const field of group.fields || []) {
+      const activeFields = getActiveFieldsForRepeatableEntry(
+        item.service,
+        group,
+        entry,
+      );
+
+      for (const field of activeFields) {
         const fieldName = String(field?.name || "").trim();
 
         if (!fieldName) {
           continue;
         }
 
-        const value = entry?.[fieldName];
+        const value = entry?.fields?.[fieldName];
 
         if (isEmptyValue(value)) {
           continue;
@@ -482,7 +565,7 @@ const getItemEstimate = (item) => {
 
   const quantity = getItemQuantity(item);
 
-  let basePrice = 0;
+  let basePrice;
 
   if (item.selectedPricingOption) {
     basePrice = Number(item.selectedPricingOption.price || 0) * quantity;
@@ -520,6 +603,10 @@ const isCustomUnpricedItem = (item) => {
   }
 
   if (item.isGroupedPricing) {
+    if (isRepeatableOnlyService(item.service)) {
+      return getItemEstimate(item) <= 0;
+    }
+
     return (
       Object.values(item.selectedPricingOptions || {}).filter(Boolean)
         .length === 0
@@ -533,11 +620,13 @@ const createOrderItem = (service) => {
   const grouped = isGroupedService(service);
   const pricingOptions = getPricingOptions(service);
   const quantityRules = getQuantityRules(service, null);
+  const repeatableOnly = isRepeatableOnlyService(service);
 
   const shouldHaveQuantity =
-    service.pricingType === "per_unit" ||
-    service.pricingType === "starting_from" ||
-    pricingOptions.length > 0;
+    !repeatableOnly &&
+    (service.pricingType === "per_unit" ||
+      service.pricingType === "starting_from" ||
+      pricingOptions.length > 0);
 
   return {
     service,
@@ -860,13 +949,14 @@ const QuantityControl = ({
   unit,
   onChange,
   dark = false,
+  className = "",
 }) => {
   const canDecrease = quantity > minQuantity;
   const canIncrease = maxQuantity === undefined || quantity < maxQuantity;
 
   return (
     <div
-      className={`
+      className={`${className}
         flex items-center rounded-xl border p-1
         ${dark ? "border-white/10 bg-white/5" : "border-zinc-200 bg-zinc-50"}
       `}
@@ -1027,19 +1117,17 @@ const RepeatableGroup = ({
 
   const pricingGroups = getRepeatableGroupPricingGroups(service, group);
 
-  const fields = getSortedItems(
-    Array.isArray(group.fields) ? group.fields : [],
-  );
-
-  const requiredFields = fields.filter((field) => field.required);
-
-  const optionalFields = fields.filter((field) => !field.required);
+  // Fields that are always part of the repeatable group
+  // plus fields belonging to the pricing options selected
+  // inside each individual entry.
+  const getEntryFields = (entry) =>
+    getActiveFieldsForRepeatableEntry(service, group, entry);
 
   const canRemove = safeEntries.length > minItems;
   const canAdd = safeEntries.length < maxItems;
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 p-4 sm:p-5">
+    <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 p-3 sm:px-3 py-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -1076,14 +1164,20 @@ const RepeatableGroup = ({
         )}
       </div>
 
-      <div className="mt-5 space-y-4">
+      <div className="mt-4 space-y-3">
         {safeEntries.map((entry, entryIndex) => {
           const optionalOpenKey = `${group.name}:${entryIndex}`;
+
+          const fields = getEntryFields(entry);
+
+          const requiredFields = fields.filter((field) => field.required);
+
+          const optionalFields = fields.filter((field) => !field.required);
 
           return (
             <div
               key={`${group.name}-${entryIndex}`}
-              className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5"
+              className="rounded-2xl border border-zinc-200 bg-white p-3 sm:px-3 py-4"
             >
               <div className="flex items-center justify-between gap-3 border-b border-zinc-100 pb-3">
                 <div>
@@ -1108,7 +1202,7 @@ const RepeatableGroup = ({
               </div>
 
               {pricingGroups.length > 0 && (
-                <div className="mt-5 space-y-6">
+                <div className="mt-4 space-y-4">
                   {pricingGroups.map((pricingGroup) => {
                     const title = pricingGroup.name
                       ? pricingGroup.name.charAt(0).toUpperCase() +
@@ -1120,7 +1214,8 @@ const RepeatableGroup = ({
                       pricingGroup.name,
                     );
 
-                    const selectedOptionId = entry?.[pricingGroup.name];
+                    const selectedOptionId =
+                      entry?.pricingOptions?.[pricingGroup.name];
 
                     return (
                       <div key={pricingGroup.key}>
@@ -1159,7 +1254,7 @@ const RepeatableGroup = ({
                               <div
                                 key={option._id}
                                 className={`
-                                  relative rounded-2xl border p-4
+                                  relative rounded-2xl border p-3 sm:p-4
                                   transition-all duration-200
                                   ${
                                     optionSelected
@@ -1236,9 +1331,9 @@ const RepeatableGroup = ({
                                 </button>
 
                                 {optionSelected && (
-                                  <div className="mt-4 border-t border-white/10 pt-3">
-                                    <div className="flex items-center justify-between gap-3">
-                                      <div>
+                                  <div className="mt-3 border-t border-white/10 pt-3">
+                                    <div className="flex flex-col gap-2 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
+                                      <div className="min-w-0">
                                         <p className="text-[11px] font-medium text-white/50">
                                           Quantity
                                         </p>
@@ -1249,6 +1344,7 @@ const RepeatableGroup = ({
                                       </div>
 
                                       <QuantityControl
+                                        className="self-start"
                                         quantity={optionQuantity}
                                         minQuantity={rules.minQuantity}
                                         maxQuantity={rules.maxQuantity}
@@ -1276,12 +1372,12 @@ const RepeatableGroup = ({
               )}
 
               {requiredFields.length > 0 && (
-                <div className="mt-5 space-y-6">
+                <div className="mt-4 space-y-4">
                   {requiredFields.map((field) => (
                     <DynamicField
                       key={field.name}
                       field={field}
-                      value={entry?.[field.name]}
+                      value={entry?.fields?.[field.name]}
                       onChange={(fieldName, value) =>
                         onFieldChange(entryIndex, fieldName, value)
                       }
@@ -1326,12 +1422,12 @@ const RepeatableGroup = ({
                   </button>
 
                   {openOptionalFields[optionalOpenKey] && (
-                    <div className="mt-5 space-y-6">
+                    <div className="mt-4 space-y-4">
                       {optionalFields.map((field) => (
                         <DynamicField
                           key={field.name}
                           field={field}
-                          value={entry?.[field.name]}
+                          value={entry?.fields?.[field.name]}
                           onChange={(fieldName, value) =>
                             onFieldChange(entryIndex, fieldName, value)
                           }
@@ -1434,15 +1530,6 @@ const NewOrder = () => {
           ? updater(item)
           : { ...item, ...updater };
       }),
-    );
-  };
-
-  const getSelectedServiceIds = () => {
-    return new Set(
-      orderItems
-        .map((item) => item?.service?._id)
-        .filter(Boolean)
-        .map(String),
     );
   };
 
@@ -1734,7 +1821,10 @@ const NewOrder = () => {
         index === entryIndex
           ? {
               ...(entry || {}),
-              [fieldName]: value,
+              fields: {
+                ...(entry?.fields || {}),
+                [fieldName]: value,
+              },
             }
           : entry,
       );
@@ -1766,27 +1856,59 @@ const NewOrder = () => {
       const existingEntry =
         currentEntries[entryIndex] || createEmptyRepeatableItem(group);
 
-      const currentSelectedId = existingEntry[pricingGroupName];
+      const currentSelectedId =
+        existingEntry?.pricingOptions?.[pricingGroupName];
 
       const isDeselecting = String(currentSelectedId) === String(option?._id);
 
       const nextEntry = {
         ...existingEntry,
+
+        pricingOptions: {
+          ...(existingEntry.pricingOptions || {}),
+        },
+
         pricingQuantities: {
           ...(existingEntry.pricingQuantities || {}),
+        },
+
+        fields: {
+          ...(existingEntry.fields || {}),
         },
       };
 
       if (isDeselecting) {
-        delete nextEntry[pricingGroupName];
+        delete nextEntry.pricingOptions[pricingGroupName];
         delete nextEntry.pricingQuantities[pricingGroupName];
       } else {
-        nextEntry[pricingGroupName] = String(option._id);
+        nextEntry.pricingOptions[pricingGroupName] = String(option._id);
 
         const rules = getQuantityRules(current.service, option);
 
         nextEntry.pricingQuantities[pricingGroupName] = rules.minQuantity;
       }
+
+      const activeFields = getActiveFieldsForRepeatableEntry(
+        current.service,
+        group,
+        nextEntry,
+      );
+      const activeFieldNames = new Set(
+        activeFields.map((field) => String(field.name)),
+      );
+
+      Object.keys(nextEntry.fields).forEach((fieldName) => {
+        if (!activeFieldNames.has(fieldName)) {
+          delete nextEntry.fields[fieldName];
+        }
+      });
+
+      activeFields.forEach((field) => {
+        if (!(field.name in nextEntry.fields)) {
+          nextEntry.fields[field.name] =
+            normalizeFieldType(field) === "checkbox" ? [] : "";
+        }
+      });
 
       const nextEntries = currentEntries.map((entry, index) =>
         index === entryIndex ? nextEntry : entry,
@@ -1822,7 +1944,8 @@ const NewOrder = () => {
         return current;
       }
 
-      const selectedOptionId = existingEntry[pricingGroupName];
+      const selectedOptionId =
+        existingEntry?.pricingOptions?.[pricingGroupName];
 
       if (!selectedOptionId) {
         return current;
@@ -1862,9 +1985,18 @@ const NewOrder = () => {
 
       const nextEntry = {
         ...existingEntry,
+
+        pricingOptions: {
+          ...(existingEntry.pricingOptions || {}),
+        },
+
         pricingQuantities: {
           ...(existingEntry.pricingQuantities || {}),
           [pricingGroupName]: normalized,
+        },
+
+        fields: {
+          ...(existingEntry.fields || {}),
         },
       };
 
@@ -2177,7 +2309,7 @@ const NewOrder = () => {
         const entry = entries[entryIndex] || {};
 
         for (const pricingGroup of repeatablePricingGroups) {
-          const selectedOptionId = entry[pricingGroup.name];
+          const selectedOptionId = entry?.pricingOptions?.[pricingGroup.name];
 
           const required = isRequiredRepeatablePricingGroup(
             group,
@@ -2238,8 +2370,14 @@ const NewOrder = () => {
           }
         }
 
-        for (const field of group.fields || []) {
-          const value = entry[field.name];
+        const activeFields = getActiveFieldsForRepeatableEntry(
+          item.service,
+          group,
+          entry,
+        );
+
+        for (const field of activeFields) {
+          const value = entry?.fields?.[field.name];
           const type = normalizeFieldType(field);
 
           if (field.required && isEmptyValue(value)) {
@@ -2393,14 +2531,19 @@ const NewOrder = () => {
 
   const validateOrderItem = (item) => {
     const itemPricingOptions = getPricingOptions(item.service);
+    const repeatableOnly = isRepeatableOnlyService(item.service);
 
-    if (item.isGroupedPricing) {
+    if (item.isGroupedPricing && !repeatableOnly) {
       const groupedError = validateGroupedPricing(item);
 
       if (groupedError) {
         return groupedError;
       }
-    } else if (itemPricingOptions.length > 0 && !item.selectedPricingOption) {
+    } else if (
+      !repeatableOnly &&
+      itemPricingOptions.length > 0 &&
+      !item.selectedPricingOption
+    ) {
       return "Please select a service option.";
     }
 
@@ -2485,32 +2628,47 @@ const NewOrder = () => {
         );
 
         cleanFormData[group.name] = entries.map((entry) => {
-          const cleanEntry = {};
+          const cleanEntry = {
+            pricingOptions: {},
+            pricingQuantities: {},
+            fields: {},
+          };
 
-          for (const field of group.fields || []) {
+          /*
+           * Repeatable fields
+           */
+          const activeFields = getActiveFieldsForRepeatableEntry(
+            item.service,
+            group,
+            entry,
+          );
+
+          for (const field of activeFields) {
             const fieldName = String(field?.name || "").trim();
 
             if (!fieldName) {
               continue;
             }
 
-            const value = entry?.[fieldName];
+            const value = entry?.fields?.[fieldName];
 
             if (value !== undefined && value !== null) {
-              cleanEntry[fieldName] = value;
+              cleanEntry.fields[fieldName] = value;
             }
           }
 
-          const entryPricingQuantities = {};
-
+          /*
+           * Repeatable pricing selections + quantities
+           */
           for (const pricingGroup of repeatablePricingGroups) {
-            const selectedOptionId = entry?.[pricingGroup.name];
+            const selectedOptionId = entry?.pricingOptions?.[pricingGroup.name];
 
             if (!selectedOptionId) {
               continue;
             }
 
-            cleanEntry[pricingGroup.name] = String(selectedOptionId);
+            cleanEntry.pricingOptions[pricingGroup.name] =
+              String(selectedOptionId);
 
             const option = pricingGroup.options.find(
               (candidate) => String(candidate._id) === String(selectedOptionId),
@@ -2520,14 +2678,10 @@ const NewOrder = () => {
 
             const rawQuantity = entry?.pricingQuantities?.[pricingGroup.name];
 
-            entryPricingQuantities[pricingGroup.name] =
+            cleanEntry.pricingQuantities[pricingGroup.name] =
               rawQuantity !== undefined && rawQuantity !== null
                 ? Number(rawQuantity)
                 : rules.minQuantity;
-          }
-
-          if (Object.keys(entryPricingQuantities).length > 0) {
-            cleanEntry.pricingQuantities = entryPricingQuantities;
           }
 
           return cleanEntry;
@@ -2541,7 +2695,7 @@ const NewOrder = () => {
     |--------------------------------------------------------------------------
     */
 
-    if (item.isGroupedPricing) {
+    if (item.isGroupedPricing && !isRepeatableOnlyService(item.service)) {
       for (const [group, option] of Object.entries(
         item.selectedPricingOptions || {},
       )) {
@@ -2738,16 +2892,19 @@ const NewOrder = () => {
 
               if (verification?.success) {
                 setOrderSuccess(verification.order);
+                toast.success("Payment completed successfully.");
               } else {
                 setError("Payment verification failed.");
+                toast.error("Payment verification failed.");
               }
             } catch (verificationError) {
               console.error("Payment verification error:", verificationError);
 
-              setError(
+              const message =
                 verificationError.response?.data?.message ||
-                  "Payment verification failed.",
-              );
+                "Payment verification failed.";
+              setError(message);
+              toast.error(message);
             } finally {
               setSubmitting(false);
             }
@@ -2767,9 +2924,10 @@ const NewOrder = () => {
             ondismiss: function () {
               setSubmitting(false);
 
-              setError(
-                "Payment was cancelled. You can try again from your order.",
-              );
+              const message =
+                "Payment was cancelled. You can try again from your order.";
+              setError(message);
+              toast.info(message);
             },
           },
         };
@@ -2786,17 +2944,19 @@ const NewOrder = () => {
       if (responseData?.errors) {
         const firstError = Object.values(responseData.errors)[0];
 
-        setError(
+        const message =
           typeof firstError === "string"
             ? firstError
-            : "Please check your order details.",
-        );
+            : "Please check your order details.";
+        setError(message);
+        toast.error(message);
       } else {
-        setError(
+        const message =
           responseData?.message ||
             submitError.message ||
-            "Unable to process your order.",
-        );
+            "Unable to process your order.";
+        setError(message);
+        toast.error(message);
       }
     } finally {
       setSubmitting(false);
@@ -2859,8 +3019,6 @@ const NewOrder = () => {
     );
   }
 
-  const selectedServiceIds = getSelectedServiceIds();
-
   /*
   |--------------------------------------------------------------------------
   | Render
@@ -2868,7 +3026,7 @@ const NewOrder = () => {
   */
 
   return (
-    <div className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-5 sm:py-10">
+    <div className="mx-auto w-full max-w-[1180px] px-2 py-6 sm:px-5 sm:py-10">
       <form onSubmit={handleSubmit}>
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           {/* ================================================================
@@ -2880,7 +3038,7 @@ const NewOrder = () => {
                 SERVICE CHECKLIST
             ============================================================== */}
 
-            <section className="relative z-30 rounded-[24px] border border-zinc-200 bg-white p-5 shadow-[0_10px_35px_rgba(0,0,0,0.04)] sm:p-7">
+            <section className="relative z-30 rounded-[24px] border border-zinc-200 bg-white px-2 py-5 shadow-[0_10px_35px_rgba(0,0,0,0.04)] sm:px-5 sm:py-6">
               <div>
                 <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
                   Step 1
@@ -2927,6 +3085,11 @@ const NewOrder = () => {
                     : [];
 
                   const isGroupedPricing = Boolean(item?.isGroupedPricing);
+                  const hasServiceLevelPricing = Boolean(
+                    item &&
+                      pricingOptions.length > 0 &&
+                      !isRepeatableOnlyService(item.service),
+                  );
 
                   const activeFields = item ? getActiveFieldsForItem(item) : [];
 
@@ -2963,9 +3126,9 @@ const NewOrder = () => {
 
                       <div
                         className={`
-                          flex flex-col gap-3 p-4
+                          flex flex-col gap-3 px-4 py-4
                           sm:flex-row sm:items-center sm:justify-between
-                          sm:p-5
+                          sm:px-3 sm:py-4
                           ${selected ? "bg-zinc-50/70" : ""}
                         `}
                       >
@@ -3085,7 +3248,7 @@ const NewOrder = () => {
                       ======================================================= */}
 
                       {selected && item && openServiceIds[serviceId] && (
-                        <div className="border-t border-zinc-200 p-4 sm:p-6">
+                        <div className="border-t border-zinc-200 p-4 sm:px-4 py-6">
                           {/* Service description */}
 
                           {service.description && (
@@ -3098,7 +3261,7 @@ const NewOrder = () => {
 
                           {/* Pricing */}
 
-                          {pricingOptions.length > 0 && (
+                          {hasServiceLevelPricing && (
                             <div>
                               <div>
                                 <p className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-400">
@@ -3403,7 +3566,7 @@ const NewOrder = () => {
                           {requiredFields.length > 0 && (
                             <div
                               className={`${
-                                pricingOptions.length > 0
+                                hasServiceLevelPricing
                                   ? "mt-7 border-t border-zinc-100 pt-7"
                                   : ""
                               }`}
@@ -3446,7 +3609,7 @@ const NewOrder = () => {
                           {optionalFields.length > 0 && (
                             <div
                               className={`${
-                                pricingOptions.length > 0 ||
+                                hasServiceLevelPricing ||
                                 requiredFields.length > 0
                                   ? "mt-7 border-t border-zinc-100 pt-7"
                                   : ""
@@ -3518,23 +3681,25 @@ const NewOrder = () => {
                           {repeatableGroups.length > 0 && (
                             <div
                               className={`${
-                                pricingOptions.length > 0 ||
+                                hasServiceLevelPricing ||
                                 requiredFields.length > 0 ||
                                 optionalFields.length > 0
                                   ? "mt-7 border-t border-zinc-100 pt-7"
                                   : ""
                               }`}
                             >
-                              <div>
-                                <p className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-400">
-                                  Repeated configurations
-                                </p>
+                              {!isRepeatableOnlyService(item.service) && (
+                                <div>
+                                  <p className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-400">
+                                    Repeated configurations
+                                  </p>
 
-                                <p className="mt-1 text-xs leading-5 text-zinc-500">
-                                  Add multiple independent configurations where
-                                  required.
-                                </p>
-                              </div>
+                                  <p className="mt-1 text-xs leading-5 text-zinc-500">
+                                    Add multiple independent configurations where
+                                    required.
+                                  </p>
+                                </div>
+                              )}
 
                               <div className="mt-5 space-y-5">
                                 {repeatableGroups.map((group) => (

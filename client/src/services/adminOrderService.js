@@ -1,21 +1,24 @@
 import api from "./api";
 
-const getAdminOrders = async () => {
-  const response = await api.get("/orders/admin");
+const getOrderRoot = (staffMode) =>
+  staffMode ? "/orders/staff" : "/orders/admin";
+
+const getAdminOrders = async (staffMode = false) => {
+  const response = await api.get(getOrderRoot(staffMode));
   return response.data;
 };
 
-const getAdminOrderById = async (orderId) => {
+const getAdminOrderById = async (orderId, staffMode = false) => {
   const response = await api.get(
-    `/orders/admin/${orderId}`
+    `${getOrderRoot(staffMode)}/${orderId}`
   );
 
   return response.data;
 };
 
-const updateOrderStatus = async (orderId, status) => {
+const updateOrderStatus = async (orderId, status, staffMode = false) => {
   const response = await api.patch(
-    `/orders/admin/${orderId}/status`,
+    `${getOrderRoot(staffMode)}/${orderId}/status`,
     {
       status,
     }
@@ -26,15 +29,32 @@ const updateOrderStatus = async (orderId, status) => {
 
 const updatePaymentStatus = async (
   orderId,
-  paymentStatus
+  paymentStatus,
+  staffMode = false
 ) => {
   const response = await api.patch(
-    `/orders/admin/${orderId}/payment-status`,
+    `${getOrderRoot(staffMode)}/${orderId}/payment-status`,
     {
       paymentStatus,
     }
   );
 
+  return response.data;
+};
+
+const updateDeliveryLink = async (orderId, deliveryLink, staffMode = false) => {
+  const response = await api.patch(
+    `${getOrderRoot(staffMode)}/${orderId}/delivery`,
+    { deliveryLink },
+  );
+  return response.data;
+};
+
+const updateInvoice = async (orderId, invoice, staffMode = false) => {
+  const response = await api.patch(
+    `${getOrderRoot(staffMode)}/${orderId}/invoice`,
+    invoice,
+  );
   return response.data;
 };
 
@@ -62,6 +82,8 @@ const adminOrderService = {
   getAdminOrderById,
   updateOrderStatus,
   updatePaymentStatus,
+  updateDeliveryLink,
+  updateInvoice,
   updateAdminNotes,
   getAdminCodOrders,
 };

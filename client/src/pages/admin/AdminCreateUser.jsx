@@ -2,6 +2,8 @@ import { useState } from "react";
 
 import {
   ArrowLeft,
+  Eye,
+  EyeOff,
   UserPlus,
 } from "lucide-react";
 
@@ -10,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import adminUserService from "../../services/adminUserService";
 
 import CustomSelect from "../../components/CustomSelect";
+import { toast } from "sonner";
 
 const AdminCreateUser = () => {
   const navigate = useNavigate();
@@ -24,7 +27,7 @@ const AdminCreateUser = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -41,11 +44,10 @@ const AdminCreateUser = () => {
     try {
       setLoading(true);
       setError("");
-      setSuccess("");
 
       await adminUserService.createUser(formData);
 
-      setSuccess("User created successfully.");
+      toast.success("User created successfully.");
 
       setTimeout(() => {
         navigate("/admin/users");
@@ -56,6 +58,9 @@ const AdminCreateUser = () => {
       setError(
         error.response?.data?.message ||
           "Unable to create user."
+      );
+      toast.error(
+        error.response?.data?.message || "Unable to create user.",
       );
     } finally {
       setLoading(false);
@@ -160,7 +165,7 @@ const AdminCreateUser = () => {
             text-zinc-500
           "
         >
-          Create a new client or administrator account.
+          Create a client, employee, or administrator account.
         </p>
       </div>
 
@@ -391,36 +396,47 @@ const AdminCreateUser = () => {
                 Password
               </label>
 
-              <input
-                id="password"
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                minLength={6}
-                placeholder="Minimum 6 characters"
-                className="
-                  w-full
-                  rounded-xl
-                  border border-zinc-200
-                  bg-zinc-50
-                  px-4
-                  py-3.5
-                  text-sm
-                  text-zinc-900
-                  outline-none
-                  transition-all
-                  duration-200
-                  placeholder:text-zinc-400
-                  hover:border-zinc-300
-                  hover:bg-white
-                  focus:border-zinc-400
-                  focus:bg-white
-                  focus:ring-2
-                  focus:ring-zinc-900/5
-                "
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required
+                  minLength={6}
+                  placeholder="Minimum 6 characters"
+                  className="
+                    w-full
+                    rounded-xl
+                    border border-zinc-200
+                    bg-zinc-50
+                    px-4
+                    py-3.5
+                    pr-12
+                    text-sm
+                    text-zinc-900
+                    outline-none
+                    transition-all
+                    duration-200
+                    placeholder:text-zinc-400
+                    hover:border-zinc-300
+                    hover:bg-white
+                    focus:border-zinc-400
+                    focus:bg-white
+                    focus:ring-2
+                    focus:ring-zinc-900/5
+                  "
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute inset-y-0 right-3 flex items-center text-zinc-400 transition hover:text-zinc-700"
+                >
+                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                </button>
+              </div>
             </div>
 
             {/* Role */}
@@ -455,6 +471,10 @@ const AdminCreateUser = () => {
                     label: "Client",
                   },
                   {
+                    value: "employee",
+                    label: "Employee",
+                  },
+                  {
                     value: "admin",
                     label: "Admin",
                   },
@@ -462,8 +482,8 @@ const AdminCreateUser = () => {
               />
 
               <p className="mt-2 text-xs leading-5 text-zinc-400">
-                Client is recommended unless administrator access
-                is required.
+                Employees can manage orders but cannot access administration
+                tools.
               </p>
             </div>
           </div>
@@ -486,23 +506,6 @@ const AdminCreateUser = () => {
               "
             >
               {error}
-            </div>
-          )}
-
-          {success && (
-            <div
-              className="
-                mt-6
-                rounded-xl
-                border border-emerald-200
-                bg-emerald-50
-                px-4
-                py-3
-                text-sm
-                text-emerald-700
-              "
-            >
-              {success}
             </div>
           )}
 

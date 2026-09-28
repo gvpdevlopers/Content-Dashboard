@@ -193,7 +193,7 @@ const OrderHistory = () => {
               border border-zinc-200
               bg-white
               shadow-[0_20px_80px_rgba(0,0,0,0.05)]
-              md:block
+              lg:block
             "
           >
             {/* Table Header */}
@@ -201,7 +201,7 @@ const OrderHistory = () => {
             <div
               className="
                 grid
-                grid-cols-[1.25fr_1.5fr_0.7fr_1fr_1.1fr_1.1fr_1fr_60px]
+                grid-cols-[minmax(0,1.25fr)_minmax(0,1.5fr)_minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.1fr)_minmax(0,1fr)_60px]
                 items-center
                 gap-4
                 border-b
@@ -239,7 +239,7 @@ const OrderHistory = () => {
               MOBILE CARDS
           ================================================== */}
 
-          <div className="space-y-4 md:hidden">
+          <div className="space-y-4 lg:hidden">
             {orders.map((order) => (
               <OrderMobileCard key={order._id || order.id} order={order} />
             ))}
@@ -323,7 +323,7 @@ const OrderTableRow = ({ order }) => {
       className="
         group
         grid
-        grid-cols-[1.25fr_1.5fr_0.7fr_1fr_1.1fr_1.1fr_1fr_60px]
+        grid-cols-[minmax(0,1.25fr)_minmax(0,1.5fr)_minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.1fr)_minmax(0,1fr)_60px]
         items-center
         gap-4
         border-b
@@ -354,6 +354,7 @@ const OrderTableRow = ({ order }) => {
             {order.service.category}
           </p>
         )}
+        <OrderArtifactIndicator order={order} />
       </div>
 
       {/* Quantity */}
@@ -517,6 +518,7 @@ const OrderMobileCard = ({ order }) => {
               {order.service.category}
             </p>
           )}
+          <OrderArtifactIndicator order={order} />
         </div>
 
         {/* Details */}
@@ -550,13 +552,6 @@ const OrderMobileCard = ({ order }) => {
             value={paymentDone ? "Paid" : formatStatus(order.paymentStatus)}
             paymentDone={paymentDone}
           />
-
-          <MobileDetail
-            label="Order Status"
-            value={formatStatus(order.orderStatus)}
-          />
-
-          <MobileDetail label="Date" value={formatDate(order.createdAt)} />
         </div>
 
         {/* View Order */}
@@ -638,6 +633,23 @@ const MobileDetail = ({ label, value, paymentDone = false }) => {
         {value || "—"}
       </p>
     </div>
+  );
+};
+
+const OrderArtifactIndicator = ({ order }) => {
+  const available = [
+    order?.deliveryLink ? "Delivery" : null,
+    order?.invoice?.url ? "Invoice" : null,
+  ].filter(Boolean);
+
+  if (!available.length) {
+    return null;
+  }
+
+  return (
+    <p className="mt-1 truncate text-[10px] font-medium text-emerald-700">
+      {available.join(" · ")} available
+    </p>
   );
 };
 

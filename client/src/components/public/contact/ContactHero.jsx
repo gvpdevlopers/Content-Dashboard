@@ -15,7 +15,7 @@ const ContactHero = () => {
       visual={<ContactHeroVisual />}
       actions={
         <>
-          <PublicButton to="/contact" variant="primary">
+          <PublicButton to="/contact#contact-form" variant="primary">
             Send an Enquiry
           </PublicButton>
 

@@ -30,7 +30,7 @@ const Contact = () => {
           </div>
 
           {/* Scrolling form */}
-          <div className="min-w-0">
+          <div id="contact-form" className="min-w-0 scroll-mt-24">
             <ContactForm />
           </div>
         </div>

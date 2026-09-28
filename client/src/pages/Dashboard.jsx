@@ -200,7 +200,7 @@ const Dashboard = () => {
         />
 
         <div className="relative max-w-3xl">
-          <p
+          {/* <p
             className="
               text-xs
               font-medium
@@ -210,7 +210,7 @@ const Dashboard = () => {
             "
           >
             Welcome back
-          </p>
+          </p> */}
 
           <h1
             className="

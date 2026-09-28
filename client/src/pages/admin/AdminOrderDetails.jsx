@@ -21,9 +21,15 @@ import { Link, useParams } from "react-router-dom";
 import adminOrderService from "../../services/adminOrderService";
 import codService from "../../services/codService";
 import CustomSelect from "../../components/CustomSelect";
+import { useAuth } from "../../context/AuthContext";
+import OrderItemsOverview from "../../components/OrderItemsOverview";
+import { toast } from "sonner";
 
 const AdminOrderDetails = () => {
   const { id } = useParams();
+  const { user } = useAuth();
+  const staffMode = user?.role === "employee";
+  const orderBasePath = staffMode ? "/staff/orders" : "/admin/orders";
 
   const [order, setOrder] = useState(null);
 
@@ -36,10 +42,14 @@ const AdminOrderDetails = () => {
   const [codLoading, setCodLoading] = useState(false);
 
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
 
   const [copied, setCopied] = useState(false);
   const [adminNotes, setAdminNotes] = useState("");
+  const [deliveryLink, setDeliveryLink] = useState("");
+  const [invoiceUrl, setInvoiceUrl] = useState("");
+  const [invoiceName, setInvoiceName] = useState("");
+  const [deliveryLoading, setDeliveryLoading] = useState(false);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
 
   /*
   |----------------------------------------------------------------------
@@ -56,12 +66,14 @@ const AdminOrderDetails = () => {
       }
 
       setError("");
-      setMessage("");
 
-      const data = await adminOrderService.getAdminOrderById(id);
+      const data = await adminOrderService.getAdminOrderById(id, staffMode);
 
       setOrder(data.order || null);
       setAdminNotes(data.order?.notes || "");
+      setDeliveryLink(data.order?.deliveryLink || "");
+      setInvoiceUrl(data.order?.invoice?.url || "");
+      setInvoiceName(data.order?.invoice?.name || "");
     } catch (error) {
       console.error("Get admin order details error:", error);
 
@@ -71,6 +83,50 @@ const AdminOrderDetails = () => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const handleSaveDelivery = async () => {
+    if (!order) return;
+
+    try {
+      setDeliveryLoading(true);
+      setError("");
+      const data = await adminOrderService.updateDeliveryLink(
+        order._id,
+        deliveryLink,
+        staffMode,
+      );
+      setOrder((current) => ({ ...current, ...data.order }));
+      toast.success("Delivery link updated successfully.");
+    } catch (saveError) {
+      toast.error(
+        saveError.response?.data?.message || "Unable to update delivery link.",
+      );
+    } finally {
+      setDeliveryLoading(false);
+    }
+  };
+
+  const handleSaveInvoice = async () => {
+    if (!order) return;
+
+    try {
+      setInvoiceLoading(true);
+      setError("");
+      const data = await adminOrderService.updateInvoice(
+        order._id,
+        { url: invoiceUrl, name: invoiceName },
+        staffMode,
+      );
+      setOrder((current) => ({ ...current, ...data.order }));
+      toast.success("Invoice link updated successfully.");
+    } catch (saveError) {
+      toast.error(
+        saveError.response?.data?.message || "Unable to update invoice link.",
+      );
+    } finally {
+      setInvoiceLoading(false);
     }
   };
 
@@ -94,20 +150,23 @@ const AdminOrderDetails = () => {
     try {
       setStatusLoading(true);
       setError("");
-      setMessage("");
 
-      const data = await adminOrderService.updateOrderStatus(order._id, value);
+      const data = await adminOrderService.updateOrderStatus(
+        order._id,
+        value,
+        staffMode,
+      );
 
       setOrder((currentOrder) => ({
         ...currentOrder,
         ...data.order,
       }));
 
-      setMessage("Order status updated successfully.");
+      toast.success("Order status updated successfully.");
     } catch (error) {
       console.error("Update order status error:", error);
 
-      setError(
+      toast.error(
         error.response?.data?.message || "Unable to update order status.",
       );
     } finally {
@@ -132,7 +191,9 @@ const AdminOrderDetails = () => {
      */
 
     if (order.paymentMethod === "cod" && value === "collected") {
-      setError("COD payment must be completed through COD PIN verification.");
+      toast.error(
+        "COD payment must be completed through COD PIN verification.",
+      );
 
       return;
     }
@@ -140,11 +201,11 @@ const AdminOrderDetails = () => {
     try {
       setPaymentLoading(true);
       setError("");
-      setMessage("");
 
       const data = await adminOrderService.updatePaymentStatus(
         order._id,
         value,
+        staffMode,
       );
 
       setOrder((currentOrder) => ({
@@ -152,11 +213,11 @@ const AdminOrderDetails = () => {
         ...data.order,
       }));
 
-      setMessage("Payment status updated successfully.");
+      toast.success("Payment status updated successfully.");
     } catch (error) {
       console.error("Update payment status error:", error);
 
-      setError(
+      toast.error(
         error.response?.data?.message || "Unable to update payment status.",
       );
     } finally {
@@ -178,7 +239,6 @@ const AdminOrderDetails = () => {
     try {
       setNotesLoading(true);
       setError("");
-      setMessage("");
 
       const data = await adminOrderService.updateAdminNotes(
         order._id,
@@ -195,11 +255,11 @@ const AdminOrderDetails = () => {
 
       setAdminNotes(updatedNotes);
 
-      setMessage("Admin notes updated successfully.");
+      toast.success("Admin notes updated successfully.");
     } catch (error) {
       console.error("Update admin notes error:", error);
 
-      setError(
+      toast.error(
         error.response?.data?.message || "Unable to update admin notes.",
       );
     } finally {
@@ -221,7 +281,6 @@ const AdminOrderDetails = () => {
     try {
       setCodLoading(true);
       setError("");
-      setMessage("");
       setCopied(false);
 
       const data = await codService.generateCodPin(order._id);
@@ -238,11 +297,13 @@ const AdminOrderDetails = () => {
         codPinStatus: data.order?.codPinStatus || "active",
       }));
 
-      setMessage("COD PIN generated successfully.");
+      toast.success("COD PIN generated successfully.");
     } catch (error) {
       console.error("Generate COD PIN error:", error);
 
-      setError(error.response?.data?.message || "Unable to generate COD PIN.");
+      toast.error(
+        error.response?.data?.message || "Unable to generate COD PIN.",
+      );
     } finally {
       setCodLoading(false);
     }
@@ -353,17 +414,18 @@ const AdminOrderDetails = () => {
   */
 
   return (
-    <div className="mx-auto max-w-[1500px] animate-fade-up">
+    <div className="mx-auto w-full min-w-0 max-w-[1500px] overflow-x-clip animate-fade-up">
       {/* =====================================================
           BACK
       ====================================================== */}
 
       <Link
-        to="/admin/orders"
+        to={orderBasePath}
         className="
           group
           mb-5
           inline-flex
+          max-w-full
           items-center
           gap-2
           text-sm
@@ -376,12 +438,13 @@ const AdminOrderDetails = () => {
         <ArrowLeft
           size={16}
           className="
+            shrink-0
             transition-transform
             duration-200
             group-hover:-translate-x-1
           "
         />
-        Back to Orders
+        <span className="truncate">Back to Orders</span>
       </Link>
 
       {/* =====================================================
@@ -393,10 +456,12 @@ const AdminOrderDetails = () => {
           className="
             mb-5
             flex
+            min-w-0
             flex-col
             gap-3
             rounded-2xl
-            border border-red-200
+            border
+            border-red-200
             bg-red-50
             px-5
             py-4
@@ -405,10 +470,10 @@ const AdminOrderDetails = () => {
             sm:justify-between
           "
         >
-          <div className="flex items-start gap-3">
+          <div className="flex min-w-0 items-start gap-3">
             <XCircle size={18} className="mt-0.5 shrink-0 text-red-500" />
 
-            <p className="text-sm text-red-600">{error}</p>
+            <p className="min-w-0 break-words text-sm text-red-600">{error}</p>
           </div>
 
           <button
@@ -416,6 +481,7 @@ const AdminOrderDetails = () => {
             onClick={() => loadOrder()}
             className="
               self-start
+              shrink-0
               text-sm
               font-medium
               text-red-600
@@ -431,32 +497,6 @@ const AdminOrderDetails = () => {
       )}
 
       {/* =====================================================
-          SUCCESS MESSAGE
-      ====================================================== */}
-
-      {message && (
-        <div
-          className="
-            mb-5
-            flex
-            items-center
-            gap-3
-            rounded-2xl
-            border border-emerald-200
-            bg-emerald-50
-            px-5
-            py-4
-            text-sm
-            text-emerald-700
-          "
-        >
-          <Check size={17} className="shrink-0" />
-
-          {message}
-        </div>
-      )}
-
-      {/* =====================================================
           PAGE HEADER
       ====================================================== */}
 
@@ -465,9 +505,11 @@ const AdminOrderDetails = () => {
           group
           relative
           mb-6
+          min-w-0
           overflow-hidden
           rounded-[28px]
-          border border-zinc-200
+          border
+          border-zinc-200
           bg-white
           p-6
           shadow-[0_20px_80px_rgba(0,0,0,0.06)]
@@ -505,10 +547,11 @@ const AdminOrderDetails = () => {
           "
         />
 
-        <div className="relative">
+        <div className="relative min-w-0">
           <div
             className="
               flex
+              min-w-0
               flex-col
               gap-6
               lg:flex-row
@@ -517,14 +560,18 @@ const AdminOrderDetails = () => {
             "
           >
             <div className="min-w-0">
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <div
                   className="
-                    flex h-10 w-10
+                    flex
+                    h-10
+                    w-10
                     shrink-0
-                    items-center justify-center
+                    items-center
+                    justify-center
                     rounded-xl
-                    border border-zinc-200
+                    border
+                    border-zinc-200
                     bg-zinc-50
                     text-zinc-500
                   "
@@ -532,7 +579,7 @@ const AdminOrderDetails = () => {
                   <Package size={18} strokeWidth={1.6} />
                 </div>
 
-                <div>
+                <div className="min-w-0">
                   <p
                     className="
                       text-[10px]
@@ -565,6 +612,7 @@ const AdminOrderDetails = () => {
                 className="
                   mt-5
                   flex
+                  min-w-0
                   flex-wrap
                   items-center
                   gap-2
@@ -577,9 +625,11 @@ const AdminOrderDetails = () => {
                 <span
                   className="
                     inline-flex
+                    max-w-full
                     items-center
                     rounded-full
-                    border border-zinc-200
+                    border
+                    border-zinc-200
                     bg-zinc-50
                     px-2.5
                     py-1
@@ -588,7 +638,9 @@ const AdminOrderDetails = () => {
                     text-zinc-500
                   "
                 >
-                  {formatPaymentMethod(order?.paymentMethod)}
+                  <span className="truncate">
+                    {formatPaymentMethod(order?.paymentMethod)}
+                  </span>
                 </span>
               </div>
 
@@ -619,12 +671,14 @@ const AdminOrderDetails = () => {
               className="
                 group/refresh
                 inline-flex
+                shrink-0
                 items-center
                 justify-center
                 gap-2
                 self-start
                 rounded-xl
-                border border-zinc-200
+                border
+                border-zinc-200
                 bg-white
                 px-4
                 py-3
@@ -665,6 +719,7 @@ const AdminOrderDetails = () => {
             className="
               mt-7
               grid
+              min-w-0
               gap-3
               sm:grid-cols-2
               xl:grid-cols-4
@@ -694,34 +749,17 @@ const AdminOrderDetails = () => {
       </section>
 
       {/* =====================================================
-          MAIN GRID
+          TOP INFORMATION — 3 CARDS
       ====================================================== */}
 
-      <div
-        className="
-          grid
-          gap-6
-          xl:grid-cols-[minmax(0,1.65fr)_minmax(330px,0.85fr)]
-        "
-      >
-        {/* ===================================================
-            LEFT
-        ==================================================== */}
+      <div className="grid min-w-0 gap-6 xl:grid-cols-3">
+        {/* =================================================
+            CLIENT INFORMATION
+        ================================================== */}
 
-        <div className="space-y-6">
-          {/* =================================================
-              CLIENT
-          ================================================== */}
-
+        <div className="min-w-0">
           <InfoCard icon={User} eyebrow="Client" title="Client Information">
-            <div
-              className="
-                grid
-                gap-x-8
-                gap-y-5
-                sm:grid-cols-2
-              "
-            >
+            <div className="grid min-w-0 gap-5 sm:grid-cols-2 xl:grid-cols-1">
               <DetailItem label="Name" value={clientName} />
 
               <DetailItem label="Email" value={order?.client?.email} />
@@ -731,11 +769,136 @@ const AdminOrderDetails = () => {
               <DetailItem label="Client ID" value={order?.client?._id} mono />
             </div>
           </InfoCard>
+        </div>
 
-          {/* =================================================
-              SERVICE
-          ================================================== */}
+        {/* =================================================
+            ORDER STATUS
+        ================================================== */}
 
+        <div className="min-w-0">
+          <InfoCard
+            icon={Package}
+            eyebrow="Order operations"
+            title="Order Status"
+            allowOverflow
+          >
+            <div className="min-w-0">
+              <h3 className="mb-2 text-sm font-medium text-zinc-800">
+                Current status
+              </h3>
+
+              <p className="mb-4 text-xs leading-5 text-zinc-400">
+                Update the current processing status of this order.
+              </p>
+
+              <div className="min-w-0">
+                <CustomSelect
+                  value={order?.orderStatus || "pending"}
+                  onChange={handleStatusChange}
+                  options={[
+                    {
+                      value: "pending",
+                      label: "Pending",
+                    },
+                    {
+                      value: "processing",
+                      label: "Processing",
+                    },
+                    {
+                      value: "in_progress",
+                      label: "In Progress",
+                    },
+                    {
+                      value: "completed",
+                      label: "Completed",
+                    },
+                    {
+                      value: "cancelled",
+                      label: "Cancelled",
+                    },
+                  ]}
+                />
+              </div>
+
+              {statusLoading && (
+                <LoadingMessage text="Updating order status..." />
+              )}
+            </div>
+          </InfoCard>
+        </div>
+
+        {/* =================================================
+            PAYMENT STATUS
+        ================================================== */}
+
+        <div className="min-w-0">
+          <InfoCard
+            icon={CreditCard}
+            eyebrow="Order operations"
+            title="Payment Status"
+            allowOverflow
+          >
+            <div className="min-w-0">
+              <div className="mb-4">
+                <SummaryCard
+                  icon={CreditCard}
+                  label="Payment Method"
+                  value={formatPaymentMethod(order?.paymentMethod)}
+                />
+              </div>
+
+              <p className="mb-4 text-xs leading-5 text-zinc-400">
+                Online payment statuses can be updated here. COD collection is
+                completed through PIN verification.
+              </p>
+
+              <div className="min-w-0">
+                <CustomSelect
+                  value={order?.paymentStatus || "pending"}
+                  onChange={handlePaymentStatusChange}
+                  options={[
+                    {
+                      value: "pending",
+                      label: "Pending",
+                    },
+                    {
+                      value: "processing",
+                      label: "Processing",
+                    },
+                    {
+                      value: "paid",
+                      label: "Paid",
+                    },
+                    {
+                      value: "failed",
+                      label: "Failed",
+                    },
+                    {
+                      value: "collected",
+                      label: "Collected",
+                    },
+                  ]}
+                />
+              </div>
+
+              {paymentLoading && (
+                <LoadingMessage text="Updating payment status..." />
+              )}
+            </div>
+          </InfoCard>
+        </div>
+      </div>
+
+      {/* =====================================================
+          ORDER CONTENT
+      ====================================================== */}
+
+      <div className="mt-6 min-w-0 space-y-6">
+        {/* =================================================
+            ORDER CONFIGURATION
+        ================================================== */}
+
+        {!order?.items?.length && (
           <InfoCard
             icon={Package}
             eyebrow="Service"
@@ -744,9 +907,11 @@ const AdminOrderDetails = () => {
             <div
               className="
                 grid
+                min-w-0
                 gap-x-8
                 gap-y-5
                 sm:grid-cols-2
+                lg:grid-cols-3
               "
             >
               <DetailItem
@@ -802,6 +967,7 @@ const AdminOrderDetails = () => {
                 <p
                   className="
                     mt-2
+                    break-words
                     text-sm
                     leading-6
                     text-zinc-600
@@ -816,6 +982,7 @@ const AdminOrderDetails = () => {
               <div
                 className="
                   mt-6
+                  min-w-0
                   rounded-2xl
                   border
                   border-zinc-200
@@ -826,12 +993,15 @@ const AdminOrderDetails = () => {
                 <div
                   className="
                     flex
-                    items-start
-                    justify-between
-                    gap-4
+                    min-w-0
+                    flex-col
+                    gap-3
+                    sm:flex-row
+                    sm:items-start
+                    sm:justify-between
                   "
                 >
-                  <div>
+                  <div className="min-w-0">
                     <p
                       className="
                         text-[10px]
@@ -847,6 +1017,7 @@ const AdminOrderDetails = () => {
                     <p
                       className="
                         mt-1
+                        break-words
                         text-sm
                         font-medium
                         text-zinc-900
@@ -872,6 +1043,7 @@ const AdminOrderDetails = () => {
                   <p
                     className="
                       mt-3
+                      break-words
                       text-xs
                       leading-5
                       text-zinc-500
@@ -883,11 +1055,19 @@ const AdminOrderDetails = () => {
               </div>
             )}
           </InfoCard>
+        )}
 
-          {/* =================================================
-              CLIENT SUBMISSION
-          ================================================== */}
+        {/* =================================================
+            ORDER ITEMS
+        ================================================== */}
 
+        {order?.items?.length > 0 && <OrderItemsOverview order={order} />}
+
+        {/* =================================================
+            CLIENT SUBMISSION
+        ================================================== */}
+
+        {!order?.items?.length && (
           <InfoCard
             icon={Clipboard}
             eyebrow="Client Submission"
@@ -908,8 +1088,10 @@ const AdminOrderDetails = () => {
             {formDataEntries.length > 0 ? (
               <div
                 className="
+                  min-w-0
                   divide-y
                   divide-zinc-100
+                  overflow-hidden
                   rounded-2xl
                   border
                   border-zinc-200
@@ -924,180 +1106,291 @@ const AdminOrderDetails = () => {
               <EmptySubmittedData />
             )}
           </InfoCard>
+        )}
 
-          {/* =================================================
-              ADDITIONAL REQUIREMENTS
-          ================================================== */}
+        {/* =================================================
+            ADDITIONAL REQUIREMENTS
+        ================================================== */}
 
-          {hasAdditionalRequirements && (
-            <InfoCard
-              icon={FileText}
-              eyebrow="Client Submission"
-              title="Additional Requirements"
+        {hasAdditionalRequirements && (
+          <InfoCard
+            icon={FileText}
+            eyebrow="Client Submission"
+            title="Additional Requirements"
+          >
+            <div
+              className="
+                min-w-0
+                rounded-2xl
+                border
+                border-zinc-200
+                bg-zinc-50
+                p-5
+              "
             >
-              <div
+              <p
                 className="
-                  rounded-2xl
-                  border
-                  border-zinc-200
-                  bg-zinc-50
-                  p-5
+                  whitespace-pre-wrap
+                  break-words
+                  text-sm
+                  leading-7
+                  text-zinc-600
                 "
               >
-                <p
-                  className="
-                    whitespace-pre-wrap
-                    break-words
-                    text-sm
-                    leading-7
-                    text-zinc-600
-                  "
-                >
-                  {order.additionalRequirements}
-                </p>
-              </div>
-            </InfoCard>
-          )}
-        </div>
+                {order.additionalRequirements}
+              </p>
+            </div>
+          </InfoCard>
+        )}
 
-        {/* ===================================================
-            RIGHT
-        ==================================================== */}
+        {/* =================================================
+            DELIVERY + COD
+        ================================================== */}
 
-        <aside className="space-y-6">
+        <div
+          className={`
+            grid
+            min-w-0
+            gap-6
+            ${
+              !staffMode && order?.paymentMethod === "cod"
+                ? "xl:grid-cols-2"
+                : "xl:grid-cols-1"
+            }
+          `}
+        >
           {/* =================================================
-              ORDER STATUS
+              DELIVERY & INVOICE
           ================================================== */}
 
           <InfoCard
             icon={Package}
-            eyebrow="Management"
-            title="Order Status"
-            allowOverflow
+            eyebrow="Client handoff"
+            title="Delivery & Invoice"
           >
-            <p
-              className="
-                mb-4
-                text-xs
-                leading-5
-                text-zinc-400
-              "
-            >
-              Update the current processing status of this order.
-            </p>
+            <div className="grid min-w-0 gap-6 2xl:grid-cols-2">
+              {/* Delivery */}
 
-            <CustomSelect
-              value={order?.orderStatus || "pending"}
-              onChange={handleStatusChange}
-              options={[
-                {
-                  value: "pending",
-                  label: "Pending",
-                },
-                {
-                  value: "processing",
-                  label: "Processing",
-                },
-                {
-                  value: "in_progress",
-                  label: "In Progress",
-                },
-                {
-                  value: "completed",
-                  label: "Completed",
-                },
-                {
-                  value: "cancelled",
-                  label: "Cancelled",
-                },
-              ]}
-            />
+              <section className="min-w-0">
+                <h3 className="mb-3 text-sm font-medium text-zinc-800">
+                  Delivery link
+                </h3>
 
-            {statusLoading && (
-              <LoadingMessage text="Updating order status..." />
-            )}
-          </InfoCard>
+                <label
+                  htmlFor="delivery-link"
+                  className="
+                    mb-2
+                    block
+                    text-xs
+                    font-medium
+                    text-zinc-600
+                  "
+                >
+                  Google Drive or other HTTPS share link
+                </label>
 
-          {/* =================================================
-              PAYMENT
-          ================================================== */}
+                <input
+                  id="delivery-link"
+                  type="url"
+                  value={deliveryLink}
+                  onChange={(event) => setDeliveryLink(event.target.value)}
+                  placeholder="https://drive.google.com/..."
+                  className="
+                    block
+                    w-full
+                    min-w-0
+                    rounded-xl
+                    border
+                    border-zinc-200
+                    bg-zinc-50
+                    px-4
+                    py-3
+                    text-sm
+                    outline-none
+                    focus:border-zinc-400
+                    focus:bg-white
+                  "
+                />
 
-          <InfoCard
-            icon={CreditCard}
-            eyebrow="Payment"
-            title="Payment Status"
-            allowOverflow
-          >
-            <div
-              className="
-                mb-5
-                grid
-                grid-cols-2
-                gap-3
-              "
-            >
-              <SummaryCard
-                icon={CreditCard}
-                label="Method"
-                value={formatPaymentMethod(order?.paymentMethod)}
-              />
+                <button
+                  type="button"
+                  onClick={handleSaveDelivery}
+                  disabled={deliveryLoading}
+                  className="
+                    mt-3
+                    inline-flex
+                    max-w-full
+                    items-center
+                    justify-center
+                    gap-2
+                    rounded-xl
+                    bg-zinc-900
+                    px-4
+                    py-2.5
+                    text-sm
+                    font-medium
+                    text-white
+                    transition
+                    hover:bg-zinc-800
+                    disabled:cursor-not-allowed
+                    disabled:opacity-50
+                  "
+                >
+                  {deliveryLoading ? (
+                    <Loader2 size={15} className="animate-spin" />
+                  ) : (
+                    <Save size={15} />
+                  )}
 
-              <SummaryCard
-                icon={CreditCard}
-                label="Amount"
-                value={formatCurrency(order?.amount)}
-              />
+                  <span>Save delivery link</span>
+                </button>
+
+                {order?.orderStatus === "completed" && !deliveryLink && (
+                  <p className="mt-3 break-words text-xs text-amber-700">
+                    Delivery is marked completed, but no link is available yet.
+                  </p>
+                )}
+              </section>
+
+              {/* Invoice */}
+
+              <section
+                className="
+                  min-w-0
+                  border-t
+                  border-zinc-100
+                  pt-5
+                  2xl:border-l
+                  2xl:border-t-0
+                  2xl:pl-6
+                  2xl:pt-0
+                "
+              >
+                <h3 className="mb-3 text-sm font-medium text-zinc-800">
+                  Invoice link
+                </h3>
+
+                <label
+                  htmlFor="invoice-name"
+                  className="
+                    mb-2
+                    block
+                    text-xs
+                    font-medium
+                    text-zinc-600
+                  "
+                >
+                  Invoice name
+                </label>
+
+                <input
+                  id="invoice-name"
+                  type="text"
+                  maxLength={200}
+                  value={invoiceName}
+                  onChange={(event) => setInvoiceName(event.target.value)}
+                  placeholder="Invoice"
+                  className="
+                    mb-3
+                    block
+                    w-full
+                    min-w-0
+                    rounded-xl
+                    border
+                    border-zinc-200
+                    bg-zinc-50
+                    px-4
+                    py-3
+                    text-sm
+                    outline-none
+                    focus:border-zinc-400
+                    focus:bg-white
+                  "
+                />
+
+                <label
+                  htmlFor="invoice-url"
+                  className="
+                    mb-2
+                    block
+                    text-xs
+                    font-medium
+                    text-zinc-600
+                  "
+                >
+                  Google Drive or other HTTPS invoice link
+                </label>
+
+                <input
+                  id="invoice-url"
+                  type="url"
+                  value={invoiceUrl}
+                  onChange={(event) => setInvoiceUrl(event.target.value)}
+                  placeholder="https://drive.google.com/..."
+                  className="
+                    block
+                    w-full
+                    min-w-0
+                    rounded-xl
+                    border
+                    border-zinc-200
+                    bg-zinc-50
+                    px-4
+                    py-3
+                    text-sm
+                    outline-none
+                    focus:border-zinc-400
+                    focus:bg-white
+                  "
+                />
+
+                <button
+                  type="button"
+                  onClick={handleSaveInvoice}
+                  disabled={invoiceLoading}
+                  className="
+                    mt-3
+                    inline-flex
+                    max-w-full
+                    items-center
+                    justify-center
+                    gap-2
+                    rounded-xl
+                    bg-zinc-900
+                    px-4
+                    py-2.5
+                    text-sm
+                    font-medium
+                    text-white
+                    transition
+                    hover:bg-zinc-800
+                    disabled:cursor-not-allowed
+                    disabled:opacity-50
+                  "
+                >
+                  {invoiceLoading ? (
+                    <Loader2 size={15} className="animate-spin" />
+                  ) : (
+                    <Save size={15} />
+                  )}
+
+                  <span>Save invoice link</span>
+                </button>
+
+                {order?.orderStatus === "completed" && !invoiceUrl && (
+                  <p className="mt-3 break-words text-xs text-amber-700">
+                    Invoice is not available yet.
+                  </p>
+                )}
+              </section>
             </div>
-
-            <p
-              className="
-                mb-4
-                text-xs
-                leading-5
-                text-zinc-400
-              "
-            >
-              Online payment statuses can be updated here. COD collection is
-              completed through PIN verification.
-            </p>
-
-            <CustomSelect
-              value={order?.paymentStatus || "pending"}
-              onChange={handlePaymentStatusChange}
-              options={[
-                {
-                  value: "pending",
-                  label: "Pending",
-                },
-                {
-                  value: "processing",
-                  label: "Processing",
-                },
-                {
-                  value: "paid",
-                  label: "Paid",
-                },
-                {
-                  value: "failed",
-                  label: "Failed",
-                },
-                {
-                  value: "collected",
-                  label: "Collected",
-                },
-              ]}
-            />
-
-            {paymentLoading && (
-              <LoadingMessage text="Updating payment status..." />
-            )}
           </InfoCard>
 
           {/* =================================================
-              COD
+              COD PAYMENT
           ================================================== */}
 
-          {order?.paymentMethod === "cod" && (
+          {!staffMode && order?.paymentMethod === "cod" && (
             <InfoCard
               icon={KeyRound}
               eyebrow="Cash on Delivery"
@@ -1105,6 +1398,7 @@ const AdminOrderDetails = () => {
             >
               <div
                 className="
+                  min-w-0
                   rounded-xl
                   border
                   border-zinc-200
@@ -1115,12 +1409,13 @@ const AdminOrderDetails = () => {
                 <div
                   className="
                     flex
+                    min-w-0
                     items-start
                     justify-between
                     gap-4
                   "
                 >
-                  <div>
+                  <div className="min-w-0">
                     <p
                       className="
                         text-[10px]
@@ -1133,13 +1428,7 @@ const AdminOrderDetails = () => {
                       PIN Status
                     </p>
 
-                    <p
-                      className="
-                        mt-1
-                        text-sm
-                        text-zinc-700
-                      "
-                    >
+                    <p className="mt-1 break-words text-sm text-zinc-700">
                       {formatCodPinStatus(order?.codPinStatus)}
                     </p>
                   </div>
@@ -1149,7 +1438,7 @@ const AdminOrderDetails = () => {
               </div>
 
               {hasCodPin ? (
-                <div className="mt-5">
+                <div className="mt-5 min-w-0">
                   <p
                     className="
                       mb-2
@@ -1163,13 +1452,14 @@ const AdminOrderDetails = () => {
                     COD PIN
                   </p>
 
-                  <div className="flex gap-2">
+                  <div className="flex min-w-0 gap-2">
                     <div
                       className="
                         flex
                         min-w-0
                         flex-1
                         items-center
+                        overflow-hidden
                         rounded-xl
                         border
                         border-zinc-200
@@ -1180,6 +1470,8 @@ const AdminOrderDetails = () => {
                     >
                       <span
                         className="
+                          min-w-0
+                          truncate
                           font-mono
                           text-xl
                           tracking-[0.3em]
@@ -1222,6 +1514,7 @@ const AdminOrderDetails = () => {
                   <p
                     className="
                       mt-3
+                      break-words
                       text-xs
                       leading-5
                       text-zinc-400
@@ -1232,7 +1525,7 @@ const AdminOrderDetails = () => {
                   </p>
                 </div>
               ) : (
-                <div className="mt-5">
+                <div className="mt-5 min-w-0">
                   <button
                     type="button"
                     onClick={handleGenerateCodPin}
@@ -1278,6 +1571,7 @@ const AdminOrderDetails = () => {
                   <p
                     className="
                       mt-3
+                      break-words
                       text-xs
                       leading-5
                       text-zinc-400
@@ -1293,6 +1587,7 @@ const AdminOrderDetails = () => {
                   className="
                     mt-4
                     flex
+                    min-w-0
                     items-center
                     gap-2
                     rounded-xl
@@ -1305,17 +1600,22 @@ const AdminOrderDetails = () => {
                     text-emerald-700
                   "
                 >
-                  <Check size={16} />
-                  COD payment has been collected.
+                  <Check size={16} className="shrink-0" />
+
+                  <span className="break-words">
+                    COD payment has been collected.
+                  </span>
                 </div>
               )}
             </InfoCard>
           )}
+        </div>
 
-          {/* =================================================
-              ADMIN NOTES
-          ================================================== */}
+        {/* =================================================
+            ADMIN NOTES
+        ================================================== */}
 
+        {!staffMode && (
           <InfoCard icon={FileText} eyebrow="Internal" title="Admin Notes">
             <p
               className="
@@ -1335,7 +1635,9 @@ const AdminOrderDetails = () => {
               rows={7}
               placeholder="Add internal notes about this order..."
               className="
+                block
                 w-full
+                min-w-0
                 resize-y
                 rounded-xl
                 border
@@ -1363,6 +1665,7 @@ const AdminOrderDetails = () => {
               className="
                 mt-4
                 flex
+                min-w-0
                 flex-col
                 gap-3
                 sm:flex-row
@@ -1413,111 +1716,8 @@ const AdminOrderDetails = () => {
               </button>
             </div>
           </InfoCard>
-
-          {/* =================================================
-              ORDER TIMELINE / META
-          ================================================== */}
-
-          <InfoCard
-            icon={CalendarDays}
-            eyebrow="Metadata"
-            title="Order Information"
-          >
-            <div className="space-y-5">
-              <DetailItem
-                label="Order Number"
-                value={order?.orderNumber}
-                mono
-              />
-
-              <DetailItem label="Order ID" value={order?._id} mono />
-
-              <DetailItem
-                label="Created"
-                value={formatDateTime(order?.createdAt)}
-              />
-
-              <DetailItem
-                label="Last Updated"
-                value={formatDateTime(order?.updatedAt)}
-              />
-            </div>
-          </InfoCard>
-        </aside>
+        )}
       </div>
-
-      {/* =====================================================
-          SAVED NOTES
-      ====================================================== */}
-
-      {order?.notes?.trim() && (
-        <section
-          className="
-            mt-6
-            rounded-[24px]
-            border
-            border-zinc-200
-            bg-white
-            p-6
-            shadow-[0_12px_45px_rgba(0,0,0,0.04)]
-            sm:p-7
-          "
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className="
-                flex h-10 w-10
-                shrink-0
-                items-center justify-center
-                rounded-xl
-                border
-                border-zinc-200
-                bg-zinc-50
-              "
-            >
-              <FileText size={18} className="text-zinc-500" />
-            </div>
-
-            <div>
-              <p
-                className="
-                  text-[10px]
-                  font-medium
-                  uppercase
-                  tracking-[0.2em]
-                  text-zinc-400
-                "
-              >
-                Internal
-              </p>
-
-              <h2
-                className="
-                  mt-1
-                  text-lg
-                  font-medium
-                  text-zinc-900
-                "
-              >
-                Saved Notes
-              </h2>
-            </div>
-          </div>
-
-          <p
-            className="
-              mt-6
-              whitespace-pre-wrap
-              break-words
-              text-sm
-              leading-7
-              text-zinc-600
-            "
-          >
-            {order.notes}
-          </p>
-        </section>
-      )}
     </div>
   );
 };
@@ -1611,8 +1811,13 @@ const InfoCard = ({
       className={`
     group
     relative
+    h-full
+    min-w-0
+    max-w-full
     ${allowOverflow ? "overflow-visible" : "overflow-hidden"}
     rounded-[24px]
+    min-w-0
+    max-w-full
     border
     border-zinc-200
     bg-white

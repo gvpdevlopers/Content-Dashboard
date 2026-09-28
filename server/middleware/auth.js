@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
+const User = require("../models/User");
 
-const protect = (req, res, next) => {
+const protect = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -15,7 +16,36 @@ const protect = (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    req.user = decoded;
+    if (!decoded || typeof decoded !== "object") {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired token.",
+      });
+    }
+
+    const userId = decoded.userId || decoded._id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authorized. User identity missing from token.",
+      });
+    }
+
+    const user = await User.findById(userId).select("_id role isActive");
+
+    if (!user || !user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authorized. Account is unavailable.",
+      });
+    }
+
+    req.user = {
+      ...decoded,
+      _id: user._id,
+      role: user.role,
+    };
 
     next();
   } catch (error) {

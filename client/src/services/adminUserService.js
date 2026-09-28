@@ -23,6 +23,16 @@ const updateUserStatus = async (userId, isActive) => {
   return response.data;
 };
 
+const deleteUser = async (userId) => {
+  const response = await api.delete(`/users/${userId}`);
+  return response.data;
+};
+
+const resetUserPassword = async (userId, password) => {
+  const response = await api.patch(`/users/${userId}/password`, { password });
+  return response.data;
+};
+
 const getUserOrders = async (userId) => {
   const response = await api.get(`/users/${userId}/orders`);
   return response.data;
@@ -33,6 +43,8 @@ const adminUserService = {
   getUsers,
   getUserById,
   updateUserStatus,
+  deleteUser,
+  resetUserPassword,
   getUserOrders,
 };
 

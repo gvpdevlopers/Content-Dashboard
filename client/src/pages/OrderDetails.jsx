@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   ArrowLeft,
-  CalendarDays,
   CheckCircle2,
   CreditCard,
   ExternalLink,
@@ -17,6 +16,8 @@ import { Link, useParams } from "react-router-dom";
 
 import orderService from "../services/orderService";
 import codService from "../services/codService";
+import OrderItemsOverview from "../components/OrderItemsOverview";
+import { toast } from "sonner";
 
 const OrderDetails = () => {
   const { id } = useParams();
@@ -29,7 +30,6 @@ const OrderDetails = () => {
   const [codPin, setCodPin] = useState("");
   const [codLoading, setCodLoading] = useState(false);
   const [codError, setCodError] = useState("");
-  const [codMessage, setCodMessage] = useState("");
 
   useEffect(() => {
     const loadOrder = async () => {
@@ -69,7 +69,6 @@ const OrderDetails = () => {
     try {
       setCodLoading(true);
       setCodError("");
-      setCodMessage("");
 
       const response = await codService.verifyCodPin(id, codPin);
 
@@ -97,11 +96,14 @@ const OrderDetails = () => {
         }));
       }
 
-      setCodMessage("Payment Done");
+      toast.success("COD payment verified.");
     } catch (error) {
       console.error("COD verification error:", error);
 
-      setCodError(error.response?.data?.message || "Unable to verify COD PIN.");
+      const message =
+        error.response?.data?.message || "Unable to verify COD PIN.";
+      setCodError(message);
+      toast.error(message);
     } finally {
       setCodLoading(false);
     }
@@ -237,25 +239,30 @@ const OrderDetails = () => {
   const serviceCategory = service.category || "";
   const serviceDescription = service.description || "";
 
-const formData =
-  order.formData instanceof Map
-    ? Object.fromEntries(order.formData)
-    : order.formData || {};
+  const formData =
+    order.formData instanceof Map
+      ? Object.fromEntries(order.formData)
+      : order.formData || {};
 
-const selectedOption = service.selectedOption || null;
+  const selectedOption = service.selectedOption || null;
 
-const quantity = Number(order.quantity || 1);
+  const quantity = Number(order.quantity || 1);
 
-const quantityUnit = selectedOption?.unit || service.unit || "";
+  const quantityUnit = selectedOption?.unit || service.unit || "";
 
-// ---------------------------------------------------------
-// Dynamic form fields
-// ---------------------------------------------------------
+  // ---------------------------------------------------------
+  // Dynamic form fields
+  // ---------------------------------------------------------
 
-const dynamicFields = Object.entries(formData).filter(
-  ([, value]) => value !== null && value !== undefined && value !== "",
-);
-
+  const dynamicFields = order.items?.length
+    ? []
+    : Object.entries(formData).filter(
+        ([key, value]) =>
+          value !== null &&
+          value !== undefined &&
+          value !== "" &&
+          !service.repeatableGroups?.some((group) => group.name === key),
+      );
 
   // ---------------------------------------------------------
   // COD State
@@ -399,24 +406,6 @@ const dynamicFields = Object.entries(formData).filter(
 
             <StatusBadge status={order.orderStatus} />
           </div>
-
-          {/* Summary */}
-
-          <div className="mt-8 grid gap-3 sm:grid-cols-3">
-            <SummaryCard icon={Package} label="Service" value={serviceName} />
-
-            <SummaryCard
-              icon={CreditCard}
-              label="Payment"
-              value={formatStatus(order.paymentMethod)}
-            />
-
-            <SummaryCard
-              icon={CalendarDays}
-              label="Amount"
-              value={`₹${Number(order.amount || 0).toLocaleString("en-IN")}`}
-            />
-          </div>
         </div>
       </div>
 
@@ -424,8 +413,9 @@ const dynamicFields = Object.entries(formData).filter(
           SERVICE INFORMATION
       ====================================================== */}
 
-      <div
-        className="
+      {!order.items?.length && (
+        <div
+          className="
           group
           relative
           mt-6
@@ -441,9 +431,9 @@ const dynamicFields = Object.entries(formData).filter(
           hover:shadow-[0_22px_85px_rgba(0,0,0,0.07)]
           sm:p-8
         "
-      >
-        <div
-          className="
+        >
+          <div
+            className="
             pointer-events-none
             absolute
             -right-24
@@ -457,12 +447,12 @@ const dynamicFields = Object.entries(formData).filter(
             duration-700
             group-hover:bg-cyan-300/[0.045]
           "
-        />
+          />
 
-        <div className="relative">
-          <div className="flex items-start gap-3">
-            <div
-              className="
+          <div className="relative">
+            <div className="flex items-start gap-3">
+              <div
+                className="
                 flex h-10 w-10
                 shrink-0
                 items-center justify-center
@@ -470,110 +460,117 @@ const dynamicFields = Object.entries(formData).filter(
                 border border-zinc-200
                 bg-zinc-50
               "
-            >
-              <Package size={18} strokeWidth={1.6} className="text-zinc-500" />
-            </div>
+              >
+                <Package
+                  size={18}
+                  strokeWidth={1.6}
+                  className="text-zinc-500"
+                />
+              </div>
 
-            <div className="min-w-0">
-              <p
-                className="
+              <div className="min-w-0">
+                <p
+                  className="
                   text-[10px]
                   font-medium
                   uppercase
                   tracking-[0.18em]
                   text-zinc-400
                 "
-              >
-                Service Information
-              </p>
+                >
+                  Service Information
+                </p>
 
-              <h2 className="mt-1 text-lg font-medium text-zinc-900">
-                {serviceName}
-              </h2>
+                <h2 className="mt-1 text-lg font-medium text-zinc-900">
+                  {serviceName}
+                </h2>
 
-              {serviceCategory && (
-                <p className="mt-1 text-xs text-zinc-400">{serviceCategory}</p>
-              )}
+                {serviceCategory && (
+                  <p className="mt-1 text-xs text-zinc-400">
+                    {serviceCategory}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
 
-          {serviceDescription && (
-            <p
-              className="
+            {serviceDescription && (
+              <p
+                className="
                 mt-5
                 max-w-3xl
                 text-sm
                 leading-6
                 text-zinc-500
               "
-            >
-              {serviceDescription}
-            </p>
-          )}
+              >
+                {serviceDescription}
+              </p>
+            )}
 
-          {/* Order pricing information */}
+            {/* Order pricing information */}
 
-          <div
-            className="
+            <div
+              className="
               mt-6
               grid
               gap-3
               sm:grid-cols-2
               lg:grid-cols-3
             "
-          >
-            <SummaryCard
-              icon={Package}
-              label="Quantity"
-              value={`${quantity}${quantityUnit ? ` ${quantityUnit}` : ""}`}
-            />
-
-            {selectedOption?.name && (
+            >
               <SummaryCard
-                icon={FileText}
-                label="Selected Option"
-                value={selectedOption.name}
+                icon={Package}
+                label="Quantity"
+                value={`${quantity}${quantityUnit ? ` ${quantityUnit}` : ""}`}
               />
-            )}
 
-            <SummaryCard
-              icon={CreditCard}
-              label="Order Amount"
-              value={`₹${Number(order.amount || 0).toLocaleString("en-IN")}`}
-            />
-          </div>
+              {selectedOption?.name && (
+                <SummaryCard
+                  icon={FileText}
+                  label="Selected Option"
+                  value={selectedOption.name}
+                />
+              )}
+            </div>
 
-          {/* Pricing option details */}
+            {/* Pricing option details */}
 
-          {selectedOption?.description && (
-            <div
-              className="
+            {selectedOption?.description && (
+              <div
+                className="
                 mt-4
                 rounded-2xl
                 border border-zinc-200
                 bg-zinc-50
                 p-4
               "
-            >
-              <p
-                className="
+              >
+                <p
+                  className="
                   text-[10px]
                   font-medium
                   uppercase
                   tracking-[0.15em]
                   text-zinc-400
                 "
-              >
-                Selected Option
-              </p>
+                >
+                  Selected Option
+                </p>
 
-              <p className="mt-1 text-sm text-zinc-600">
-                {selectedOption.description}
-              </p>
-            </div>
-          )}
+                <p className="mt-1 text-sm text-zinc-600">
+                  {selectedOption.description}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {order.items?.length > 0 && (
+        <div className="mt-6">
+          <OrderItemsOverview order={order} />
+        </div>
+      )}
 
       {/* =====================================================
           COD VERIFICATION
@@ -746,7 +743,6 @@ const dynamicFields = Object.entries(formData).filter(
                           value={codPin}
                           onChange={(event) => {
                             setCodError("");
-                            setCodMessage("");
 
                             setCodPin(
                               event.target.value.replace(/\D/g, "").slice(0, 6),
@@ -853,35 +849,6 @@ const dynamicFields = Object.entries(formData).filter(
                   </div>
                 </div>
 
-                {codMessage && (
-                  <div
-                    className="
-                      mt-4
-                      flex
-                      items-start
-                      gap-3
-                      rounded-xl
-                      border border-emerald-200
-                      bg-emerald-50
-                      px-4
-                      py-3.5
-                    "
-                  >
-                    <CheckCircle2
-                      size={17}
-                      className="
-                        mt-0.5
-                        shrink-0
-                        text-emerald-600
-                      "
-                    />
-
-                    <p className="text-sm leading-5 text-emerald-700">
-                      {codMessage}
-                    </p>
-                  </div>
-                )}
-
                 {codError && (
                   <div
                     className="
@@ -959,6 +926,32 @@ const dynamicFields = Object.entries(formData).filter(
           )}
         </InfoCard>
       </div>
+
+      {order.orderStatus === "completed" && (
+        <section className="mt-6 rounded-[24px] border border-zinc-200 bg-white p-6 shadow-sm sm:p-7">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
+            Completed order
+          </p>
+
+          <h2 className="mt-1 text-lg font-medium text-zinc-900">
+            Delivery & invoice
+          </h2>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <ClientOrderResource
+              title="Delivery"
+              name="View delivery"
+              url={order.deliveryLink}
+            />
+
+            <ClientOrderResource
+              title="Invoice"
+              name={order.invoice?.name || "View invoice"}
+              url={order.invoice?.url}
+            />
+          </div>
+        </section>
+      )}
 
       {/* =====================================================
           REQUIREMENTS / DYNAMIC FORM DATA
@@ -1079,6 +1072,23 @@ const dynamicFields = Object.entries(formData).filter(
             </div>
           )}
 
+          {!order.items?.length &&
+            (service.repeatableGroups || []).map((group) => {
+              const entries = formData[group.name] || group.items || [];
+
+              if (!Array.isArray(entries) || entries.length === 0) {
+                return null;
+              }
+
+              return (
+                <RepeatableConfigurationDetails
+                  key={group.name}
+                  group={group}
+                  entries={entries}
+                />
+              );
+            })}
+
           {/* Additional Requirements */}
 
           {order.additionalRequirements && (
@@ -1186,6 +1196,117 @@ const SummaryCard = ({ icon: Icon, label, value }) => {
     </div>
   );
 };
+
+const ClientOrderResource = ({ title, name, url }) => (
+  <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+    <p className="text-sm font-medium text-zinc-800">{title}</p>
+
+    {url ? (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="
+          mt-3
+          inline-flex
+          cursor-pointer
+          items-center
+          gap-2
+          rounded-xl
+          bg-zinc-900
+          px-4
+          py-2.5
+          text-sm
+          font-medium
+          !text-white
+          transition-all
+          duration-200
+          hover:bg-zinc-700
+          hover:!text-white
+          active:scale-[0.98]
+        "
+      >
+        <span className="!text-white">{name}</span>
+
+        <ExternalLink size={14} strokeWidth={1.8} className="!text-white" />
+      </a>
+    ) : (
+      <p className="mt-2 text-sm text-zinc-500">
+        {title === "Delivery"
+          ? "Delivery is pending."
+          : "Invoice is not available yet."}
+      </p>
+    )}
+  </div>
+);
+
+const RepeatableConfigurationDetails = ({ group, entries }) => (
+  <section className="mt-7 space-y-4">
+    <h3 className="text-sm font-semibold text-zinc-900">
+      {group.label || group.name} configurations
+    </h3>
+    {entries.map((entry, index) => {
+      const snapshotItem = group.items?.[index] || {};
+      const pricingSnapshots =
+        snapshotItem.pricingSnapshots instanceof Map
+          ? Object.fromEntries(snapshotItem.pricingSnapshots)
+          : snapshotItem.pricingSnapshots || {};
+      const fields =
+        entry?.fields && typeof entry.fields === "object"
+          ? entry.fields
+          : entry || {};
+      const displayFields = Object.entries(fields)
+        .map(([fieldName, value]) => ({
+          label: formatLabel(fieldName),
+          value,
+        }))
+        .filter(
+          ({ value }) =>
+            value !== undefined &&
+            value !== null &&
+            value !== "" &&
+            !(Array.isArray(value) && value.length === 0),
+        );
+
+      return (
+        <article
+          key={`${group.name}-${index}`}
+          className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4"
+        >
+          <h4 className="text-sm font-medium text-zinc-800">
+            {group.label || "Item"} {index + 1}
+          </h4>
+          {Object.entries(pricingSnapshots).length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {Object.entries(pricingSnapshots).map(([name, option]) => (
+                <span
+                  key={name}
+                  className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-600"
+                >
+                  {formatLabel(name)}: {option?.name || "Selected"}
+                </span>
+              ))}
+            </div>
+          )}
+          {displayFields.length > 0 && (
+            <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+              {displayFields.map(({ label, value }) => (
+                <div key={label}>
+                  <dt className="text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+                    {label}
+                  </dt>
+                  <dd className="mt-1 break-words text-sm text-zinc-700">
+                    {formatDynamicValue(value)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </article>
+      );
+    })}
+  </section>
+);
 
 /* =========================================================
    INFORMATION CARD
@@ -1555,18 +1676,6 @@ const formatStatus = (status) => {
 /* =========================================================
    DATE
 ========================================================= */
-
-const formatDate = (date) => {
-  if (!date) {
-    return "—";
-  }
-
-  return new Date(date).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-};
 
 /* =========================================================
    DATE + TIME

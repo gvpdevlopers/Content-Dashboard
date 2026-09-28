@@ -13,8 +13,12 @@ import { Link } from "react-router-dom";
 
 import adminOrderService from "../../services/adminOrderService";
 import CustomSelect from "../../components/CustomSelect";
+import { useAuth } from "../../context/AuthContext";
 
 const AdminOrders = () => {
+  const { user } = useAuth();
+  const staffMode = user?.role === "employee";
+  const orderPath = staffMode ? "/staff/orders" : "/admin/orders";
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -38,7 +42,7 @@ const AdminOrders = () => {
 
       setError("");
 
-      const data = await adminOrderService.getAdminOrders();
+      const data = await adminOrderService.getAdminOrders(staffMode);
 
       const receivedOrders = Array.isArray(data?.orders) ? data.orders : [];
 
@@ -670,7 +674,7 @@ const AdminOrders = () => {
               border border-zinc-200
               bg-white
               shadow-[0_15px_55px_rgba(0,0,0,0.05)]
-              md:block
+              lg:block
             "
           >
             {/* Table Header */}
@@ -678,7 +682,7 @@ const AdminOrders = () => {
             <div
               className="
                 grid
-                grid-cols-[1.25fr_1.25fr_1.2fr_0.8fr_0.9fr_0.9fr_56px]
+                grid-cols-[minmax(0,1.25fr)_minmax(0,1.25fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_56px]
                 border-b
                 border-zinc-200
                 bg-zinc-50
@@ -702,7 +706,11 @@ const AdminOrders = () => {
 
             <div>
               {filteredOrders.map((order) => (
-                <AdminOrderRow key={order._id} order={order} />
+                <AdminOrderRow
+                  key={order._id}
+                  order={order}
+                  orderPath={orderPath}
+                />
               ))}
             </div>
           </div>
@@ -711,9 +719,13 @@ const AdminOrders = () => {
               MOBILE
           ================================================== */}
 
-          <div className="space-y-3 md:hidden">
+          <div className="space-y-3 lg:hidden">
             {filteredOrders.map((order) => (
-              <AdminOrderMobileCard key={order._id} order={order} />
+              <AdminOrderMobileCard
+                key={order._id}
+                order={order}
+                orderPath={orderPath}
+              />
             ))}
           </div>
         </>
@@ -726,7 +738,7 @@ const AdminOrders = () => {
    DESKTOP ORDER ROW
 ========================================================= */
 
-const AdminOrderRow = ({ order }) => {
+const AdminOrderRow = ({ order, orderPath }) => {
   const serviceName =
     order?.serviceSnapshot?.name || order?.service?.name || "Service";
 
@@ -742,11 +754,11 @@ const AdminOrderRow = ({ order }) => {
 
   return (
     <Link
-      to={`/admin/orders/${order._id}`}
+      to={`${orderPath}/${order._id}`}
       className="
         group
         grid
-        grid-cols-[1.25fr_1.25fr_1.2fr_0.8fr_0.9fr_0.9fr_56px]
+        grid-cols-[minmax(0,1.25fr)_minmax(0,1.25fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_56px]
         items-center
         border-b
         border-zinc-100
@@ -782,7 +794,10 @@ const AdminOrderRow = ({ order }) => {
 
       {/* Service */}
 
-      <p className="truncate pr-4 text-sm text-zinc-600">{serviceName}</p>
+      <div className="min-w-0 pr-4">
+        <p className="truncate text-sm text-zinc-600">{serviceName}</p>
+        <OrderArtifactBadges order={order} />
+      </div>
 
       {/* Amount */}
 
@@ -837,11 +852,28 @@ const AdminOrderRow = ({ order }) => {
   );
 };
 
+const OrderArtifactBadges = ({ order }) => {
+  const artifacts = [
+    order?.deliveryLink && "delivery",
+    order?.invoice?.url && "invoice",
+  ].filter(Boolean);
+
+  if (!artifacts.length) {
+    return null;
+  }
+
+  return (
+    <p className="mt-1 truncate text-[10px] font-medium text-emerald-700">
+      {artifacts.join(" + ")} available
+    </p>
+  );
+};
+
 /* =========================================================
    MOBILE ORDER CARD
 ========================================================= */
 
-const AdminOrderMobileCard = ({ order }) => {
+const AdminOrderMobileCard = ({ order, orderPath }) => {
   const serviceName =
     order?.serviceSnapshot?.name || order?.service?.name || "Service";
 
@@ -857,7 +889,7 @@ const AdminOrderMobileCard = ({ order }) => {
 
   return (
     <Link
-      to={`/admin/orders/${order._id}`}
+      to={`${orderPath}/${order._id}`}
       className="
         group
         block
@@ -947,6 +979,7 @@ const AdminOrderMobileCard = ({ order }) => {
           </p>
 
           <p className="mt-1 text-sm text-zinc-700">{serviceName}</p>
+          <OrderArtifactBadges order={order} />
         </div>
 
         {/* Amount + Payment */}

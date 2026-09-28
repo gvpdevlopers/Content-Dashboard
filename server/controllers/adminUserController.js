@@ -107,6 +107,88 @@ const updateUserStatus = async (req, res) => {
   }
 };
 
+// DELETE /api/users/admin/:id
+const deleteAdminUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    if (String(user._id) === String(req.user?._id)) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot delete your own account.",
+      });
+    }
+
+    if (user.role === "admin") {
+      return res.status(400).json({
+        success: false,
+        message: "Admin accounts cannot be deleted here.",
+      });
+    }
+
+    await user.deleteOne();
+
+    return res.status(200).json({
+      success: true,
+      message: "User deleted successfully.",
+      userId: String(user._id),
+    });
+  } catch (error) {
+    console.error("Delete admin user error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to delete user.",
+    });
+  }
+};
+
+// PATCH /api/users/admin/:id/password
+const resetAdminUserPassword = async (req, res) => {
+  try {
+    const password =
+      typeof req.body?.password === "string" ? req.body.password : "";
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters.",
+      });
+    }
+
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    user.password = await bcrypt.hash(password, 10);
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "User password reset successfully.",
+    });
+  } catch (error) {
+    console.error("Reset admin user password error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to reset user password.",
+    });
+  }
+};
+
 // GET /api/users/admin/:id/orders
 const getAdminUserOrders = async (req, res) => {
   try {
@@ -161,7 +243,7 @@ const createAdminUser = async (req, res) => {
     }
 
     // Validate role
-    if (!["client", "admin"].includes(role)) {
+    if (!["client", "employee", "admin"].includes(role)) {
       return res.status(400).json({
         success: false,
         message: "Invalid user role.",
@@ -244,6 +326,8 @@ module.exports = {
   getAdminUsers,
   getAdminUserById,
   updateUserStatus,
+  deleteAdminUser,
+  resetAdminUserPassword,
   getAdminUserOrders,
   createAdminUser,
 };

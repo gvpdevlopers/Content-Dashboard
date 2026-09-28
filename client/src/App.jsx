@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { Toaster } from "sonner";
 
 import ScrollToTop from "./components/ScrollToTop";
 
@@ -36,15 +37,18 @@ import AdminEditService from "./pages/admin/AdminEditService";
 // Route Guards
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
+import OrderStaffRoute from "./components/OrderStaffRoute";
 
 // Layouts
 import DashboardLayout from "./layouts/DashboardLayout";
 import AdminLayout from "./layouts/AdminLayout";
+import EmployeeDashboard from "./pages/EmployeeDashboard";
 
 const App = () => {
   return (
     <>
       <ScrollToTop />
+      <Toaster position="top-right" richColors closeButton />
 
       <Routes>
         {/* =====================================================
@@ -84,6 +88,20 @@ const App = () => {
           <Route path="/dashboard/orders" element={<OrderHistory />} />
 
           <Route path="/dashboard/orders/:id" element={<OrderDetails />} />
+        </Route>
+
+        {/* EMPLOYEE ORDER OPERATIONS */}
+
+        <Route
+          element={
+            <OrderStaffRoute>
+              <AdminLayout />
+            </OrderStaffRoute>
+          }
+        >
+          <Route path="/staff" element={<EmployeeDashboard />} />
+          <Route path="/staff/orders" element={<AdminOrders />} />
+          <Route path="/staff/orders/:id" element={<AdminOrderDetails />} />
         </Route>
 
         {/* ADMIN AREA */}

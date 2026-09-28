@@ -36,15 +36,15 @@ const DashboardLayout = () => {
 
       <header
         className="
-          fixed left-0 right-0 top-0 z-40
-          flex h-16 items-center justify-between
-          border-b border-zinc-200/80
-          bg-white/90
-          px-5
-          shadow-[0_1px_10px_rgba(0,0,0,0.03)]
-          backdrop-blur-xl
-          lg:hidden
-        "
+    fixed left-0 right-0 top-0 z-50
+    flex h-16 items-center justify-between
+    border-b border-zinc-200/80
+    bg-white/90
+    px-5
+    shadow-[0_1px_10px_rgba(0,0,0,0.03)]
+    backdrop-blur-xl
+    lg:hidden
+  "
       >
         {/* Menu */}
         <button
@@ -74,20 +74,11 @@ const DashboardLayout = () => {
           Dashboard
         </div>
 
-        {/* User Avatar */}
-        <div
-          className="
-            flex h-9 w-9
-            items-center justify-center
-            rounded-full
-            bg-zinc-900
-            text-sm font-semibold
-            text-white
-            shadow-[0_5px_20px_rgba(0,0,0,0.10)]
-          "
-        >
-          {userInitial}
-        </div>
+        <UserMenu
+          user={user}
+          userInitial={userInitial}
+          onLogout={handleLogout}
+        />
       </header>
 
       {/* =====================================================
@@ -337,15 +328,16 @@ const DashboardLayout = () => {
 
         <header
           className="
-            hidden h-20
-            items-center justify-between
-            border-b border-zinc-200/80
-            bg-white/70
-            px-8
-            backdrop-blur-xl
-            lg:flex
-            xl:px-10
-          "
+    relative z-50
+    hidden h-20
+    items-center justify-between
+    border-b border-zinc-200/80
+    bg-white/70
+    px-8
+    backdrop-blur-xl
+    lg:flex
+    xl:px-10
+  "
         >
           {/* Page Title */}
           <div>
@@ -358,24 +350,11 @@ const DashboardLayout = () => {
             </p>
           </div>
 
-          {/* User */}
-          <div className="flex items-center gap-3">
-            <div
-              className="
-                flex h-10 w-10
-                items-center justify-center
-                rounded-full
-                bg-zinc-900
-                text-sm font-semibold
-                text-white
-                shadow-[0_5px_20px_rgba(0,0,0,0.10)]
-                transition-transform duration-200
-                hover:scale-105
-              "
-            >
-              {userInitial}
-            </div>
-          </div>
+          <UserMenu
+            user={user}
+            userInitial={userInitial}
+            onLogout={handleLogout}
+          />
         </header>
 
         {/* =================================================
@@ -395,6 +374,114 @@ const DashboardLayout = () => {
         >
           <Outlet />
         </main>
+      </div>
+    </div>
+  );
+};
+
+const UserMenu = ({ user, userInitial, onLogout }) => {
+  return (
+    <div className="group relative z-[100]">
+      {/* Avatar */}
+      <button
+        type="button"
+        aria-label="Open account menu"
+        className="
+          flex
+          h-9 w-9
+          cursor-pointer
+          items-center
+          justify-center
+          rounded-full
+          bg-zinc-900
+          text-sm
+          font-semibold
+          text-white
+          shadow-[0_5px_20px_rgba(0,0,0,0.10)]
+          outline-none
+          transition-all
+          duration-200
+          hover:scale-105
+          hover:shadow-[0_8px_25px_rgba(0,0,0,0.14)]
+          focus-visible:ring-2
+          focus-visible:ring-zinc-400
+          focus-visible:ring-offset-2
+        "
+      >
+        {userInitial}
+      </button>
+
+      {/* Account Dropdown */}
+      <div
+        className="
+          invisible
+          absolute
+          right-0
+          top-full
+          z-[9999]
+          mt-2
+          w-56
+          translate-y-1
+          rounded-xl
+          border
+          border-zinc-200
+          bg-white
+          p-2
+          opacity-0
+          shadow-[0_12px_40px_rgba(0,0,0,0.14)]
+          transition-all
+          duration-150
+          group-hover:visible
+          group-hover:translate-y-0
+          group-hover:opacity-100
+        "
+      >
+        {/* Email */}
+        <p
+          className="
+            truncate
+            px-3
+            py-2
+            text-xs
+            text-zinc-500
+          "
+        >
+          {user?.email || user?.username || "Client account"}
+        </p>
+
+        {/* Divider */}
+        <div className="my-1 h-px bg-zinc-100" />
+
+        {/* Logout */}
+        <button
+          type="button"
+          onClick={onLogout}
+          className="
+            flex
+            w-full
+            cursor-pointer
+            items-center
+            gap-2
+            rounded-lg
+            px-3
+            py-2.5
+            text-left
+            text-sm
+            text-zinc-600
+            transition-all
+            duration-200
+            hover:bg-red-50
+            hover:text-red-700
+            active:scale-[0.98]
+          "
+        >
+          <LogOut
+            size={16}
+            strokeWidth={1.8}
+          />
+
+          <span>Log out</span>
+        </button>
       </div>
     </div>
   );

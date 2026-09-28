@@ -862,6 +862,42 @@ const orderSchema = new mongoose.Schema(
       default: "pending",
     },
 
+    deliveryLink: {
+      type: String,
+      trim: true,
+      default: "",
+      validate: {
+        validator: (value) => !value || /^https?:\/\/\S+$/i.test(value),
+        message: "Delivery link must be a valid HTTP or HTTPS URL.",
+      },
+    },
+
+    invoice: {
+      url: {
+        type: String,
+        trim: true,
+        default: "",
+        validate: {
+          validator: (value) => !value || /^https?:\/\/\S+$/i.test(value),
+          message: "Invoice URL must be a valid HTTP or HTTPS URL.",
+        },
+      },
+      type: {
+        type: String,
+        enum: ["link"],
+        default: "link",
+      },
+      name: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+      uploadedAt: {
+        type: Date,
+        default: null,
+      },
+    },
+
     /*
     |--------------------------------------------------------------------------
     | Admin notes

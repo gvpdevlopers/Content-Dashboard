@@ -2172,6 +2172,13 @@ const createOrder = async (
   res,
 ) => {
   try {
+    if (!req.user?._id) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authorized. User identity is unavailable.",
+      });
+    }
+
     const {
       services,
       serviceId,
@@ -2513,7 +2520,7 @@ const getMyOrders = async (
 
     return res.status(200).json({
       success: true,
-      orders,
+      orders: orders.map(toClientVisibleOrder),
     });
   } catch (error) {
     console.error(
@@ -2563,7 +2570,7 @@ const getOrderById = async (
 
     return res.status(200).json({
       success: true,
-      order,
+      order: toClientVisibleOrder(order),
     });
   } catch (error) {
     console.error(
@@ -2577,6 +2584,18 @@ const getOrderById = async (
         "Unable to fetch order.",
     });
   }
+};
+
+const toClientVisibleOrder = (order) => {
+  const visibleOrder =
+    typeof order?.toObject === "function" ? order.toObject() : { ...order };
+
+  if (visibleOrder.orderStatus !== "completed") {
+    delete visibleOrder.deliveryLink;
+    delete visibleOrder.invoice;
+  }
+
+  return visibleOrder;
 };
 
 /* =========================================================
@@ -2678,6 +2697,50 @@ const getAdminOrderById = async (
   }
 };
 
+const getStaffOrders = async (req, res) => {
+  try {
+    const orders = await Order.find({})
+      .select("-codPin -notes")
+      .populate("client", "name email username")
+      .populate("service", "name category")
+      .populate("items.service", "name category")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({ success: true, orders });
+  } catch (error) {
+    console.error("Get staff orders error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to fetch orders.",
+    });
+  }
+};
+
+const getStaffOrderById = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id)
+      .select("-codPin -notes")
+      .populate("client", "name email username")
+      .populate("service", "name category")
+      .populate("items.service", "name category");
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found.",
+      });
+    }
+
+    return res.status(200).json({ success: true, order });
+  } catch (error) {
+    console.error("Get staff order error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to fetch order.",
+    });
+  }
+};
+
 /* =========================================================
    ADMIN - UPDATE ORDER STATUS
 ========================================================= */
@@ -2740,7 +2803,11 @@ const updateOrderStatus = async (
       await Order.findById(
         order._id,
       )
-        .select("-codPin")
+        .select(
+          req.user?.role === "employee"
+            ? "-codPin -notes"
+            : "-codPin",
+        )
         .populate(
           "client",
           "name email username",
@@ -2892,6 +2959,129 @@ const updatePaymentStatus =
     }
   };
 
+const updateDeliveryLink = async (req, res) => {
+  try {
+    const deliveryLink = String(req.body?.deliveryLink || "").trim();
+
+    if (deliveryLink) {
+      let parsedUrl;
+
+      try {
+        parsedUrl = new URL(deliveryLink);
+      } catch {
+        return res.status(400).json({
+          success: false,
+          message: "Delivery link must be a valid URL.",
+        });
+      }
+
+      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+        return res.status(400).json({
+          success: false,
+          message: "Delivery link must use HTTP or HTTPS.",
+        });
+      }
+    }
+
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found.",
+      });
+    }
+
+    order.deliveryLink = deliveryLink;
+    await order.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Delivery link updated successfully.",
+      order: {
+        _id: order._id,
+        deliveryLink: order.deliveryLink,
+        orderStatus: order.orderStatus,
+      },
+    });
+  } catch (error) {
+    console.error("Update delivery link error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to update delivery link.",
+    });
+  }
+};
+
+const updateInvoice = async (req, res) => {
+  try {
+    const url = String(req.body?.url || "").trim();
+    const name = String(req.body?.name || "").trim();
+
+    if (url) {
+      let parsedUrl;
+
+      try {
+        parsedUrl = new URL(url);
+      } catch {
+        return res.status(400).json({
+          success: false,
+          message: "Invoice link must be a valid URL.",
+        });
+      }
+
+      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invoice link must use HTTP or HTTPS.",
+        });
+      }
+    }
+
+    if (name.length > 200) {
+      return res.status(400).json({
+        success: false,
+        message: "Invoice name must be 200 characters or fewer.",
+      });
+    }
+
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found.",
+      });
+    }
+
+    order.invoice = {
+      url,
+      type: "link",
+      name,
+      uploadedAt: url ? new Date() : null,
+    };
+    await order.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Invoice link updated successfully.",
+      order: {
+        _id: order._id,
+        invoice: order.invoice,
+        orderStatus: order.orderStatus,
+      },
+    });
+  } catch (error) {
+    console.error("Update invoice error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to update invoice link.",
+    });
+  }
+};
+
 /* =========================================================
    ADMIN - UPDATE NOTES
 ========================================================= */
@@ -3022,8 +3212,12 @@ module.exports = {
   getOrderById,
   getAdminOrders,
   getAdminOrderById,
+  getStaffOrders,
+  getStaffOrderById,
   updateOrderStatus,
   updatePaymentStatus,
+  updateDeliveryLink,
+  updateInvoice,
   updateAdminNotes,
   getAdminCodOrders,
 };
