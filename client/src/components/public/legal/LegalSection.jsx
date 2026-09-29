@@ -1,25 +1,22 @@
-import Reveal from "../Reveal";
-
 const LegalSection = ({
   number,
   title,
   children,
 }) => {
   return (
-    <Reveal amount={0.12} y={16} duration={0.45}>
-      <section
-        className="
-          scroll-mt-28
-          border-b
-          border-zinc-100
-          py-6
-          first:pt-0
-          last:border-b-0
-          last:pb-0
-          sm:py-8
-        "
-      >
-        <div className="flex gap-4 sm:gap-5">
+    <section
+      className="
+        scroll-mt-28
+        border-b
+        border-zinc-100
+        py-6
+        first:pt-0
+        last:border-b-0
+        last:pb-0
+        sm:py-8
+      "
+    >
+      <div className="flex gap-4 sm:gap-5">
         {/* Section number */}
         {number && (
           <span
@@ -68,9 +65,8 @@ const LegalSection = ({
             {children}
           </div>
         </div>
-        </div>
-      </section>
-    </Reveal>
+      </div>
+    </section>
   );
 };
 

@@ -110,6 +110,7 @@ const Dashboard = () => {
   }, [orders]);
 
   const firstName = user?.name?.split(" ")[0] || "there";
+  const supportPhone = "+919876543210";
 
   return (
     <div className="relative mx-auto max-w-[1500px]">
@@ -490,6 +491,179 @@ const Dashboard = () => {
             >
               {loading ? "—" : `₹${stats.totalAmount.toLocaleString("en-IN")}`}
             </span>
+          </div>
+        </div>
+      </section>
+
+      {/* =====================================================
+          NEED HELP / SUPPORT
+      ====================================================== */}
+
+      <section className="mt-6">
+        <div
+          className="
+            group
+            relative
+            overflow-hidden
+            rounded-[22px]
+            border
+            border-zinc-200
+            bg-white
+            p-5
+            shadow-[0_10px_35px_rgba(0,0,0,0.04)]
+            transition-all
+            duration-200
+            hover:border-zinc-300
+            hover:shadow-[0_15px_45px_rgba(0,0,0,0.07)]
+            sm:p-6
+          "
+        >
+          {/* Subtle background effect */}
+
+          <div
+            className="
+              pointer-events-none
+              absolute
+              -right-16
+              -top-16
+              h-36
+              w-36
+              rounded-full
+              bg-zinc-200/[0.35]
+              blur-3xl
+              transition
+              duration-500
+              group-hover:bg-zinc-300/[0.45]
+            "
+          />
+
+          <div
+            className="
+              relative
+              flex
+              flex-col
+              gap-5
+              sm:flex-row
+              sm:items-center
+              sm:justify-between
+            "
+          >
+            {/* Support information */}
+
+            <div className="flex min-w-0 items-start gap-4">
+              <div
+                className="
+                  flex
+                  h-11
+                  w-11
+                  shrink-0
+                  items-center
+                  justify-center
+                  rounded-xl
+                  border
+                  border-zinc-200
+                  bg-zinc-50
+                  text-zinc-500
+                  transition
+                  duration-200
+                  group-hover:border-zinc-300
+                  group-hover:bg-white
+                  group-hover:text-zinc-700
+                "
+              >
+                <span
+                  className="
+                    text-base
+                    font-medium
+                  "
+                >
+                  ?
+                </span>
+              </div>
+
+              <div className="min-w-0">
+                <p
+                  className="
+                    text-xs
+                    font-medium
+                    uppercase
+                    tracking-[0.16em]
+                    text-zinc-400
+                  "
+                >
+                  Need help?
+                </p>
+
+                <h2
+                  className="
+                    mt-1
+                    text-base
+                    font-medium
+                    text-zinc-900
+                    sm:text-lg
+                  "
+                >
+                  Having trouble with your order?
+                </h2>
+
+                <p
+                  className="
+                    mt-1
+                    max-w-xl
+                    text-sm
+                    leading-6
+                    text-zinc-500
+                  "
+                >
+                  For payment, service, or order-related issues, contact our
+                  support team and we'll help you.
+                </p>
+              </div>
+            </div>
+
+            {/* Contact action */}
+
+            <div
+              className="
+                flex
+                shrink-0
+                flex-col
+                gap-2
+                sm:items-end
+              "
+            >
+              <p className="text-xs text-zinc-400">Support contact</p>
+
+              <a
+                href={`tel:${supportPhone}`}
+                className="
+    group/support
+    inline-flex
+    items-center
+    justify-center
+    rounded-xl
+    border
+    border-zinc-200
+    bg-zinc-50
+    px-4
+    py-2.5
+    text-sm
+    font-medium
+    text-zinc-800
+    transition-all
+    duration-200
+    hover:border-zinc-900
+    hover:bg-zinc-900
+    hover:text-white
+    active:scale-[0.98]
+  "
+              >
+                <span className="text-zinc-800 transition-colors duration-200 group-hover/support:text-white">
+                  {supportPhone}
+                </span>
+              </a>
+              <p className="text-[11px] text-zinc-400">Tap to call</p>
+            </div>
           </div>
         </div>
       </section>

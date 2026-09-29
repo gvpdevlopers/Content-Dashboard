@@ -1,98 +1,87 @@
-import { ArrowUpRight, CheckCircle2, Layers3, Sparkles } from "lucide-react";
+import { ArrowDown } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
 
-import PublicHero from "../PublicHero";
 import PublicButton from "../PublicButton";
 
 const HeroSection = () => {
+  const reduceMotion = useReducedMotion();
+
   return (
-    <PublicHero
-      className="bg-white"
-      eyebrow="Glow Ventures Client Platform"
-      eyebrowIcon={Sparkles}
-      title="Like Steroids for"
-      highlight="Your Business."
-      description="Discover content services, configure exactly what you need, place orders, and manage everything from one streamlined client platform."
-      visual={
-        <div className="relative rounded-[28px] border border-zinc-200 bg-white p-5 shadow-[0_22px_65px_rgba(24,24,27,0.08)] sm:p-7">
-          <div className="flex items-center justify-between border-b border-zinc-100 pb-5">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-100 text-zinc-600">
-                <Layers3 size={18} />
-              </span>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">
-                  Client workspace
-                </p>
-                <p className="mt-1 text-sm font-semibold text-zinc-900">
-                  Project overview
-                </p>
-              </div>
-            </div>
-            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-              On track
-            </span>
-          </div>
-          <div className="py-5">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-zinc-900">
-                  Content production
-                </p>
-                <p className="mt-1 text-xs text-zinc-500">
-                  Brief, configure, and follow your order in one place.
-                </p>
-              </div>
-              <CheckCircle2
-                size={20}
-                className="shrink-0 text-emerald-600"
-              />
-            </div>
-            <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-zinc-100">
-              <div className="h-full w-2/3 rounded-full bg-zinc-800" />
-            </div>
-            <div className="mt-2 flex justify-between text-[11px] text-zinc-400">
-              <span>Order progress</span>
-              <span>2 of 3 steps</span>
-            </div>
-          </div>
-          <div className="flex items-center justify-between rounded-2xl bg-zinc-50 px-4 py-3">
-            <p className="text-xs text-zinc-500">
-              One clear view from request to delivery
-            </p>
-            <ArrowUpRight size={16} className="text-zinc-500" />
-          </div>
-        </div>
-      }
-      actions={
-        <>
-          <PublicButton to="/services" variant="primary">
-            Explore Services
+    <section className="relative isolate flex min-h-[calc(100svh-72px)] items-center justify-center overflow-hidden bg-[#f7f7f5] px-5 py-20 text-center sm:px-8 lg:py-24">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute left-1/2 top-[44%] h-[30rem] w-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(24,24,27,0.075),rgba(24,24,27,0.018)_48%,transparent_72%)] sm:h-[42rem] sm:w-[42rem]" />
+        <svg
+          className="absolute left-1/2 top-[44%] h-[min(94vw,780px)] w-[min(94vw,780px)] -translate-x-1/2 -translate-y-1/2 text-zinc-900/[0.075]"
+          viewBox="0 0 800 800"
+          fill="none"
+        >
+          <circle cx="400" cy="400" r="230" stroke="currentColor" />
+          <circle cx="400" cy="400" r="300" stroke="currentColor" strokeDasharray="2 10" />
+          <path d="M100 400h600M400 100v600" stroke="currentColor" strokeDasharray="1 9" />
+          <circle cx="400" cy="170" r="3" fill="currentColor" />
+          <circle cx="610" cy="520" r="3" fill="currentColor" />
+        </svg>
+        <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-[#f7f7f5] to-transparent" />
+      </div>
+
+      <div className="relative mx-auto flex w-full max-w-5xl flex-col items-center">
+        <motion.p
+          initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.55 }}
+          className="inline-flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-zinc-500 sm:text-xs"
+        >
+          <span className="h-px w-7 bg-zinc-400" />
+          Glow Ventures · Since 2017
+          <span className="h-px w-7 bg-zinc-400" />
+        </motion.p>
+
+        <motion.h1
+          initial={reduceMotion ? false : { opacity: 0, y: 22 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.75, delay: reduceMotion ? 0 : 0.06 }}
+         className="mx-auto mt-7 max-w-5xl text-[clamp(2.8rem,7.3vw,6.6rem)] font-semibold leading-[0.94] tracking-[-0.075em] text-zinc-950 sm:mt-6"
+        >
+          Good ideas,
+          <br />
+          <span className="bg-gradient-to-r from-zinc-500 via-zinc-900 to-zinc-500 bg-clip-text text-transparent">
+            made to move.
+          </span>
+        </motion.h1>
+
+        <motion.p
+          initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.65, delay: reduceMotion ? 0 : 0.16 }}
+          className="mx-auto mt-7 max-w-xl text-base leading-7 text-zinc-600 sm:mt-9 sm:text-lg sm:leading-8"
+        >
+          Marketing, public relations, and content-connected around what your
+          business wants to do next.
+        </motion.p>
+
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.6, delay: reduceMotion ? 0 : 0.25 }}
+          className="mt-8 flex w-full flex-col items-center justify-center gap-3 sm:mt-10 sm:w-auto sm:flex-row"
+        >
+          <PublicButton to="/services" variant="primary" className="w-full sm:w-auto">
+            Explore our services
           </PublicButton>
+          <PublicButton to="/contact" variant="secondary" className="w-full sm:w-auto">
+            Start a conversation
+          </PublicButton>
+        </motion.div>
+      </div>
 
-          <PublicButton
-  href="https://www.glowventures.org/"
-  variant="secondary"
-  target="_blank"
-  rel="noopener noreferrer"
->
-  Discover Glow Ventures
-</PublicButton>
-        </>
-      }
-      meta={
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-xs font-medium text-[var(--color-text-subtle)] sm:text-sm">
-          <span>Clear service options</span>
-
-          <span className="hidden h-1 w-1 rounded-full bg-[var(--color-border-strong)] sm:block" />
-
-          <span>Transparent ordering</span>
-
-          <span className="hidden h-1 w-1 rounded-full bg-[var(--color-border-strong)] sm:block" />
-
-          <span>Centralized order tracking</span>
-        </div>
-      }
-    />
+      <a
+        href="#what-we-do"
+        className="absolute bottom-7 left-1/2 hidden -translate-x-1/2 items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-400 transition-colors hover:text-zinc-900 sm:flex"
+      >
+        Discover
+        <ArrowDown size={14} aria-hidden="true" />
+      </a>
+    </section>
   );
 };
 

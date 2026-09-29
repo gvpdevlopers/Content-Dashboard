@@ -199,7 +199,7 @@ const CustomSelect = ({
                       text-sm
                       transition-all
                       duration-150
-                      hover: cursor-pointer
+                      cursor-pointer
                       ${
                         isSelected
                           ? `

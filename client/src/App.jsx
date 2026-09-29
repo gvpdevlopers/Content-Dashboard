@@ -33,6 +33,9 @@ import CodManagement from "./pages/admin/CodManagement";
 import AdminServices from "./pages/admin/AdminServices";
 import AdminCreateService from "./pages/admin/AdminCreateService";
 import AdminEditService from "./pages/admin/AdminEditService";
+import AdminContactSubmissions from "./pages/admin/AdminContactSubmissions";
+import NetworkStatus from "./components/NetworkStatus";
+import OnlineOnlyRoute from "./components/OnlineOnlyRoute";
 
 // Route Guards
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -49,6 +52,7 @@ const App = () => {
     <>
       <ScrollToTop />
       <Toaster position="top-right" richColors closeButton />
+      <NetworkStatus />
 
       <Routes>
         {/* =====================================================
@@ -62,76 +66,71 @@ const App = () => {
           <Route path="/contact" element={<Contact />} />
 
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
 
           <Route path="/terms-conditions" element={<TermsConditions />} />
+          <Route path="/terms" element={<TermsConditions />} />
 
           <Route path="/refund-cancellation" element={<RefundCancellation />} />
         </Route>
 
-        {/* AUTHENTICATION */}
+        <Route element={<OnlineOnlyRoute />}>
+          {/* AUTHENTICATION */}
+          <Route path="/login" element={<Login />} />
 
-        <Route path="/login" element={<Login />} />
+          {/* CLIENT AREA */}
+          <Route
+            element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/dashboard/new-order" element={<NewOrder />} />
+            <Route path="/dashboard/orders" element={<OrderHistory />} />
+            <Route path="/dashboard/orders/:id" element={<OrderDetails />} />
+          </Route>
 
-        {/* CLIENT AREA */}
+          {/* EMPLOYEE ORDER OPERATIONS */}
+          <Route
+            element={
+              <OrderStaffRoute>
+                <AdminLayout />
+              </OrderStaffRoute>
+            }
+          >
+            <Route path="/staff" element={<EmployeeDashboard />} />
+            <Route path="/staff/orders" element={<AdminOrders />} />
+            <Route path="/staff/orders/:id" element={<AdminOrderDetails />} />
+          </Route>
 
-        <Route
-          element={
-            <ProtectedRoute>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route path="/dashboard" element={<Dashboard />} />
-
-          <Route path="/dashboard/new-order" element={<NewOrder />} />
-
-          <Route path="/dashboard/orders" element={<OrderHistory />} />
-
-          <Route path="/dashboard/orders/:id" element={<OrderDetails />} />
-        </Route>
-
-        {/* EMPLOYEE ORDER OPERATIONS */}
-
-        <Route
-          element={
-            <OrderStaffRoute>
-              <AdminLayout />
-            </OrderStaffRoute>
-          }
-        >
-          <Route path="/staff" element={<EmployeeDashboard />} />
-          <Route path="/staff/orders" element={<AdminOrders />} />
-          <Route path="/staff/orders/:id" element={<AdminOrderDetails />} />
-        </Route>
-
-        {/* ADMIN AREA */}
-
-        <Route
-          element={
-            <AdminRoute>
-              <AdminLayout />
-            </AdminRoute>
-          }
-        >
-          <Route path="/admin" element={<AdminDashboard />} />
-
-          <Route path="/admin/services" element={<AdminServices />} />
-
-          <Route path="/admin/services/new" element={<AdminCreateService />} />
-
-          <Route path="/admin/services/:id/edit" element={<AdminEditService />} />
-
-          <Route path="/admin/orders" element={<AdminOrders />} />
-
-          <Route path="/admin/orders/:id" element={<AdminOrderDetails />} />
-
-          <Route path="/admin/users" element={<AdminUsers />} />
-
-          <Route path="/admin/users/new" element={<AdminCreateUser />} />
-
-          <Route path="/admin/users/:id" element={<AdminUserDetails />} />
-
-          <Route path="/admin/cod" element={<CodManagement />} />
+          {/* ADMIN AREA */}
+          <Route
+            element={
+              <AdminRoute>
+                <AdminLayout />
+              </AdminRoute>
+            }
+          >
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/services" element={<AdminServices />} />
+            <Route path="/admin/services/new" element={<AdminCreateService />} />
+            <Route
+              path="/admin/services/:id/edit"
+              element={<AdminEditService />}
+            />
+            <Route path="/admin/orders" element={<AdminOrders />} />
+            <Route path="/admin/orders/:id" element={<AdminOrderDetails />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/users/new" element={<AdminCreateUser />} />
+            <Route path="/admin/users/:id" element={<AdminUserDetails />} />
+            <Route path="/admin/cod" element={<CodManagement />} />
+            <Route
+              path="/admin/contact-submissions"
+              element={<AdminContactSubmissions />}
+            />
+          </Route>
         </Route>
 
         {/* FALLBACK */}

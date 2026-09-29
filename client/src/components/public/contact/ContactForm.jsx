@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   AlertCircle,
-  ArrowUpRight,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -12,8 +11,8 @@ import {
 
 import Reveal from "../Reveal";
 import PublicButton from "../PublicButton";
-
-const CONTACT_EMAIL = "team@glowventures.org";
+import contactSubmissionService from "../../../services/contactSubmissionService";
+import { useOnlineStatus } from "../../../hooks/useOnlineStatus";
 
 const initialForm = {
   name: "",
@@ -25,9 +24,12 @@ const initialForm = {
 };
 
 const serviceOptions = [
-  "Internet Marketing",
-  "Public Relations",
-  "Content Production",
+  "Social Media Profile Management",
+  "Social Media Grid Posts",
+  "Festival Stories - Animated Graphics",
+  "Google Business Profile SEO & Reviews",
+  "Visual Content - Reels",
+  "Ads",
   "Other / Not sure yet",
 ];
 
@@ -36,9 +38,12 @@ const ContactForm = () => {
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [status, setStatus] = useState("idle");
+  const [submissionError, setSubmissionError] = useState("");
   const [serviceOpen, setServiceOpen] = useState(false);
   const [activeServiceIndex, setActiveServiceIndex] = useState(-1);
 
+  const isOnline = useOnlineStatus();
+  const submitLockRef = useRef(false);
   const serviceDropdownRef = useRef(null);
   const serviceTriggerRef = useRef(null);
   const serviceOptionsRef = useRef(null);
@@ -154,6 +159,7 @@ const ContactForm = () => {
     if (status !== "idle") {
       setStatus("idle");
     }
+    setSubmissionError("");
   };
 
   const handleBlur = (event) => {
@@ -196,6 +202,7 @@ const ContactForm = () => {
     if (status !== "idle") {
       setStatus("idle");
     }
+    setSubmissionError("");
 
     requestAnimationFrame(() => {
       serviceTriggerRef.current?.focus();
@@ -317,38 +324,43 @@ const ContactForm = () => {
       SUBMIT
   ========================================================== */
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
+
+    if (submitLockRef.current) {
+      return;
+    }
+
+    if (!isOnline) {
+      setSubmissionError(
+        "You're offline. Please reconnect to the internet before sending your enquiry.",
+      );
+      setStatus("idle");
+      return;
+    }
 
     if (!validateForm()) {
       setStatus("idle");
       return;
     }
 
+    submitLockRef.current = true;
     setStatus("submitting");
+    setSubmissionError("");
 
-    const subject = encodeURIComponent(
-      `New enquiry from ${formData.name}`,
-    );
-
-    const body = encodeURIComponent(
-      [
-        `Name: ${formData.name}`,
-        `Email: ${formData.email}`,
-        `Phone: ${formData.phone}`,
-        `Company: ${formData.company || "Not provided"}`,
-        `Service: ${formData.service}`,
-        "",
-        "Message:",
-        formData.message,
-      ].join("\n"),
-    );
-
-    window.location.href = `mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`;
-
-    setTimeout(() => {
+    try {
+      await contactSubmissionService.createContactSubmission(formData);
       setStatus("success");
-    }, 400);
+    } catch (error) {
+      console.error("Submit contact enquiry error:", error);
+      setSubmissionError(
+        error.response?.data?.message ||
+          "We couldn't submit your enquiry. Please try again.",
+      );
+      setStatus("idle");
+    } finally {
+      submitLockRef.current = false;
+    }
   };
 
   /* ==========================================================
@@ -357,6 +369,7 @@ const ContactForm = () => {
 
   const resetForm = () => {
     setStatus("idle");
+    setSubmissionError("");
     setFormData(initialForm);
     setErrors({});
     setTouched({});
@@ -516,59 +529,19 @@ const ContactForm = () => {
         className="
           relative
           overflow-hidden
-          rounded-[28px]
-          border
-          border-zinc-200/90
-          bg-[var(--color-surface-soft)]
-          p-5
-          shadow-[0_8px_30px_rgba(24,24,27,0.035)]
-          sm:p-7
-          lg:p-8
+          rounded-none
+          border-0
+          bg-transparent
+          p-0
+          shadow-none
         "
       >
-        {/* Ambient glow */}
-        <div
-          aria-hidden="true"
-          className="
-            pointer-events-none
-            absolute
-            -right-24
-            -top-24
-            h-64
-            w-64
-            rounded-full
-            bg-zinc-200/50
-            blur-3xl
-          "
-        />
-
         <div className="relative">
           {/* ==================================================
               HEADER
           =================================================== */}
-          <div>
-            <div
-              className="
-                inline-flex
-                items-center
-                gap-1.5
-                rounded-full
-                border
-                border-zinc-200/80
-                bg-white/80
-                px-3
-                py-1.5
-                text-[11px]
-                font-semibold
-                tracking-[0.11em]
-                text-zinc-500
-                shadow-[0_2px_8px_rgba(0,0,0,0.035)]
-                backdrop-blur-md
-                sm:gap-2
-                sm:px-3.5
-                sm:text-xs
-              "
-            >
+          <div id="contact-form">
+            <div className="inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500 sm:text-xs">
               <Send
                 size={13}
                 strokeWidth={1.7}
@@ -581,9 +554,9 @@ const ContactForm = () => {
             <h3
               className="
                 mt-5
-                text-2xl
-                font-bold
-                tracking-[-0.04em]
+                text-3xl
+                font-semibold
+                tracking-[-0.055em]
                 text-zinc-950
                 sm:text-3xl
               "
@@ -653,7 +626,7 @@ const ContactForm = () => {
                   text-zinc-900
                 "
               >
-                Your enquiry is ready to send.
+                Your enquiry has been sent.
               </h4>
 
               <p
@@ -664,9 +637,8 @@ const ContactForm = () => {
                   text-zinc-600
                 "
               >
-                Your email client should have opened with the
-                enquiry details. If it did not, please contact us
-                directly at {CONTACT_EMAIL}.
+                Thank you for reaching out. Our team will review your
+                message and get back to you soon.
               </p>
 
               <button
@@ -1239,6 +1211,21 @@ const ContactForm = () => {
                       sending your enquiry.
                     </p>
                   </div>
+                </div>
+              )}
+
+              {submissionError && (
+                <div
+                  className="mt-6 flex items-start gap-3 rounded-[18px] border border-red-200 bg-red-50/70 px-4 py-3.5 text-sm text-red-700"
+                  role="alert"
+                >
+                  <AlertCircle
+                    size={17}
+                    strokeWidth={1.8}
+                    className="mt-0.5 shrink-0"
+                    aria-hidden="true"
+                  />
+                  <p>{submissionError}</p>
                 </div>
               )}
 

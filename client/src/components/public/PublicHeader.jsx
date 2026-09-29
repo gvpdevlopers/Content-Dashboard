@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 
 import { Menu, X } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 import PublicButton from "./PublicButton";
 
@@ -15,6 +16,7 @@ const navItems = [
 
 const PublicHeader = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
 
   const closeMenu = () => setIsMenuOpen(false);
 
@@ -212,12 +214,18 @@ const PublicHeader = () => {
       {/* =====================================================
           MOBILE NAVIGATION
       ====================================================== */}
-      {isMenuOpen && (
-        <div
+      <AnimatePresence initial={false}>
+        {isMenuOpen && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: shouldReduceMotion ? 0 : 0.2 }}
           className="
             border-t
             border-[var(--color-border-soft)]
             bg-white
+            overflow-hidden
             lg:hidden
           "
         >
@@ -305,8 +313,9 @@ const PublicHeader = () => {
               Login
             </PublicButton>
           </nav>
-        </div>
-      )}
+        </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 };

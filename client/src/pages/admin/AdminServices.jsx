@@ -19,6 +19,7 @@ import {
 
 import serviceService from "../../services/serviceService";
 import ConfirmDialog from "../../components/ConfirmDialog";
+import CustomSelect from "../../components/CustomSelect";
 import { toast } from "sonner";
 
 // ============================================================
@@ -302,7 +303,16 @@ const AdminServices = () => {
             </div>
 
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
+              <h1
+                className="
+                  mt-1
+                  text-3xl
+                  font-medium
+                  tracking-tight
+                  text-zinc-900
+                  sm:text-4xl
+                "
+              >
                 Services
               </h1>
 
@@ -436,27 +446,24 @@ const AdminServices = () => {
 
           <div className="flex flex-col gap-3 sm:flex-row">
             {/* Status Filter */}
-            <div className="relative">
-              <Filter
-                size={16}
-                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400"
-              />
-
-              <select
+            <div className="w-full sm:min-w-[170px] sm:max-w-[190px]">
+              <CustomSelect
                 value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-                className="h-11 w-full min-w-[170px] appearance-none rounded-xl border border-zinc-200 bg-zinc-50 pl-10 pr-9 text-sm font-medium text-zinc-700 outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50"
-              >
-                <option value="all">All Services</option>
-
-                <option value="active">Active</option>
-
-                <option value="inactive">Inactive</option>
-              </select>
-
-              <ChevronRight
-                size={16}
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rotate-90 text-zinc-400"
+                onChange={setStatusFilter}
+                options={[
+                  {
+                    value: "all",
+                    label: "All Services",
+                  },
+                  {
+                    value: "active",
+                    label: "Active",
+                  },
+                  {
+                    value: "inactive",
+                    label: "Inactive",
+                  },
+                ]}
               />
             </div>
 

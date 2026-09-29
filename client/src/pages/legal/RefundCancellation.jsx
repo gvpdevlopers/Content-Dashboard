@@ -1,6 +1,5 @@
 import LegalHero from "../../components/public/legal/LegalHero";
 import LegalLayout from "../../components/public/legal/LegalLayout";
-import LegalLastUpdated from "../../components/public/legal/LegalLastUpdated";
 import LegalSection from "../../components/public/legal/LegalSection";
 
 const RefundCancellation = () => {
@@ -21,7 +20,6 @@ const RefundCancellation = () => {
           LEGAL CONTENT
       ====================================================== */}
       <LegalLayout>
-        <LegalLastUpdated date="September 2026" />
 
         {/* =================================================
             01 — OVERVIEW

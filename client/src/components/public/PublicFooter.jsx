@@ -1,387 +1,154 @@
+import { ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
-import {
-  ArrowUpRight,
-  ChevronRight,
-} from "lucide-react";
 
-const companyLinks = [
+const navigation = [
   {
-    label: "About",
-    to: "/about",
+    title: "Explore",
+    links: [
+      { label: "Home", to: "/" },
+      { label: "Services", to: "/services" },
+      { label: "About", to: "/about" },
+      { label: "Contact", to: "/contact" },
+    ],
   },
   {
-    label: "Services",
-    to: "/services",
+    title: "Client platform",
+    links: [
+      { label: "Login", to: "/login" },
+      { label: "Explore services", to: "/services" },
+    ],
   },
   {
-    label: "Contact",
-    to: "/contact",
-  },
-];
-
-const platformLinks = [
-  {
-    label: "Login",
-    to: "/login",
-  },
-  {
-    label: "Explore Services",
-    to: "/services",
+    title: "Legal",
+    links: [
+      { label: "Privacy policy", to: "/privacy-policy" },
+      { label: "Terms & conditions", to: "/terms-conditions" },
+      { label: "Refund & cancellation", to: "/refund-cancellation" },
+    ],
   },
 ];
 
-const legalLinks = [
-  {
-    label: "Privacy Policy",
-    to: "/privacy-policy",
-  },
-  {
-    label: "Terms & Conditions",
-    to: "/terms-conditions",
-  },
-  {
-    label: "Refund & Cancellation",
-    to: "/refund-cancellation",
-  },
-];
-
-const FooterLink = ({ to, children }) => {
-  return (
-    <li>
-      <Link
-        to={to}
-        className="
-          group
-          inline-flex
-          items-center
-          gap-1.5
-          text-sm
-          font-medium
-          text-[var(--color-text-muted)]
-          transition-all
-          duration-300
-          hover:translate-x-0.5
-          hover:text-[var(--color-text-primary)]
-        "
-      >
-        <span>{children}</span>
-
-        <ArrowUpRight
-          size={12}
-          strokeWidth={1.8}
-          className="
-            -translate-x-1
-            opacity-0
-            transition-all
-            duration-300
-            group-hover:translate-x-0
-            group-hover:opacity-100
-          "
-          aria-hidden="true"
-        />
-      </Link>
-    </li>
-  );
-};
-
-const FooterColumn = ({ title, links }) => {
-  return (
-    <div>
-      <h3
-        className="
-          text-xs
-          font-bold
-          uppercase
-          tracking-[0.12em]
-          text-[var(--color-text-primary)]
-        "
-      >
-        {title}
-      </h3>
-
-      <ul className="mt-4 space-y-2.5">
-        {links.map((link) => (
-          <FooterLink
-            key={link.to}
-            to={link.to}
-          >
-            {link.label}
-          </FooterLink>
-        ))}
-      </ul>
-    </div>
-  );
-};
-
-const PublicFooter = () => {
-  return (
-    <footer
-      className="
-        relative
-        overflow-hidden
-        border-t
-        border-[var(--color-border)]
-        bg-white
-      "
+const FooterLink = ({ to, children }) => (
+  <li>
+    <Link
+      to={to}
+      className="group inline-flex items-center gap-2 py-1 text-sm text-zinc-600 transition-colors duration-200 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-800/60"
     >
-      {/* =====================================================
-          SUBTLE AMBIENT BACKGROUND
-      ====================================================== */}
-      <div
+      <span>{children}</span>
+
+      <ArrowUpRight
+        size={13}
+        className="opacity-0 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:opacity-100"
         aria-hidden="true"
-        className="
-          pointer-events-none
-          absolute
-          -right-32
-          -top-32
-          h-72
-          w-72
-          rounded-full
-          bg-zinc-100/70
-          blur-3xl
-        "
       />
+    </Link>
+  </li>
+);
 
-      <div
-        aria-hidden="true"
-        className="
-          pointer-events-none
-          absolute
-          -bottom-40
-          left-1/4
-          h-64
-          w-64
-          rounded-full
-          bg-zinc-100/50
-          blur-3xl
-        "
-      />
+const PublicFooter = () => (
+  <footer className="relative isolate overflow-hidden bg-[#e8e7e3] text-zinc-950">
+    {/* Subtle background detail */}
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 overflow-hidden"
+    >
+      <div className="absolute -right-48 -top-56 h-[36rem] w-[36rem] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.48),transparent_68%)]" />
+    </div>
 
-      <div
-        className="
-          relative
-          mx-auto
-          w-full
-          max-w-[1400px]
-          px-4
-          py-10
-          sm:px-6
-          sm:py-12
-          lg:px-8
-          lg:py-14
-        "
-      >
-        {/* =====================================================
-            MAIN FOOTER
-        ====================================================== */}
-        <div
-          className="
-            grid
-            gap-8
-            sm:grid-cols-2
-            lg:grid-cols-[1.7fr_1fr_1fr_1fr]
-            lg:gap-10
-            xl:gap-14
-          "
-        >
-          {/* =================================================
-              BRAND
-          ================================================== */}
-          <div className="max-w-md">
-            <Link
-              to="/"
-              className="
-                group
-                inline-flex
-                items-center
-                rounded-lg
-                outline-none
-                transition-transform
-                duration-300
-                hover:-translate-y-0.5
-                focus-visible:ring-2
-                focus-visible:ring-zinc-900
-                focus-visible:ring-offset-4
-              "
-              aria-label="Glow Ventures home"
-            >
-              <img
-                src="/Logo.png"
-                alt="Glow Ventures"
-                className="
-                  h-9
-                  w-auto
-                  object-contain
-                  transition-transform
-                  duration-500
-                  ease-[cubic-bezier(0.22,1,0.36,1)]
-                  group-hover:scale-[1.02]
-                "
-              />
-            </Link>
+    <div className="relative mx-auto w-full max-w-[1400px] px-5 sm:px-8 lg:px-10">
+      {/* Main Footer */}
+      <div className="grid gap-10 py-14 sm:py-16 lg:grid-cols-[1.35fr_repeat(4,minmax(0,1fr))] lg:gap-8 lg:py-20">
+        {/* Brand */}
+        <div className="max-w-xs">
+          <Link
+            to="/"
+            aria-label="Glow Ventures home"
+            className="group inline-flex rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-800/70 focus-visible:ring-offset-4 focus-visible:ring-offset-[#e8e7e3]"
+          >
+            <img
+              src="/Logo.png"
+              alt="Glow Ventures"
+              className="h-9 w-auto object-contain transition-opacity duration-200 group-hover:opacity-70"
+            />
+          </Link>
 
-            <p
-              className="
-                mt-4
-                max-w-sm
-                text-sm
-                leading-6
-                text-[var(--color-text-muted)]
-                sm:mt-5
-              "
-            >
-              Content and digital services delivered through a
-              streamlined client experience.
-            </p>
-
-            {/* Client platform link */}
-            <Link
-              to="/login"
-              className="
-                group
-                mt-5
-                inline-flex
-                items-center
-                gap-2
-                rounded-full
-                border
-                border-zinc-200
-                bg-zinc-50
-                px-4
-                py-2.5
-                text-xs
-                font-semibold
-                text-zinc-900
-                shadow-[0_2px_8px_rgba(0,0,0,0.025)]
-                transition-all
-                duration-300
-                hover:-translate-y-0.5
-                hover:border-zinc-300
-                hover:bg-white
-                hover:shadow-[0_10px_25px_rgba(24,24,27,0.07)]
-              "
-            >
-              <span>Access Client Platform</span>
-
-              <span
-                className="
-                  flex
-                  h-5
-                  w-5
-                  items-center
-                  justify-center
-                  rounded-full
-                  bg-zinc-900
-                  text-white
-                  transition-transform
-                  duration-300
-                  group-hover:translate-x-0.5
-                  group-hover:-translate-y-0.5
-                "
-              >
-                <ArrowUpRight
-                  size={11}
-                  strokeWidth={2}
-                  aria-hidden="true"
-                />
-              </span>
-            </Link>
-          </div>
-
-          {/* =================================================
-              COMPANY
-          ================================================== */}
-          <FooterColumn
-            title="Company"
-            links={companyLinks}
-          />
-
-          {/* =================================================
-              PLATFORM
-          ================================================== */}
-          <FooterColumn
-            title="Platform"
-            links={platformLinks}
-          />
-
-          {/* =================================================
-              LEGAL
-          ================================================== */}
-          <FooterColumn
-            title="Legal"
-            links={legalLinks}
-          />
+          <p className="mt-4 text-sm leading-6 text-zinc-600">
+            Marketing, public relations, and content - connected around your next move, bringing the right ideas, stories, and strategies together.
+          </p>
         </div>
 
-        {/* =====================================================
-            BOTTOM BAR
-        ====================================================== */}
-        <div
-          className="
-            mt-8
-            border-t
-            border-[var(--color-border-soft)]
-            pt-5
-            sm:mt-10
-            sm:pt-6
-          "
-        >
-          <div
-            className="
-              flex
-              flex-col
-              gap-3
-              sm:flex-row
-              sm:items-center
-              sm:justify-between
-            "
+        {/* Navigation */}
+        {navigation.map(({ title, links }) => (
+          <nav key={title} aria-label={title}>
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-600">
+              {title}
+            </h3>
+
+            <ul className="mt-4 space-y-1">
+              {links.map(({ label, to }) => (
+                <FooterLink key={`${label}-${to}`} to={to}>
+                  {label}
+                </FooterLink>
+              ))}
+            </ul>
+          </nav>
+        ))}
+
+        {/* Contact */}
+        <div className="sm:col-span-2 lg:col-span-1">
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-600">
+            Get in touch
+          </h3>
+
+          <a
+            href="mailto:team@glowventures.org"
+            className="group mt-4 inline-flex items-center gap-2 break-all text-sm text-zinc-700 transition-colors hover:text-zinc-950"
           >
-            <p
-              className="
-                text-[11px]
-                font-medium
-                text-[var(--color-text-subtle)]
-              "
-            >
-              © {new Date().getFullYear()} Glow Ventures. All rights
-              reserved.
-            </p>
+            team@glowventures.org
 
-            <div
-              className="
-                flex
-                items-center
-                gap-1.5
-                text-[10px]
-                font-semibold
-                uppercase
-                tracking-[0.1em]
-                text-zinc-400
-              "
-            >
-              <span
-                className="
-                  h-1.5
-                  w-1.5
-                  rounded-full
-                  bg-zinc-300
-                "
-                aria-hidden="true"
-              />
+            <ArrowUpRight
+              size={13}
+              className="shrink-0 opacity-0 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:opacity-100"
+              aria-hidden="true"
+            />
+          </a>
 
-              <span>Client-first digital experience</span>
+          <a
+            href="tel:+919316876023"
+            className="group mt-2 flex w-fit items-center gap-2 text-sm text-zinc-600 transition-colors hover:text-zinc-950"
+          >
+            +91 9316876023
 
-              <ChevronRight
-                size={11}
-                strokeWidth={1.8}
-                aria-hidden="true"
-              />
-            </div>
-          </div>
+            <ArrowUpRight
+              size={13}
+              className="opacity-0 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:opacity-100"
+              aria-hidden="true"
+            />
+          </a>
+
+          <Link
+            to="/login"
+            className="mt-5 inline-flex items-center gap-2 text-xs font-semibold text-zinc-900 transition-colors hover:text-zinc-600"
+          >
+            Access client platform
+
+            <ArrowUpRight size={13} aria-hidden="true" />
+          </Link>
         </div>
       </div>
-    </footer>
-  );
-};
+
+      {/* Copyright */}
+      <div className="flex flex-col gap-3 border-t border-zinc-400/50 py-5 text-[11px] text-zinc-600 sm:flex-row sm:items-center sm:justify-between sm:py-6">
+        <p>
+          © {new Date().getFullYear()} Glow Ventures. All rights reserved.
+        </p>
+
+        <p className="tracking-wide">
+          Strategy · Progress · Growth
+        </p>
+      </div>
+    </div>
+  </footer>
+);
 
 export default PublicFooter;

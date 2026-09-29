@@ -17,7 +17,7 @@ const contactMethods = [
   {
     number: "02",
     title: "Phone",
-    description: "+91 9499555444",
+    description: "+91 9316876023",
     icon: Phone,
     position: "lg:-translate-x-5",
   },

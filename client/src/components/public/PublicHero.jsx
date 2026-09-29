@@ -1,7 +1,6 @@
 import { motion, useReducedMotion } from "framer-motion";
 
 import GradientText from "./GradientText";
-import Reveal from "./Reveal";
 
 const PublicHero = ({
   eyebrow,
@@ -10,170 +9,141 @@ const PublicHero = ({
   highlight,
   description,
   actions,
-  visual,
   meta,
   className = "",
-  visualClassName = "",
 }) => {
-  const shouldReduceMotion = useReducedMotion();
+  const reduceMotion = useReducedMotion();
+  const enter = (delay = 0, y = 14, duration = 0.6) => ({
+    initial: reduceMotion ? false : { opacity: 0, y },
+    animate: { opacity: 1, y: 0 },
+    transition: {
+      duration: reduceMotion ? 0 : duration,
+      delay: reduceMotion ? 0 : delay,
+      ease: [0.22, 1, 0.36, 1],
+    },
+  });
 
   return (
     <section
-      className={`relative isolate overflow-hidden bg-white ${className}`}
+      className={`relative isolate flex min-h-[calc(100svh-72px)] items-center justify-center overflow-hidden bg-[#f7f7f5] px-5 py-20 text-center sm:px-8 lg:py-24 ${className}`}
     >
-      {/* =========================================
-          AMBIENT BACKGROUND
-      ========================================= */}
+      {/* Background */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 overflow-hidden"
       >
-        {/* Top-right ambient glow */}
-        <div className="public-ambient-glow absolute -right-32 -top-32 h-72 w-72 bg-zinc-900/[0.055] sm:h-[28rem] sm:w-[28rem]" />
+        <div className="absolute left-1/2 top-[44%] h-[30rem] w-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(24,24,27,0.075),rgba(24,24,27,0.018)_48%,transparent_72%)] sm:h-[42rem] sm:w-[42rem]" />
 
-        {/* Bottom ambient glow */}
-        <div className="public-ambient-glow absolute -bottom-40 left-1/4 h-72 w-72 bg-zinc-400/[0.045] sm:h-[28rem] sm:w-[28rem]" />
+        <svg
+          className="absolute left-1/2 top-[44%] h-[min(94vw,780px)] w-[min(94vw,780px)] -translate-x-1/2 -translate-y-1/2 text-zinc-900/[0.075]"
+          viewBox="0 0 800 800"
+          fill="none"
+        >
+          <circle
+            cx="400"
+            cy="400"
+            r="230"
+            stroke="currentColor"
+          />
 
-        {/* Subtle grid */}
-        <div
-          className="absolute inset-0 opacity-[0.016]"
-          style={{
-            backgroundImage:
-              "linear-gradient(to right, #18181b 1px, transparent 1px), linear-gradient(to bottom, #18181b 1px, transparent 1px)",
-            backgroundSize: "64px 64px",
-          }}
-        />
+          <circle
+            cx="400"
+            cy="400"
+            r="300"
+            stroke="currentColor"
+            strokeDasharray="2 10"
+          />
 
-        {/* Soft fade */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0)_0%,rgba(255,255,255,0.72)_62%,#fff_100%)]" />
+          <path
+            d="M100 400h600M400 100v600"
+            stroke="currentColor"
+            strokeDasharray="1 9"
+          />
+
+          <circle
+            cx="400"
+            cy="170"
+            r="3"
+            fill="currentColor"
+          />
+
+          <circle
+            cx="610"
+            cy="520"
+            r="3"
+            fill="currentColor"
+          />
+        </svg>
+
+        <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-[#f7f7f5] to-transparent" />
       </div>
 
-      {/* =========================================
-          MAIN HERO
-      ========================================= */}
-      <div className="relative mx-auto flex min-h-[480px] w-full max-w-[1400px] items-center px-4 py-8 sm:min-h-[500px] sm:px-6 sm:py-10 lg:px-8 lg:py-10">
-        <div className="grid w-full items-center gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14 xl:gap-20">
-          {/* =========================================
-              CONTENT
-          ========================================= */}
-          <div className="mx-auto w-full max-w-4xl text-center lg:mx-0 lg:max-w-3xl lg:text-left">
-            {/* Eyebrow */}
-            <Reveal>
-              <div
-                className="
-      inline-flex
-      items-center
-      gap-1.5
-      rounded-full
-      border
-      border-zinc-200/75
-      bg-white/70
-      px-3
-      py-1.5
-      text-[11px]
-      font-semibold
-      capitalize
-      tracking-[0.11em]
-      text-zinc-500
-      shadow-[0_2px_8px_rgba(0,0,0,0.035)]
-      backdrop-blur-md
-      sm:gap-2
-      sm:px-3.5
-      sm:py-1.5
-      sm:text-xs
-    "
-              >
-                {EyebrowIcon && (
-                  <EyebrowIcon size={13} strokeWidth={1.7} aria-hidden="true" />
-                )}
-
-                {eyebrow}
-              </div>
-            </Reveal>
-
-            {/* Heading */}
-            <Reveal delay={0.08}>
-              <h1
-                className="
-    mx-auto
-    mt-5
-    max-w-4xl
-    text-[clamp(2.35rem,5.2vw,4.35rem)]
-    font-bold
-    leading-[0.96]
-    tracking-[-0.052em]
-    text-zinc-950
-    sm:mt-6
-    sm:leading-[0.94]
-    lg:mx-0
-    lg:leading-[0.93]
-  "
-              >
-                <span className="block leading-[1.02]">{title}</span>
-
-                <span className="mt-1 block leading-[1.12] sm:mt-0.5">
-                  <GradientText>{highlight}</GradientText>
-                </span>
-              </h1>
-            </Reveal>
-
-            {/* Description */}
-            <Reveal delay={0.16}>
-              <p className="mx-auto mt-6 max-w-2xl text-[0.95rem] leading-7 text-zinc-500 sm:mt-7 sm:text-lg sm:leading-8 lg:mx-0">
-                {description}
-              </p>
-            </Reveal>
-
-            {/* Actions */}
-            {actions && (
-              <Reveal delay={0.24}>
-                <div className="mt-7 flex flex-col items-stretch justify-center gap-3 sm:mt-8 sm:flex-row sm:items-center lg:justify-start">
-                  {actions}
-                </div>
-              </Reveal>
+      {/* Content */}
+      <div className="relative mx-auto flex w-full max-w-5xl flex-col items-center">
+        {/* Eyebrow */}
+        {eyebrow && (
+          <motion.p
+            {...enter(0, 10, 0.55)}
+            className="inline-flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-zinc-500 sm:text-xs"
+          >
+            <span className="h-px w-7 bg-zinc-400" />
+            {EyebrowIcon && (
+              <EyebrowIcon
+                size={13}
+                strokeWidth={1.6}
+                aria-hidden="true"
+              />
             )}
+            <span>{eyebrow}</span>
+            <span className="h-px w-7 bg-zinc-400" />
+          </motion.p>
+        )}
 
-            {/* Meta */}
-            {meta && (
-              <Reveal delay={0.32}>
-                <div className="mt-7 flex justify-center lg:justify-start">
-                  {meta}
-                </div>
-              </Reveal>
+        {/* Heading */}
+        <motion.h1
+          {...enter(0.06, 22, 0.75)}
+          className="mx-auto mt-7 max-w-5xl text-[clamp(2.8rem,7vw,6.6rem)] font-semibold leading-[0.94] tracking-[-0.075em] text-zinc-950 sm:mt-6"
+        >
+            <span className="block leading-[0.94]">
+              {title}
+            </span>
+
+            {highlight && (
+              <span className="mt-1 block leading-[0.94] text-zinc-400">
+                <GradientText>{highlight}</GradientText>
+              </span>
             )}
-          </div>
+        </motion.h1>
 
-          {/* =========================================
-              DESKTOP VISUAL ONLY
-              Hidden below lg
-          ========================================= */}
-          {visual && (
-            <motion.div
-              initial={
-                shouldReduceMotion
-                  ? { opacity: 1 }
-                  : {
-                      opacity: 0,
-                      y: 20,
-                      scale: 0.98,
-                    }
-              }
-              animate={{
-                opacity: 1,
-                y: 0,
-                scale: 1,
-              }}
-              transition={{
-                duration: shouldReduceMotion ? 0 : 0.75,
-                delay: shouldReduceMotion ? 0 : 0.1,
-                ease: [0.22, 1, 0.36, 1],
-              }}
-              className={`relative mx-auto hidden w-full max-w-[620px] lg:mx-0 lg:ml-auto lg:block ${visualClassName}`}
-            >
-              {visual}
-            </motion.div>
-          )}
-        </div>
+        {/* Description */}
+        {description && (
+          <motion.p
+            {...enter(0.16, 16, 0.65)}
+            className="mx-auto mt-7 max-w-xl text-base leading-7 text-zinc-600 sm:mt-9 sm:text-lg sm:leading-8"
+          >
+              {description}
+          </motion.p>
+        )}
+
+        {/* Actions */}
+        {actions && (
+          <motion.div
+            {...enter(0.25, 12, 0.6)}
+            className="mt-8 flex w-full flex-col items-center justify-center gap-3 sm:mt-10 sm:w-auto sm:flex-row"
+          >
+              {actions}
+          </motion.div>
+        )}
+
+        {/* Meta */}
+        {meta && (
+          <motion.div
+            {...enter(0.32, 10, 0.55)}
+            className="mt-7 flex justify-center"
+          >
+              {meta}
+          </motion.div>
+        )}
       </div>
     </section>
   );

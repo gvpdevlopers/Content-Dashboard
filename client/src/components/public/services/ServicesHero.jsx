@@ -1,7 +1,6 @@
 import { Sparkles } from "lucide-react";
 
 import PublicHero from "../PublicHero";
-import ServicesHeroVisual from "../hero/ServicesHeroVisual";
 import PublicButton from "../PublicButton";
 
 const ServicesHero = () => {
@@ -9,10 +8,9 @@ const ServicesHero = () => {
     <PublicHero
       eyebrow="Our Services"
       eyebrowIcon={Sparkles}
-      title="Services that turn"
-      highlight="ideas into action."
-      description="Explore the services available through the Glow Ventures platform. Choose what fits your project and configure your requirements when you're ready to order."
-      visual={<ServicesHeroVisual />}
+      title="Work that moves"
+      highlight="ideas forward."
+      description="Explore focused marketing, public relations, and content services. Find the right starting point, then shape the details around your project."
       actions={
         <>
           <PublicButton to="/login" variant="primary">

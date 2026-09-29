@@ -8,7 +8,8 @@ import {
   ShoppingBag,
   Users,
   KeyRound,
-  Layers3
+  Layers3,
+  MessageSquareText
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -221,6 +222,13 @@ const AdminLayout = () => {
               icon={KeyRound}
               label="COD Payments"
               to="/admin/cod"
+              onClick={closeSidebar}
+            />}
+
+            {!isEmployee && <AdminSidebarItem
+              icon={MessageSquareText}
+              label="Contact Submissions"
+              to="/admin/contact-submissions"
               onClick={closeSidebar}
             />}
           </div>
