@@ -751,58 +751,47 @@ select {
 }
 
 /* =========================================================
-   GRADIENT TEXT SELECTION
+   PUBLIC HEADING TEXT SELECTION
 ========================================================= */
 
-.gradient-text::selection {
-  background: #e4e4e7;
-  color: #18181b;
-
-  /*
-    Restore a real text color while selected.
-    This prevents the transparent gradient text from
-    looking broken during selection.
-  */
-  -webkit-text-fill-color: #18181b;
-
-  -webkit-background-clip: initial;
-  background-clip: initial;
+.public-page h1::selection,
+.public-page h1 *::selection,
+.public-page h2::selection,
+.public-page h2 *::selection {
+  background: transparent;
+  color: currentColor;
 }
 
-.gradient-text::-moz-selection {
-  background: #e4e4e7;
-  color: #18181b;
-
-  -webkit-text-fill-color: #18181b;
-
-  -webkit-background-clip: initial;
-  background-clip: initial;
+.public-page h1::-moz-selection,
+.public-page h1 *::-moz-selection,
+.public-page h2::-moz-selection,
+.public-page h2 *::-moz-selection {
+  background: transparent;
+  color: currentColor;
 }
 
-/* =========================================================
-   PUBLIC HERO TITLE SELECTION
-========================================================= */
-
-.public-page h1::selection {
-  background: #e4e4e7;
-  color: #18181b;
+.public-page h1 .gradient-text[data-gradient-variant="dark"]::selection,
+.public-page h2 .gradient-text[data-gradient-variant="dark"]::selection {
+  color: #52525b;
+  -webkit-text-fill-color: #52525b;
 }
 
-.public-page h1::-moz-selection {
-  background: #e4e4e7;
-  color: #18181b;
+.public-page h1 .gradient-text[data-gradient-variant="dark"]::-moz-selection,
+.public-page h2 .gradient-text[data-gradient-variant="dark"]::-moz-selection {
+  color: #52525b;
+  -webkit-text-fill-color: #52525b;
 }
 
-.public-page h1 span::selection {
-  background: #e4e4e7;
-  color: #18181b;
-  -webkit-text-fill-color: #18181b;
+.public-page h1 .gradient-text[data-gradient-variant="light"]::selection,
+.public-page h2 .gradient-text[data-gradient-variant="light"]::selection {
+  color: #f4f4f5;
+  -webkit-text-fill-color: #f4f4f5;
 }
 
-.public-page h1 span::-moz-selection {
-  background: #e4e4e7;
-  color: #18181b;
-  -webkit-text-fill-color: #18181b;
+.public-page h1 .gradient-text[data-gradient-variant="light"]::-moz-selection,
+.public-page h2 .gradient-text[data-gradient-variant="light"]::-moz-selection {
+  color: #f4f4f5;
+  -webkit-text-fill-color: #f4f4f5;
 }
 /* =========================================================
    PUBLIC HERO HEADING

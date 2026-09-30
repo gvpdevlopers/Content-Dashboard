@@ -10,7 +10,7 @@ const disciplines = [
     title: "Internet marketing",
     summary: "Reach the people who matter.",
     detail:
-      "Build a clearer digital presence and connect your business with the right audiences through focused marketing.",
+      "Build a clearer digital presence, connect your business with the right audiences, and create marketing that builds visibility, trust, and growth.",
   },
   {
     number: "02",
@@ -24,7 +24,7 @@ const disciplines = [
     title: "Content production",
     summary: "Make the story worth stopping for.",
     detail:
-      "Bring ideas to life through considered scripting and production designed to capture attention.",
+      "Bring ideas to life through considered scripting and production designed to capture attention, create impact, and drive meaningful engagement.",
   },
 ];
 

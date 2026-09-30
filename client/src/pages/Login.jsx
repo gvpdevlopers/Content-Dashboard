@@ -137,23 +137,28 @@ const Login = () => {
             </svg>
           </div>
 
-          <div className="relative flex items-center gap-4">
+          {/* Desktop logo */}
+          <a
+            href="https://content.glowventures.org/"
+            aria-label="Back to website"
+            className="relative flex w-fit items-center gap-4"
+          >
             <img
               src="/Logo.png"
               alt="Glow Ventures"
               className="
-      h-8 w-auto max-w-[200px]
-      object-contain
-      brightness-0 invert
-      opacity-95
+                h-8 w-auto max-w-[200px]
+                object-contain
+                brightness-0 invert
+                opacity-95
 
-      sm:h-10 sm:max-w-[240px]
-      md:h-12 md:max-w-[280px]
-      lg:h-14 lg:max-w-[320px]
-      xl:h-[4rem] xl:max-w-[360px]
-    "
+                sm:h-10 sm:max-w-[240px]
+                md:h-12 md:max-w-[280px]
+                lg:h-14 lg:max-w-[320px]
+                xl:h-[4rem] xl:max-w-[360px]
+              "
             />
-          </div>
+          </a>
 
           <div className="relative max-w-lg py-8 xl:py-10">
             <p className="text-sm text-zinc-400">
@@ -196,6 +201,24 @@ const Login = () => {
             xl:px-10
           "
         >
+          {/* Mobile logo */}
+          <div className="mb-6 lg:hidden">
+            <a
+              href="https://content.glowventures.org/"
+              aria-label="Back to website"
+              className="inline-flex items-center"
+            >
+              <img
+                src="/Logo.png"
+                alt="Glow Ventures"
+                className="
+                  h-10 w-auto max-w-[220px]
+                  object-contain
+                "
+              />
+            </a>
+          </div>
+
           {/* Header */}
           <div className="mb-6 lg:mb-5">
             <div
@@ -205,7 +228,11 @@ const Login = () => {
                 tracking-[0.22em] text-zinc-400
               "
             >
-              <Sparkles size={13} strokeWidth={1.6} className="text-zinc-500" />
+              <Sparkles
+                size={13}
+                strokeWidth={1.6}
+                className="text-zinc-500"
+              />
 
               <span>Content Dashboard</span>
             </div>
@@ -313,7 +340,6 @@ const Login = () => {
                     type="text"
                     value={identifier}
                     onChange={(event) => setIdentifier(event.target.value)}
-                    placeholder="Enter email or username"
                     autoComplete="username"
                     className="
                       relative w-full rounded-2xl
@@ -373,7 +399,6 @@ const Login = () => {
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    placeholder="Enter password"
                     autoComplete="current-password"
                     className="
                       relative w-full rounded-2xl
@@ -486,6 +511,25 @@ const Login = () => {
               </button>
             </div>
           </form>
+
+          {/* Public website link */}
+          <div className="mt-5 text-center">
+            <a
+              href="https://content.glowventures.org/"
+              className="
+                inline-flex items-center gap-1.5
+                text-sm font-medium text-zinc-500
+                transition-colors duration-200
+                hover:text-zinc-900
+              "
+            >
+              Back to Website
+              <ArrowRight
+                size={15}
+                className="transition-transform duration-200 hover:translate-x-0.5"
+              />
+            </a>
+          </div>
         </div>
       </div>
     </main>
