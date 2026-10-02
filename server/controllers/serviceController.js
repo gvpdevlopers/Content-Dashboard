@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const Service = require("../models/Service");
+const normalizeAdsService = require("../utils/normalizeAdsService");
 
 /* =========================================================
    Validation Constants
@@ -1232,7 +1233,7 @@ const getActiveServices = async (
 
     return res.status(200).json({
       success: true,
-      services,
+      services: services.map(normalizeAdsService),
     });
   } catch (error) {
     console.error(
@@ -1273,7 +1274,7 @@ const getServiceById = async (
 
     return res.status(200).json({
       success: true,
-      service,
+      service: normalizeAdsService(service),
     });
   } catch (error) {
     console.error(
@@ -1306,7 +1307,7 @@ const getAdminServices = async (
 
     return res.status(200).json({
       success: true,
-      services,
+      services: services.map(normalizeAdsService),
     });
   } catch (error) {
     console.error(
@@ -1346,7 +1347,7 @@ const getAdminServiceById = async (
 
     return res.status(200).json({
       success: true,
-      service,
+      service: normalizeAdsService(service),
     });
   } catch (error) {
     console.error(

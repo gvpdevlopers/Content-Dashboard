@@ -1,6 +1,7 @@
 const Order = require("../models/Order");
 const Service = require("../models/Service");
 const generateOrderNumber = require("../utils/generateOrderNumber");
+const normalizeAdsService = require("../utils/normalizeAdsService");
 
 const ONLINE_GST_RATE = 18;
 
@@ -1916,19 +1917,21 @@ const processOrderServiceItem = async ({
   quantity = 1,
   formData = {},
 }) => {
-  const service =
+  const storedService =
     await Service.findOne({
       _id: serviceId,
       isActive: true,
     });
 
-  if (!service) {
+  if (!storedService) {
     return {
       success: false,
       message:
         "Selected service is not available.",
     };
   }
+
+  const service = normalizeAdsService(storedService);
 
   if (!isPlainObject(formData)) {
     return {

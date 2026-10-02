@@ -738,6 +738,7 @@ const services = [
     pricingOptions: [
       {
         name: "Meta Ads",
+        group: "metaAds",
         description:
           "Meta Ads campaign management for 30 days.",
         price: 30000,
@@ -748,7 +749,7 @@ const services = [
 
         fields: [
           {
-            name: "adSpendAmount",
+            name: "metaAdsAdSpendAmount",
             label: "Meta Ad Spend Amount",
             type: "number",
             required: true,
@@ -758,7 +759,7 @@ const services = [
           },
 
           {
-            name: "adSpendDays",
+            name: "metaAdsAdSpendDays",
             label: "Meta Ad Spend Days",
             type: "number",
             required: true,
@@ -768,7 +769,7 @@ const services = [
           },
 
           {
-            name: "targetCities",
+            name: "metaAdsTargetCities",
             label: "Target Cities",
             type: "textarea",
             required: true,
@@ -788,7 +789,7 @@ const services = [
           },
 
           {
-            name: "requirements",
+            name: "metaAdsRequirements",
             label: "Campaign Requirements",
             type: "textarea",
             required: false,
@@ -801,6 +802,7 @@ const services = [
 
       {
         name: "Google Ads",
+        group: "googleAds",
         description:
           "Google Ads campaign management for 30 days.",
         price: 15000,
@@ -811,7 +813,7 @@ const services = [
 
         fields: [
           {
-            name: "adSpendAmount",
+            name: "googleAdsAdSpendAmount",
             label: "Google Ad Spend Amount",
             type: "number",
             required: true,
@@ -821,7 +823,7 @@ const services = [
           },
 
           {
-            name: "adSpendDays",
+            name: "googleAdsAdSpendDays",
             label: "Google Ad Spend Days",
             type: "number",
             required: true,
@@ -831,7 +833,7 @@ const services = [
           },
 
           {
-            name: "targetCities",
+            name: "googleAdsTargetCities",
             label: "Target Cities",
             type: "textarea",
             required: true,
@@ -851,7 +853,7 @@ const services = [
           },
 
           {
-            name: "requirements",
+            name: "googleAdsRequirements",
             label: "Campaign Requirements",
             type: "textarea",
             required: false,
