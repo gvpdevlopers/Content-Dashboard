@@ -53,6 +53,46 @@ button:disabled {
   cursor: not-allowed;
 }
 
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .public-page .heading-cursor-enabled,
+  .public-page .heading-cursor-enabled * {
+    cursor: none;
+  }
+
+  .heading-cursor {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 100;
+    display: block;
+    width: 52px;
+    height: 52px;
+    pointer-events: none;
+    will-change: transform, opacity;
+        mix-blend-mode: difference;
+  }
+
+  .heading-cursor__surface {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgb(255 255 255 / 92%);
+    border-radius: 50%;
+    background: white;
+    box-shadow: 0 2px 18px rgb(0 0 0 / 30%);
+     -webkit-backdrop-filter: invert(1) contrast(8);
+    backdrop-filter: invert(1) contrast(8);
+    transform: translate(-50%, -50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heading-cursor {
+    display: none;
+  }
+}
+
 input,
 textarea,
 select {

@@ -9,6 +9,7 @@ import {
 
 import Section from "../Section";
 import Reveal from "../Reveal";
+import HeadingCursor from "../HeadingCursor";
 import Stagger, { StaggerItem } from "../Stagger";
 import GradientText from "../GradientText";
 
@@ -87,7 +88,8 @@ const WhyGlowSection = () => {
               </div>
 
               {/* Heading */}
-              <h2
+              <HeadingCursor
+                as="h2"
                 className="
                   mt-5
                   max-w-xl
@@ -104,7 +106,7 @@ const WhyGlowSection = () => {
               >
                 A better way to{" "}
                 <GradientText>work together.</GradientText>
-              </h2>
+              </HeadingCursor>
 
               {/* Description */}
               <p

@@ -1,4 +1,5 @@
 import GradientText from "./GradientText";
+import HeadingCursor from "./HeadingCursor";
 
 const SectionHeading = ({
   eyebrow,
@@ -20,10 +21,13 @@ const SectionHeading = ({
         </span>
       )}
 
-      <h2 className="text-3xl font-bold tracking-[-0.035em] text-[var(--color-text-primary)] sm:text-4xl lg:text-5xl">
+      <HeadingCursor
+        as="h2"
+        className="text-3xl font-bold tracking-[-0.035em] text-[var(--color-text-primary)] sm:text-4xl lg:text-5xl"
+      >
         {title}{" "}
         {highlight && <GradientText>{highlight}</GradientText>}
-      </h2>
+      </HeadingCursor>
 
       {description && (
         <p className="mt-5 max-w-2xl text-base leading-7 text-[var(--color-text-muted)] sm:text-lg sm:leading-8">

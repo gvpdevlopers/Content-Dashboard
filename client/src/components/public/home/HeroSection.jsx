@@ -2,6 +2,7 @@ import { ArrowDown } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 
 import PublicButton from "../PublicButton";
+import HeadingCursor from "../HeadingCursor";
 
 const HeroSection = () => {
   const reduceMotion = useReducedMotion();
@@ -36,7 +37,8 @@ const HeroSection = () => {
           <span className="h-px w-7 bg-zinc-400" />
         </motion.p>
 
-        <motion.h1
+        <HeadingCursor
+          as={motion.h1}
           initial={reduceMotion ? false : { opacity: 0, y: 22 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduceMotion ? 0 : 0.75, delay: reduceMotion ? 0 : 0.06 }}
@@ -47,7 +49,7 @@ const HeroSection = () => {
           <span className="bg-gradient-to-r from-zinc-500 via-zinc-900 to-zinc-500 bg-clip-text text-transparent">
             made to move.
           </span>
-        </motion.h1>
+        </HeadingCursor>
 
         <motion.p
           initial={reduceMotion ? false : { opacity: 0, y: 16 }}

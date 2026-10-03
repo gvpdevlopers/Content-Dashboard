@@ -7,6 +7,7 @@ import {
 import Section from "../Section";
 import Reveal from "../Reveal";
 import GradientText from "../GradientText";
+import HeadingCursor from "../HeadingCursor";
 import PublicButton from "../PublicButton";
 
 const ContactCTA = () => {
@@ -164,7 +165,8 @@ const ContactCTA = () => {
               </div>
 
               {/* Heading */}
-              <h2
+              <HeadingCursor
+                as="h2"
                 className="
                   mt-5
                   max-w-3xl
@@ -184,7 +186,7 @@ const ContactCTA = () => {
                 <GradientText variant="light">
                   one platform.
                 </GradientText>
-              </h2>
+              </HeadingCursor>
 
               {/* Description */}
               <p

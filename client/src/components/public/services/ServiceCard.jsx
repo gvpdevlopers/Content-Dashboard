@@ -1,5 +1,6 @@
 import { ArrowUpRight, Layers3, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
+import HeadingCursor from "../HeadingCursor";
 
 const pricingLabels = {
   fixed: "Fixed pricing",
@@ -153,7 +154,8 @@ const ServiceCard = ({ service, index = 0 }) => {
       {/* Content */}
       <div className="relative mt-7">
         <div className="flex items-center gap-2">
-          <h2
+          <HeadingCursor
+            as="h2"
             className="
               text-xl
               font-bold
@@ -166,7 +168,7 @@ const ServiceCard = ({ service, index = 0 }) => {
             "
           >
             {service?.name}
-          </h2>
+          </HeadingCursor>
 
           <Sparkles
             size={13}

@@ -8,6 +8,7 @@ import Section from "../Section";
 import Reveal from "../Reveal";
 import GradientText from "../GradientText";
 import PublicButton from "../PublicButton";
+import HeadingCursor from "../HeadingCursor";
 
 const PlatformCTA = () => {
   return (
@@ -162,7 +163,8 @@ const PlatformCTA = () => {
               </div>
 
               {/* Heading */}
-              <h2
+              <HeadingCursor
+                as="h2"
                 className="
                   mt-5
                   max-w-3xl
@@ -182,7 +184,7 @@ const PlatformCTA = () => {
                 <GradientText variant="light">
                   from brief to action.
                 </GradientText>
-              </h2>
+              </HeadingCursor>
 
               {/* Description */}
               <p

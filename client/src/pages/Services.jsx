@@ -8,6 +8,7 @@ import ServicesCTA from "../components/public/services/ServicesCTA";
 import Section from "../components/public/Section";
 import Reveal from "../components/public/Reveal";
 import Stagger, { StaggerItem } from "../components/public/Stagger";
+import HeadingCursor from "../components/public/HeadingCursor";
 
 const pricingLabels = {
   fixed: "Fixed pricing",
@@ -122,11 +123,11 @@ const Services = () => {
             <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500 sm:text-xs">
               Made around your goals
             </p>
-            <h2 className="mt-5 text-4xl font-medium leading-[1] tracking-[-0.065em] text-zinc-950 sm:text-6xl lg:text-7xl">
+            <HeadingCursor as="h2" className="mt-5 text-4xl font-medium leading-[1] tracking-[-0.065em] text-zinc-950 sm:text-6xl lg:text-7xl">
               One ambition.
               <br />
               <span className="text-zinc-400">Many ways to move it forward.</span>
-            </h2>
+            </HeadingCursor>
             <p className="mx-auto mt-7 max-w-2xl text-sm leading-7 text-zinc-600 sm:text-base sm:leading-8">
               Explore the work we do across marketing, public relations, and
               content. Choose a starting point and tailor the details to your project.

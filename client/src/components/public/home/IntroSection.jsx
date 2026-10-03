@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 import Section from "../Section";
 import Reveal from "../Reveal";
+import HeadingCursor from "../HeadingCursor";
 
 const disciplines = [
   {
@@ -39,11 +40,11 @@ const IntroSection = () => {
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500 sm:text-xs">
           What we do
         </p>
-        <h2 className="mx-auto mt-5 text-4xl font-semibold leading-[0.98] tracking-[-0.065em] text-zinc-950 sm:text-6xl lg:text-7xl">
+        <HeadingCursor as="h2" className="mx-auto mt-5 text-4xl font-semibold leading-[0.98] tracking-[-0.065em] text-zinc-950 sm:text-6xl lg:text-7xl">
           Different disciplines.
           <br />
           <span className="text-zinc-400">One clear direction.</span>
-        </h2>
+        </HeadingCursor>
         <p className="mx-auto mt-6 max-w-2xl text-sm leading-7 text-zinc-500 sm:mt-8 sm:text-base sm:leading-8">
           We bring the right kind of thinking and making together, so every
           part of the work can move toward the same goal.

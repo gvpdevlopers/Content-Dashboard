@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import Section from "../Section";
 import Reveal from "../Reveal";
+import HeadingCursor from "../HeadingCursor";
 
 const process = [
   {
@@ -33,9 +34,9 @@ const AboutProcess = () => (
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500 sm:text-xs">
             How we work
           </p>
-          <h2 className="mt-5 max-w-3xl text-4xl font-semibold leading-[0.98] tracking-[-0.065em] text-zinc-950 sm:text-6xl">
+          <HeadingCursor as="h2" className="mt-5 max-w-3xl text-4xl font-semibold leading-[0.98] tracking-[-0.065em] text-zinc-950 sm:text-6xl">
             Thoughtful at every step.
-          </h2>
+          </HeadingCursor>
         </div>
         <Link
           to="/contact"

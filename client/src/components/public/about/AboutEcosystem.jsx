@@ -1,5 +1,6 @@
 import Section from "../Section";
 import Reveal from "../Reveal";
+import HeadingCursor from "../HeadingCursor";
 
 const disciplines = [
   {
@@ -29,11 +30,11 @@ const AboutEcosystem = () => (
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-400 sm:text-xs">
           What we bring together
         </p>
-        <h2 className="mt-5 text-4xl font-medium leading-[0.98] tracking-[-0.065em] sm:text-6xl">
+        <HeadingCursor as="h2" className="mt-5 text-4xl font-medium leading-[0.98] tracking-[-0.065em] sm:text-6xl">
           Separate strengths.
           <br />
           <span className="text-zinc-500">Shared momentum.</span>
-        </h2>
+        </HeadingCursor>
       </Reveal>
 
       <div className="mt-14 grid gap-x-8 border-t border-white/20 sm:mt-20 md:grid-cols-3 md:divide-x md:divide-white/15">

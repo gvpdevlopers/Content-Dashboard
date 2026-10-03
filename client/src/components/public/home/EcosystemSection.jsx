@@ -10,6 +10,7 @@ import Section from "../Section";
 import Reveal from "../Reveal";
 import Stagger, { StaggerItem } from "../Stagger";
 import GradientText from "../GradientText";
+import HeadingCursor from "../HeadingCursor";
 
 const ecosystem = [
   {
@@ -73,7 +74,8 @@ const EcosystemSection = () => {
             </div>
 
             {/* Heading */}
-            <h2
+            <HeadingCursor
+              as="h2"
               className="
     mt-5
     max-w-xl
@@ -89,7 +91,7 @@ const EcosystemSection = () => {
   "
             >
               More than <GradientText>a service.</GradientText>
-            </h2>
+            </HeadingCursor>
 
             {/* Description */}
             <p

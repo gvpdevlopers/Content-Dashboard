@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 
 import GradientText from "./GradientText";
+import HeadingCursor from "./HeadingCursor";
 
 const PublicHero = ({
   eyebrow,
@@ -100,7 +101,8 @@ const PublicHero = ({
         )}
 
         {/* Heading */}
-        <motion.h1
+        <HeadingCursor
+          as={motion.h1}
           {...enter(0.06, 22, 0.75)}
           className="mx-auto mt-7 max-w-5xl text-[clamp(2.8rem,7vw,6.6rem)] font-semibold leading-[0.94] tracking-[-0.075em] text-zinc-950 sm:mt-6"
         >
@@ -113,7 +115,7 @@ const PublicHero = ({
                 <GradientText>{highlight}</GradientText>
               </span>
             )}
-        </motion.h1>
+        </HeadingCursor>
 
         {/* Description */}
         {description && (

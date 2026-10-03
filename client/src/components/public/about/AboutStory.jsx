@@ -1,5 +1,6 @@
 import Section from "../Section";
 import Reveal from "../Reveal";
+import HeadingCursor from "../HeadingCursor";
 
 const AboutStory = () => (
   <Section className="bg-white !py-24 sm:!py-32 lg:!py-44">
@@ -7,11 +8,11 @@ const AboutStory = () => (
       <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500 sm:text-xs">
         A connected point of view
       </p>
-      <h2 className="mt-7 text-4xl font-medium leading-[1.05] tracking-[-0.065em] text-zinc-950 sm:text-6xl lg:text-7xl">
+      <HeadingCursor as="h2" className="mt-7 text-4xl font-medium leading-[1.05] tracking-[-0.065em] text-zinc-950 sm:text-6xl lg:text-7xl">
         Good work happens when
         <br className="hidden sm:block" />{" "}
         <span className="text-zinc-400">every part moves together.</span>
-      </h2>
+      </HeadingCursor>
       <p className="mx-auto mt-8 max-w-2xl text-sm leading-7 text-zinc-600 sm:mt-10 sm:text-lg sm:leading-8">
         Since 2017, we’ve brought marketing, public relations, and content
         production under one roof. We help businesses move from a clear idea to

@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
+import HeadingCursor from "./HeadingCursor";
 
 const PublicDarkCTA = ({ eyebrow, title, highlight, description, children }) => {
   const reduceMotion = useReducedMotion();
@@ -22,11 +23,11 @@ const PublicDarkCTA = ({ eyebrow, title, highlight, description, children }) => 
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-400 sm:text-xs">
           {eyebrow}
         </p>
-        <h2 className="mt-6 text-4xl font-medium leading-[0.98] tracking-[-0.065em] sm:text-6xl lg:text-7xl">
+        <HeadingCursor as="h2" className="mt-6 text-4xl font-medium leading-[0.98] tracking-[-0.065em] sm:text-6xl lg:text-7xl">
           {title}
           <br />
           <span className="text-zinc-500">{highlight}</span>
-        </h2>
+        </HeadingCursor>
         {description && (
           <p className="mx-auto mt-7 max-w-xl text-sm leading-7 text-zinc-400 sm:text-base sm:leading-8">
             {description}

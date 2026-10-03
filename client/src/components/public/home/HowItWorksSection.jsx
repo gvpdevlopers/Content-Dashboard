@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import Section from "../Section";
 import Reveal from "../Reveal";
+import HeadingCursor from "../HeadingCursor";
 
 const steps = [
   {
@@ -34,11 +35,11 @@ const HowItWorksSection = () => (
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500 sm:text-xs">
           A clear process
         </p>
-        <h2 className="mt-5 text-4xl font-semibold leading-[0.98] tracking-[-0.065em] text-zinc-950 sm:text-6xl">
+        <HeadingCursor as="h2" className="mt-5 text-4xl font-semibold leading-[0.98] tracking-[-0.065em] text-zinc-950 sm:text-6xl">
           From first thought
           <br />
           <span className="text-zinc-400">to forward motion.</span>
-        </h2>
+        </HeadingCursor>
       </Reveal>
 
       <ol className="relative mt-14 grid gap-0 sm:mt-20 md:grid-cols-4 md:before:absolute md:before:left-0 md:before:right-0 md:before:top-[15px] md:before:h-px md:before:bg-zinc-200">

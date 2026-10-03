@@ -1,3 +1,5 @@
+import HeadingCursor from "../HeadingCursor";
+
 const LegalSection = ({
   number,
   title,
@@ -36,7 +38,8 @@ const LegalSection = ({
         )}
 
         <div className="min-w-0 flex-1">
-          <h2
+          <HeadingCursor
+            as="h2"
             className="
               text-xl
               font-bold
@@ -47,7 +50,7 @@ const LegalSection = ({
             "
           >
             {title}
-          </h2>
+          </HeadingCursor>
 
           <div
             className="
