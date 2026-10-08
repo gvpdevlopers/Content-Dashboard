@@ -3,16 +3,18 @@ import { motion, useReducedMotion } from "framer-motion";
 const Reveal = ({
   children,
   className = "",
+  as = "div",
   delay = 0,
-  duration = 0.6,
-  y = 24,
+  duration = 0.55,
+  y = 18,
   amount = 0.2,
   once = true,
 }) => {
   const shouldReduceMotion = useReducedMotion();
+  const MotionElement = motion[as] || motion.div;
 
   return (
-    <motion.div
+    <MotionElement
       className={className}
       initial={
         shouldReduceMotion
@@ -41,7 +43,7 @@ const Reveal = ({
       }}
     >
       {children}
-    </motion.div>
+    </MotionElement>
   );
 };
 

@@ -8,13 +8,17 @@ import Section from "../Section";
 import Reveal from "../Reveal";
 import GradientText from "../GradientText";
 import HeadingCursor from "../HeadingCursor";
+import usePointerParallax from "../usePointerParallax";
 import PublicButton from "../PublicButton";
 
 const ContactCTA = () => {
+  const parallaxRef = usePointerParallax();
+
   return (
     <Section className="bg-[var(--color-surface-soft)] !py-12 sm:!py-14 lg:!py-16">
       <Reveal>
         <div
+          ref={parallaxRef}
           className="
             group
             relative
@@ -42,6 +46,8 @@ const ContactCTA = () => {
             aria-hidden="true"
             className="
               public-ambient-glow
+              public-parallax-layer
+              public-parallax-strong
               pointer-events-none
               absolute
               -right-24
@@ -63,6 +69,8 @@ const ContactCTA = () => {
             aria-hidden="true"
             className="
               public-ambient-glow
+              public-parallax-layer
+              public-parallax-medium
               pointer-events-none
               absolute
               -bottom-48
@@ -78,6 +86,8 @@ const ContactCTA = () => {
           <div
             aria-hidden="true"
             className="
+              public-parallax-layer
+              public-parallax-subtle
               pointer-events-none
               absolute
               -left-32

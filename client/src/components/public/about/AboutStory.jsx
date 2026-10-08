@@ -3,29 +3,39 @@ import Reveal from "../Reveal";
 import HeadingCursor from "../HeadingCursor";
 
 const AboutStory = () => (
-  <Section className="bg-white !py-24 sm:!py-32 lg:!py-44">
-    <Reveal className="mx-auto max-w-5xl text-center">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500 sm:text-xs">
-        A connected point of view
-      </p>
-      <HeadingCursor as="h2" className="mt-7 text-4xl font-medium leading-[1.05] tracking-[-0.065em] text-zinc-950 sm:text-6xl lg:text-7xl">
-        Good work happens when
-        <br className="hidden sm:block" />{" "}
-        <span className="text-zinc-400">every part moves together.</span>
-      </HeadingCursor>
-      <p className="mx-auto mt-8 max-w-2xl text-sm leading-7 text-zinc-600 sm:mt-10 sm:text-lg sm:leading-8">
-        Since 2017, we’ve brought marketing, public relations, and content
-        production under one roof. We help businesses move from a clear idea to
-        considered action—with consistency at every step.
-      </p>
-      <div className="mx-auto mt-12 flex max-w-xl items-center justify-center gap-5 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-400 sm:mt-16 sm:text-xs">
-        <span>Think</span>
-        <span className="h-px flex-1 bg-zinc-200" />
-        <span>Make</span>
-        <span className="h-px flex-1 bg-zinc-200" />
-        <span>Grow</span>
-      </div>
-    </Reveal>
+  <Section className="bg-white !py-20 sm:!py-28 lg:!py-36">
+    <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:gap-20">
+      <Reveal>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500 sm:text-xs">
+          Who we are
+        </p>
+        <HeadingCursor
+          as="h2"
+          className="mt-5 text-4xl font-medium leading-[0.98] tracking-[-0.065em] text-zinc-950 sm:text-6xl lg:text-7xl"
+        >
+          Like Steroids For
+          <br />
+          <span className="text-zinc-400">Your Business.</span>
+        </HeadingCursor>
+      </Reveal>
+
+      <Reveal delay={0.08} className="lg:pt-12">
+        <p className="text-base leading-7 text-zinc-800 sm:text-lg sm:leading-8">
+          Glow Ventures is a marketing and public relations agency bringing
+          Internet Marketing, Public Relations, and Content Production together
+          around a clear business direction.
+        </p>
+        <p className="mt-5 text-sm leading-7 text-zinc-600 sm:text-base sm:leading-8">
+          Since 2017, our methods have been tested across hundreds of
+          businesses. We connect strategy, stories, and execution so the work
+          can move together—not as disconnected pieces.
+        </p>
+        <p className="mt-5 border-l-2 border-zinc-300 pl-4 text-sm leading-6 text-zinc-500">
+          A connected approach, shaped by the goals of each business we work
+          with.
+        </p>
+      </Reveal>
+    </div>
   </Section>
 );
 

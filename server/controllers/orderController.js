@@ -681,6 +681,17 @@ const calculateFieldOptionPrice = (
   value,
 ) => {
   if (
+    field?.includeValueInPrice &&
+    !isEmptyValue(value)
+  ) {
+    const numericValue = Number(value);
+
+    return Number.isFinite(numericValue)
+      ? numericValue
+      : 0;
+  }
+
+  if (
     !field ||
     !Array.isArray(field.options) ||
     isEmptyValue(value)

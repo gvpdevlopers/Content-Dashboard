@@ -21,7 +21,13 @@ const PublicHeader = () => {
   const closeMenu = () => setIsMenuOpen(false);
 
   return (
-    <header
+    <motion.header
+      initial={shouldReduceMotion ? false : { opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        duration: shouldReduceMotion ? 0 : 0.35,
+        ease: [0.22, 1, 0.36, 1],
+      }}
       className="
         sticky
         top-0
@@ -316,7 +322,7 @@ const PublicHeader = () => {
         </motion.div>
         )}
       </AnimatePresence>
-    </header>
+    </motion.header>
   );
 };
 

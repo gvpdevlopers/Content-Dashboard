@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowUpRight } from "lucide-react";
+import Magnetic from "./Magnetic";
 
 const PublicButton = ({
   children,
@@ -33,27 +34,36 @@ const PublicButton = ({
       </span>
     </>
   );
+  const magneticClassName = className.split(/\s+/).includes("w-full")
+    ? "w-full"
+    : "";
 
   if (to) {
     return (
-      <Link to={to} className={classes} {...props}>
-        {content}
-      </Link>
+      <Magnetic className={magneticClassName}>
+        <Link to={to} className={classes} {...props}>
+          {content}
+        </Link>
+      </Magnetic>
     );
   }
 
   if (href) {
     return (
-      <a href={href} className={classes} {...props}>
-        {content}
-      </a>
+      <Magnetic className={magneticClassName}>
+        <a href={href} className={classes} {...props}>
+          {content}
+        </a>
+      </Magnetic>
     );
   }
 
   return (
-    <button type="button" className={classes} {...props}>
-      {content}
-    </button>
+    <Magnetic className={magneticClassName}>
+      <button type="button" className={classes} {...props}>
+        {content}
+      </button>
+    </Magnetic>
   );
 };
 

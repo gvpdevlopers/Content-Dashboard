@@ -9,12 +9,16 @@ import Reveal from "../Reveal";
 import GradientText from "../GradientText";
 import PublicButton from "../PublicButton";
 import HeadingCursor from "../HeadingCursor";
+import usePointerParallax from "../usePointerParallax";
 
 const PlatformCTA = () => {
+  const parallaxRef = usePointerParallax();
+
   return (
     <Section className="bg-[var(--color-surface-soft)] !py-12 sm:!py-14 lg:!py-16">
       <Reveal>
         <div
+          ref={parallaxRef}
           className="
             group
             relative
@@ -44,6 +48,8 @@ const PlatformCTA = () => {
             aria-hidden="true"
             className="
               public-ambient-glow
+              public-parallax-layer
+              public-parallax-strong
               pointer-events-none
               absolute
               -right-24
@@ -66,6 +72,8 @@ const PlatformCTA = () => {
             aria-hidden="true"
             className="
               public-ambient-glow
+              public-parallax-layer
+              public-parallax-medium
               pointer-events-none
               absolute
               -bottom-48
@@ -82,6 +90,8 @@ const PlatformCTA = () => {
           <div
             aria-hidden="true"
             className="
+              public-parallax-layer
+              public-parallax-subtle
               pointer-events-none
               absolute
               -left-32

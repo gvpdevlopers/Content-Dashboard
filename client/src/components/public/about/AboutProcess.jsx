@@ -4,23 +4,24 @@ import { Link } from "react-router-dom";
 import Section from "../Section";
 import Reveal from "../Reveal";
 import HeadingCursor from "../HeadingCursor";
+import Magnetic from "../Magnetic";
 
 const process = [
   {
     number: "01",
-    title: "Strategize",
+    title: "Strategize Plan",
     description:
       "Understand the opportunity, define the direction, and establish a clear plan.",
   },
   {
     number: "02",
-    title: "Spark progress",
+    title: "Spark Progress",
     description:
       "Put the plan into motion through focused marketing, communication, and content.",
   },
   {
     number: "03",
-    title: "Drive growth",
+    title: "Drive Growth",
     description:
       "Build momentum by refining the work around the business objective.",
   },
@@ -38,26 +39,28 @@ const AboutProcess = () => (
             Thoughtful at every step.
           </HeadingCursor>
         </div>
-        <Link
-          to="/contact"
-          className="group inline-flex w-fit items-center gap-2 pb-1 text-sm font-semibold text-zinc-800 transition-colors hover:text-zinc-500"
-        >
-          Start a conversation
-          <ArrowUpRight size={16} className="transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden="true" />
-        </Link>
+        <Magnetic>
+          <Link
+            to="/contact"
+            className="group inline-flex w-fit items-center gap-2 pb-1 text-sm font-semibold text-zinc-800 transition-colors hover:text-zinc-500"
+          >
+            Start a conversation
+            <ArrowUpRight size={16} className="transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden="true" />
+          </Link>
+        </Magnetic>
       </Reveal>
 
       <ol className="mt-12 border-t border-zinc-300 sm:mt-16">
         {process.map((item, index) => (
           <Reveal key={item.number} delay={index * 0.06} y={14}>
-            <li className="grid gap-3 border-b border-zinc-300 py-7 sm:grid-cols-[90px_minmax(0,0.85fr)_minmax(0,1fr)] sm:items-baseline sm:gap-6 sm:py-9">
-              <span className="text-[10px] font-semibold tracking-[0.18em] text-zinc-400 sm:text-xs">
+            <li className="public-process-row grid gap-3 border-b border-zinc-300 py-7 sm:grid-cols-[90px_minmax(0,0.85fr)_minmax(0,1fr)] sm:items-baseline sm:gap-6 sm:py-9">
+              <span className="public-process-row__number text-[10px] font-semibold tracking-[0.18em] text-zinc-400 sm:text-xs">
                 {item.number}
               </span>
-              <h3 className="text-2xl font-medium tracking-[-0.05em] text-zinc-950 sm:text-3xl">
+              <h3 className="public-process-row__title text-2xl font-medium tracking-[-0.05em] text-zinc-950 sm:text-3xl">
                 {item.title}
               </h3>
-              <p className="max-w-xl text-sm leading-6 text-zinc-600 sm:text-base">
+              <p className="public-process-row__description max-w-xl text-sm leading-6 text-zinc-600 sm:text-base">
                 {item.description}
               </p>
             </li>

@@ -8,9 +8,9 @@ const ServicesHero = () => {
     <PublicHero
       eyebrow="Our Services"
       eyebrowIcon={Sparkles}
-      title="Work that moves"
-      highlight="ideas forward."
-      description="Explore focused marketing, public relations, and content services. Find the right starting point, then shape the details around your project."
+      title="Ideas deserve"
+      highlight="forward motion."
+      description="Explore Internet Marketing, Public Relations, and Content Production—connected around your goals and configured from our current service offering."
       actions={
         <>
           <PublicButton to="/login" variant="primary">

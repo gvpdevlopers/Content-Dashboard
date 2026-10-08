@@ -3,16 +3,18 @@ import { motion, useReducedMotion } from "framer-motion";
 
 import PublicButton from "../PublicButton";
 import HeadingCursor from "../HeadingCursor";
+import usePointerParallax from "../usePointerParallax";
 
 const HeroSection = () => {
   const reduceMotion = useReducedMotion();
+  const parallaxRef = usePointerParallax();
 
   return (
-    <section className="relative isolate flex min-h-[calc(100svh-72px)] items-center justify-center overflow-hidden bg-[#f7f7f5] px-5 py-20 text-center sm:px-8 lg:py-24">
+    <section ref={parallaxRef} className="relative isolate flex min-h-[calc(100svh-72px)] items-center justify-center overflow-hidden bg-[#f7f7f5] px-5 py-20 text-center sm:px-8 lg:py-24">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute left-1/2 top-[44%] h-[30rem] w-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(24,24,27,0.075),rgba(24,24,27,0.018)_48%,transparent_72%)] sm:h-[42rem] sm:w-[42rem]" />
+        <div className="public-parallax-layer public-parallax-strong absolute left-1/2 top-[44%] h-[30rem] w-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(24,24,27,0.075),rgba(24,24,27,0.018)_48%,transparent_72%)] sm:h-[42rem] sm:w-[42rem]" />
         <svg
-          className="absolute left-1/2 top-[44%] h-[min(94vw,780px)] w-[min(94vw,780px)] -translate-x-1/2 -translate-y-1/2 text-zinc-900/[0.075]"
+          className="public-parallax-layer public-parallax-subtle absolute left-1/2 top-[44%] h-[min(94vw,780px)] w-[min(94vw,780px)] -translate-x-1/2 -translate-y-1/2 text-zinc-900/[0.075]"
           viewBox="0 0 800 800"
           fill="none"
         >
@@ -39,9 +41,9 @@ const HeroSection = () => {
 
         <HeadingCursor
           as={motion.h1}
-          initial={reduceMotion ? false : { opacity: 0, y: 22 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: reduceMotion ? 0 : 0.75, delay: reduceMotion ? 0 : 0.06 }}
+          initial={reduceMotion ? false : { opacity: 0, y: 22, filter: "blur(3px)" }}
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: reduceMotion ? 0 : 0.7, delay: reduceMotion ? 0 : 0.06, ease: [0.22, 1, 0.36, 1] }}
          className="mx-auto mt-7 max-w-5xl text-[clamp(2.8rem,7.3vw,6.6rem)] font-semibold leading-[0.94] tracking-[-0.075em] text-zinc-950 sm:mt-6"
         >
           Good ideas,

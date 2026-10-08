@@ -422,6 +422,14 @@ const getSelectedFieldsPrice = (item) => {
         total += Number(selectedOption.price || 0);
       }
     }
+
+    if (field.includeValueInPrice) {
+      const numericValue = Number(fieldValue);
+
+      if (Number.isFinite(numericValue)) {
+        total += numericValue;
+      }
+    }
   }
 
   return total;
@@ -474,6 +482,14 @@ const getRepeatableGroupsPrice = (item) => {
 
           if (selectedOption) {
             total += Number(selectedOption.price || 0);
+          }
+        }
+
+        if (field.includeValueInPrice) {
+          const numericValue = Number(value);
+
+          if (Number.isFinite(numericValue)) {
+            total += numericValue;
           }
         }
       }
@@ -679,7 +695,14 @@ const SelectionField = ({ field, value, onChange, compact = false }) => {
     <div>
       <div className="mb-3">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-medium text-zinc-900">{field.label}</p>
+          <p className="text-sm font-medium text-zinc-900">
+            {field.label}
+            {field.required && (
+              <span className="ml-1 text-red-500" aria-hidden="true">
+                *
+              </span>
+            )}
+          </p>
 
           <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
             {field.required ? "Required" : "Optional"}
@@ -795,7 +818,14 @@ const DynamicField = ({ field, value, onChange, compact = false }) => {
     return (
       <div>
         <div className="mb-3">
-          <p className="text-sm font-medium text-zinc-900">{field.label}</p>
+          <p className="text-sm font-medium text-zinc-900">
+            {field.label}
+            {field.required && (
+              <span className="ml-1 text-red-500" aria-hidden="true">
+                *
+              </span>
+            )}
+          </p>
 
           <p className="mt-1 text-xs text-zinc-400">
             {field.required ? "Required · Select one" : "Optional · Select one"}
@@ -829,7 +859,14 @@ const DynamicField = ({ field, value, onChange, compact = false }) => {
   const label = (
     <div className="mb-3">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-sm font-medium text-zinc-900">{field.label}</p>
+        <p className="text-sm font-medium text-zinc-900">
+          {field.label}
+          {field.required && (
+            <span className="ml-1 text-red-500" aria-hidden="true">
+              *
+            </span>
+          )}
+        </p>
 
         <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
           {field.required ? "Required" : "Optional"}
@@ -889,12 +926,24 @@ const DynamicField = ({ field, value, onChange, compact = false }) => {
       <div>
         {label}
 
-        <input
-          type="date"
-          value={value ?? ""}
-          onChange={(event) => onChange(field.name, event.target.value)}
-          className={commonClassName}
-        />
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            type="date"
+            value={value ?? ""}
+            onChange={(event) => onChange(field.name, event.target.value)}
+            className={`${commonClassName} min-w-0 flex-1`}
+          />
+
+          {!field.required && (
+            <button
+              type="button"
+              onClick={() => onChange(field.name, "")}
+              className="shrink-0 text-xs font-medium text-zinc-500 underline decoration-zinc-300 underline-offset-4 transition hover:text-zinc-900"
+            >
+              Choose any
+            </button>
+          )}
+        </div>
 
         {helpText}
       </div>
@@ -3092,16 +3141,30 @@ const NewOrder = () => {
                   );
 
                   const activeFields = item ? getActiveFieldsForItem(item) : [];
+                  const inlinePriceFieldNames = new Set(
+                    isGroupedPricing
+                      ? Object.values(item.selectedPricingOptions || {})
+                          .filter(Boolean)
+                          .flatMap((option) =>
+                            (option.fields || [])
+                              .filter((field) => field.includeValueInPrice)
+                              .map((field) => field.name),
+                          )
+                      : [],
+                  );
+                  const visibleActiveFields = activeFields.filter(
+                    (field) => !inlinePriceFieldNames.has(field.name),
+                  );
 
                   const repeatableGroups = item
                     ? getRepeatableGroups(item.service)
                     : [];
 
-                  const requiredFields = activeFields.filter(
+                  const requiredFields = visibleActiveFields.filter(
                     (field) => field.required,
                   );
 
-                  const optionalFields = activeFields.filter(
+                  const optionalFields = visibleActiveFields.filter(
                     (field) => !field.required,
                   );
 
@@ -3286,6 +3349,11 @@ const NewOrder = () => {
                                   {pricingGroups.map((group) => {
                                     const selectedOption =
                                       item.selectedPricingOptions?.[group.key];
+                                    const inlineFields = (
+                                      selectedOption?.fields || []
+                                    ).filter(
+                                      (field) => field.includeValueInPrice,
+                                    );
 
                                     const title = group.name
                                       ? group.name.charAt(0).toUpperCase() +
@@ -3461,6 +3529,25 @@ const NewOrder = () => {
                                             );
                                           })}
                                         </div>
+
+                                        {inlineFields.map((field) => (
+                                          <div
+                                            key={field.name}
+                                            className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50/60 p-4"
+                                          >
+                                            <DynamicField
+                                              field={field}
+                                              value={item.formData?.[field.name]}
+                                              onChange={(fieldName, value) =>
+                                                handleFieldChange(
+                                                  selectedIndex,
+                                                  fieldName,
+                                                  value,
+                                                )
+                                              }
+                                            />
+                                          </div>
+                                        ))}
                                       </div>
                                     );
                                   })}
@@ -3891,6 +3978,43 @@ const NewOrder = () => {
                     />
                   </div>
 
+                  {error && (
+                    <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                      <p className="text-xs leading-5 text-red-700">{error}</p>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={
+                      submitting ||
+                      Boolean(loadingServiceId) ||
+                      !orderItems.length ||
+                      (paymentMethod === "online" && estimatedTotal <= 0)
+                    }
+                    className="group mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-900 px-5 py-3.5 text-sm font-semibold text-white shadow-[0_8px_25px_rgba(24,24,27,0.12)] transition-all duration-300 ease-out hover:bg-zinc-800 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 size={17} className="animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <span>
+                          {paymentMethod === "online"
+                            ? "Continue to payment"
+                            : "Place order"}
+                        </span>
+
+                        <ArrowRight
+                          size={17}
+                          className="transition-transform duration-200 group-hover:translate-x-0.5"
+                        />
+                      </>
+                    )}
+                  </button>
+
                   {paymentMethod === "online" && (
                     <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-zinc-100 bg-zinc-50 px-4 py-3.5">
                       <Info
@@ -4118,50 +4242,6 @@ const NewOrder = () => {
                       </div>
                     </div>
 
-                    {error && (
-                      <div className="mt-5 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3">
-                        <p className="text-xs leading-5 text-red-300">
-                          {error}
-                        </p>
-                      </div>
-                    )}
-
-                    <button
-                      type="submit"
-                      disabled={
-                        submitting ||
-                        Boolean(loadingServiceId) ||
-                        !orderItems.length ||
-                        (paymentMethod === "online" && estimatedTotal <= 0)
-                      }
-                      className="group mt-6 flex w-full items-center justify-center gap-2 rounded-xl border border-white bg-white px-5 py-3.5 text-sm font-semibold text-zinc-900 shadow-[0_8px_25px_rgba(255,255,255,0.08)] transition-all duration-300 ease-out hover:bg-zinc-100 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {submitting ? (
-                        <>
-                          <Loader2 size={17} className="animate-spin" />
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <span>
-                            {paymentMethod === "online"
-                              ? "Continue to payment"
-                              : "Place order"}
-                          </span>
-
-                          <ArrowRight
-                            size={17}
-                            className="transition-transform duration-200 group-hover:translate-x-0.5"
-                          />
-                        </>
-                      )}
-                    </button>
-
-                    <p className="mt-3 text-center text-[11px] leading-5 text-white/30">
-                      {paymentMethod === "online"
-                        ? "You will be redirected to secure Razorpay Checkout."
-                        : "Your order details will be reviewed and processed securely."}
-                    </p>
                   </div>
                 </section>
               )}

@@ -9,9 +9,9 @@ const AboutHero = () => {
       className="bg-[#f7f7f5]"
       eyebrow="A little about us"
       eyebrowIcon={Sparkles}
-      title="We build momentum"
-      highlight="around ideas."
-      description="Glow Ventures brings marketing, public relations, and content production together to help businesses turn ideas into meaningful progress."
+      title="We Ignite"
+      highlight="Growth."
+      description="Glow Ventures is a marketing and PR agency connecting Internet Marketing, Public Relations, and Content Production around business ambition."
       actions={
         <>
           <PublicButton to="/services" variant="primary">

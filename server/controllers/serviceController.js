@@ -260,6 +260,20 @@ const validateField = (
   }
 
   if (
+    field.includeValueInPrice !== undefined &&
+    !isBoolean(field.includeValueInPrice)
+  ) {
+    return `${fieldPath} includeValueInPrice must be a boolean.`;
+  }
+
+  if (
+    field.includeValueInPrice === true &&
+    (field.type || "text") !== "number"
+  ) {
+    return `${fieldPath} can include its value in the price only when it is a number field.`;
+  }
+
+  if (
     field.placeholder !== undefined &&
     field.placeholder !== null &&
     typeof field.placeholder !== "string"

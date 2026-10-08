@@ -18,14 +18,14 @@ const HeadingCursor = ({
   const pointerX = useMotionValue(0);
   const pointerY = useMotionValue(0);
   const x = useSpring(pointerX, {
-    stiffness: 520,
-    damping: 42,
-    mass: 0.35,
+    stiffness: 380,
+    damping: 34,
+    mass: 0.4,
   });
   const y = useSpring(pointerY, {
-    stiffness: 520,
-    damping: 42,
-    mass: 0.35,
+    stiffness: 380,
+    damping: 34,
+    mass: 0.4,
   });
 
   useEffect(() => {
@@ -93,9 +93,12 @@ const HeadingCursor = ({
             style={{ x, y }}
             animate={{
               opacity: active ? 1 : 0,
-              scale: active ? 1 : 0.88,
+              scale: active ? 1 : 0.92,
             }}
-            transition={{ duration: 0.18, ease: "easeOut" }}
+            transition={{
+              opacity: { duration: 0.16, ease: "easeOut" },
+              scale: { type: "spring", stiffness: 420, damping: 28 },
+            }}
           >
             <span className="heading-cursor__surface" />
           </motion.span>,

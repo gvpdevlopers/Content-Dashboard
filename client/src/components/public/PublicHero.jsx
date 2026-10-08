@@ -2,6 +2,7 @@ import { motion, useReducedMotion } from "framer-motion";
 
 import GradientText from "./GradientText";
 import HeadingCursor from "./HeadingCursor";
+import usePointerParallax from "./usePointerParallax";
 
 const PublicHero = ({
   eyebrow,
@@ -14,9 +15,10 @@ const PublicHero = ({
   className = "",
 }) => {
   const reduceMotion = useReducedMotion();
+  const parallaxRef = usePointerParallax();
   const enter = (delay = 0, y = 14, duration = 0.6) => ({
-    initial: reduceMotion ? false : { opacity: 0, y },
-    animate: { opacity: 1, y: 0 },
+    initial: reduceMotion ? false : { opacity: 0, y, filter: "blur(2px)" },
+    animate: { opacity: 1, y: 0, filter: "blur(0px)" },
     transition: {
       duration: reduceMotion ? 0 : duration,
       delay: reduceMotion ? 0 : delay,
@@ -26,6 +28,7 @@ const PublicHero = ({
 
   return (
     <section
+      ref={parallaxRef}
       className={`relative isolate flex min-h-[calc(100svh-72px)] items-center justify-center overflow-hidden bg-[#f7f7f5] px-5 py-20 text-center sm:px-8 lg:py-24 ${className}`}
     >
       {/* Background */}
@@ -33,10 +36,10 @@ const PublicHero = ({
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 overflow-hidden"
       >
-        <div className="absolute left-1/2 top-[44%] h-[30rem] w-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(24,24,27,0.075),rgba(24,24,27,0.018)_48%,transparent_72%)] sm:h-[42rem] sm:w-[42rem]" />
+        <div className="public-parallax-layer public-parallax-strong absolute left-1/2 top-[44%] h-[30rem] w-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(24,24,27,0.075),rgba(24,24,27,0.018)_48%,transparent_72%)] sm:h-[42rem] sm:w-[42rem]" />
 
         <svg
-          className="absolute left-1/2 top-[44%] h-[min(94vw,780px)] w-[min(94vw,780px)] -translate-x-1/2 -translate-y-1/2 text-zinc-900/[0.075]"
+          className="public-parallax-layer public-parallax-subtle absolute left-1/2 top-[44%] h-[min(94vw,780px)] w-[min(94vw,780px)] -translate-x-1/2 -translate-y-1/2 text-zinc-900/[0.075]"
           viewBox="0 0 800 800"
           fill="none"
         >

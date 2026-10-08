@@ -6,8 +6,8 @@ import PublicDarkCTA from "../PublicDarkCTA";
 const AboutCTA = () => (
   <PublicDarkCTA
     eyebrow="Good work begins with a conversation"
-    title="Have a good idea?"
-    highlight="Let’s give it momentum."
+    title="Have something"
+    highlight="worth growing?"
   >
     <Link
       to="/contact"

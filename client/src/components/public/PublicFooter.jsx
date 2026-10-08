@@ -1,5 +1,6 @@
 import { ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
+import { motion, useReducedMotion } from "framer-motion";
 
 const navigation = [
   {
@@ -45,7 +46,10 @@ const FooterLink = ({ to, children }) => (
   </li>
 );
 
-const PublicFooter = () => (
+const PublicFooter = () => {
+  const reduceMotion = useReducedMotion();
+
+  return (
   <footer className="relative isolate overflow-hidden bg-[#e8e7e3] text-zinc-950">
     {/* Subtle background detail */}
     <div
@@ -55,7 +59,21 @@ const PublicFooter = () => (
       <div className="absolute -right-48 -top-56 h-[36rem] w-[36rem] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.48),transparent_68%)]" />
     </div>
 
-    <div className="relative mx-auto w-full max-w-[1400px] px-5 sm:px-8 lg:px-10">
+    <motion.p
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-x-0 bottom-16 z-0 overflow-hidden whitespace-nowrap text-center text-[clamp(3.25rem,14vw,12rem)] font-semibold leading-[0.8] tracking-[-0.09em] text-zinc-950/[0.035]"
+      initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{
+        duration: reduceMotion ? 0 : 0.7,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+    >
+      GLOW VENTURES
+    </motion.p>
+
+    <div className="relative z-10 mx-auto w-full max-w-[1400px] px-5 sm:px-8 lg:px-10">
       {/* Main Footer */}
       <div className="grid gap-10 py-14 sm:py-16 lg:grid-cols-[1.35fr_repeat(4,minmax(0,1fr))] lg:gap-8 lg:py-20">
         {/* Brand */}
@@ -149,6 +167,7 @@ const PublicFooter = () => (
       </div>
     </div>
   </footer>
-);
+  );
+};
 
 export default PublicFooter;

@@ -8,23 +8,21 @@ import HeadingCursor from "../HeadingCursor";
 const steps = [
   {
     number: "01",
-    title: "Find the fit",
-    description: "Explore the service that meets your next objective.",
+    title: "Strategize Plan",
+    description:
+      "Understand the ambition, identify the opportunity, and set a clear direction.",
   },
   {
     number: "02",
-    title: "Make it yours",
-    description: "Choose options and tell us what your project needs.",
+    title: "Spark Progress",
+    description:
+      "Bring marketing, public relations, and content together to move the work forward.",
   },
   {
     number: "03",
-    title: "Move forward",
-    description: "Review your order and confirm the details securely.",
-  },
-  {
-    number: "04",
-    title: "Stay in the loop",
-    description: "Track progress in one place through your client workspace.",
+    title: "Drive Growth",
+    description:
+      "Put the plan into motion and keep the work aligned with your goals.",
   },
 ];
 
@@ -33,16 +31,16 @@ const HowItWorksSection = () => (
     <div className="mx-auto max-w-6xl">
       <Reveal className="mx-auto max-w-3xl text-center">
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-zinc-500 sm:text-xs">
-          A clear process
+          We Ignite Growth
         </p>
         <HeadingCursor as="h2" className="mt-5 text-4xl font-semibold leading-[0.98] tracking-[-0.065em] text-zinc-950 sm:text-6xl">
-          From first thought
+          Strategize Plan.
           <br />
-          <span className="text-zinc-400">to forward motion.</span>
+          <span className="text-zinc-400">Spark Progress. Drive Growth.</span>
         </HeadingCursor>
       </Reveal>
 
-      <ol className="relative mt-14 grid gap-0 sm:mt-20 md:grid-cols-4 md:before:absolute md:before:left-0 md:before:right-0 md:before:top-[15px] md:before:h-px md:before:bg-zinc-200">
+      <ol className="relative mt-14 grid gap-0 sm:mt-20 md:grid-cols-3 md:before:absolute md:before:left-0 md:before:right-0 md:before:top-[15px] md:before:h-px md:before:bg-zinc-200">
         {steps.map((step, index) => (
           <Reveal key={step.number} delay={index * 0.06} className="relative">
             <li className="grid grid-cols-[32px_1fr] gap-4 border-l border-zinc-200 py-5 pl-5 md:block md:border-l-0 md:px-5 md:py-0 md:first:pl-0 md:last:pr-0">

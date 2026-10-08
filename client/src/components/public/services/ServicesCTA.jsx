@@ -5,10 +5,10 @@ import PublicDarkCTA from "../PublicDarkCTA";
 
 const ServicesCTA = () => (
   <PublicDarkCTA
-    eyebrow="Find your starting point"
-    title="The next step"
-    highlight="starts with a conversation."
-    description="Tell us what you’re working toward, and we’ll help you explore the services that fit."
+    eyebrow="Make the next move"
+    title="Have a goal"
+    highlight="worth growing toward?"
+    description="Start a conversation with our team. We’ll help you explore the services and approach that fit your ambition."
   >
     <Link
       to="/contact"

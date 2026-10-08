@@ -1,4 +1,5 @@
 import HeadingCursor from "../HeadingCursor";
+import Reveal from "../Reveal";
 
 const LegalSection = ({
   number,
@@ -6,7 +7,8 @@ const LegalSection = ({
   children,
 }) => {
   return (
-    <section
+    <Reveal
+      as="section"
       className="
         scroll-mt-28
         border-b
@@ -69,7 +71,7 @@ const LegalSection = ({
           </div>
         </div>
       </div>
-    </section>
+    </Reveal>
   );
 };
 

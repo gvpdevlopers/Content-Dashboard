@@ -31,23 +31,23 @@ const AboutEcosystem = () => (
           What we bring together
         </p>
         <HeadingCursor as="h2" className="mt-5 text-4xl font-medium leading-[0.98] tracking-[-0.065em] sm:text-6xl">
-          Separate strengths.
+          Three disciplines.
           <br />
-          <span className="text-zinc-500">Shared momentum.</span>
+          <span className="text-zinc-500">One connected direction.</span>
         </HeadingCursor>
       </Reveal>
 
-      <div className="mt-14 grid gap-x-8 border-t border-white/20 sm:mt-20 md:grid-cols-3 md:divide-x md:divide-white/15">
+      <div className="mt-12 border-t border-white/20 sm:mt-16">
         {disciplines.map((item, index) => (
-          <Reveal key={item.number} delay={index * 0.07} y={16}>
-            <article className="group min-h-64 border-b border-white/15 py-7 transition-colors hover:bg-white/[0.025] sm:py-9 md:border-b-0 md:px-6 md:first:pl-0 md:last:pr-0">
-              <p className="text-[10px] font-semibold tracking-[0.18em] text-zinc-500">
+          <Reveal key={item.number} delay={index * 0.05} y={14}>
+            <article className="grid gap-3 border-b border-white/15 py-7 sm:grid-cols-[64px_minmax(0,0.9fr)_minmax(220px,0.7fr)] sm:items-center sm:gap-6 sm:py-9">
+              <p className="text-[10px] font-semibold tracking-[0.18em] text-zinc-500 sm:text-xs">
                 {item.number}
               </p>
-              <h3 className="mt-10 max-w-xs text-2xl font-medium leading-tight tracking-[-0.05em] text-white transition-transform duration-300 group-hover:translate-x-1 sm:mt-14 sm:text-3xl">
+              <h3 className="break-words text-2xl font-medium leading-tight tracking-[-0.05em] text-white sm:text-3xl lg:text-4xl">
                 {item.title}
               </h3>
-              <p className="mt-4 max-w-sm text-sm leading-6 text-zinc-400">
+              <p className="max-w-md text-sm leading-6 text-zinc-400 sm:text-base">
                 {item.description}
               </p>
             </article>

@@ -70,6 +70,7 @@ const createEmptyField = (order = 0) => ({
   placeholder: "",
   helpText: "",
   required: false,
+  includeValueInPrice: false,
   options: [],
   min: "",
   max: "",
@@ -132,6 +133,7 @@ const hydrateField = (field = {}, index = 0) => ({
   placeholder: toInputValue(field.placeholder),
   helpText: toInputValue(field.helpText),
   required: Boolean(field.required),
+  includeValueInPrice: Boolean(field.includeValueInPrice),
 
   options: Array.isArray(field.options)
     ? field.options.map((option) => ({
@@ -491,6 +493,8 @@ const cleanFieldForPayload = (field, index = 0) => {
     helpText: String(field.helpText || "").trim(),
 
     required: Boolean(field.required),
+    includeValueInPrice:
+      field.type === "number" && Boolean(field.includeValueInPrice),
 
     order: Number.isFinite(Number(field.order)) ? Number(field.order) : index,
   };
@@ -1313,6 +1317,8 @@ const FieldEditor = ({
             onChange({
               ...field,
               type: value,
+              includeValueInPrice:
+                value === "number" && field.includeValueInPrice,
               options: isOptionFieldType(value)
                 ? field.options?.length
                   ? field.options
@@ -1367,6 +1373,20 @@ const FieldEditor = ({
       {hasNumberSettings && (
         <div className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50/70 p-4">
           <p className="text-sm font-semibold text-zinc-800">Number settings</p>
+
+          <div className="mt-4">
+            <Toggle
+              checked={field.includeValueInPrice}
+              onChange={(checked) =>
+                onChange({
+                  ...field,
+                  includeValueInPrice: checked,
+                })
+              }
+              label="Include value in order price"
+              description="Add the submitted number directly to the order total."
+            />
+          </div>
 
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             <Input

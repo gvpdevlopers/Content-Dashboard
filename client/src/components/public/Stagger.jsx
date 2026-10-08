@@ -49,14 +49,14 @@ export const StaggerItem = ({
         }
       : {
           opacity: 0,
-          y: 20,
+          y: 16,
         },
 
     visible: {
       opacity: 1,
       y: 0,
       transition: {
-        duration: shouldReduceMotion ? 0 : 0.55,
+        duration: shouldReduceMotion ? 0 : 0.5,
         ease: [0.22, 1, 0.36, 1],
       },
     },

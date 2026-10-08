@@ -83,6 +83,11 @@ const serviceFieldSchema = new mongoose.Schema(
       default: false,
     },
 
+    includeValueInPrice: {
+      type: Boolean,
+      default: false,
+    },
+
     options: {
       type: [serviceFieldOptionSchema],
       default: [],
