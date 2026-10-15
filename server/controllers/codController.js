@@ -21,24 +21,31 @@ const generateCodPin = async (req, res) => {
       });
     }
 
-    if (order.paymentMethod !== "cod") {
+    if (!["cod", "cheque"].includes(order.paymentMethod)) {
       return res.status(400).json({
         success: false,
-        message: "This order is not a COD order.",
+        message: "This order does not use PIN verification.",
       });
     }
 
-    if (order.paymentStatus === "collected") {
+    if (
+      order.paymentStatus === "collected" ||
+      (order.paymentMethod === "cheque" && order.paymentStatus === "paid")
+    ) {
       return res.status(400).json({
         success: false,
-        message: "COD payment has already been collected.",
+        message: "Payment has already been completed.",
       });
     }
 
-    if (order.codPinStatus === "active") {
+    if (
+      order.codPinStatus === "active" ||
+      order.codPinStatus === "verified" ||
+      order.codPinStatus === "used"
+    ) {
       return res.status(400).json({
         success: false,
-        message: "A COD PIN is already active for this order.",
+        message: "A PIN has already been generated or verified for this order.",
       });
     }
 
@@ -48,17 +55,17 @@ const generateCodPin = async (req, res) => {
 
     const generatedAt = new Date();
 
-order.codPin = codPin;
-order.codPinStatus = "active";
-order.codPinGeneratedAt = generatedAt;
-order.codPinVerifiedAt = null;
-order.codCollectedAt = null;
+    order.codPin = codPin;
+    order.codPinStatus = "active";
+    order.codPinGeneratedAt = generatedAt;
+    order.codPinVerifiedAt = null;
+    order.codCollectedAt = null;
 
-await order.save();
+    await order.save();
 
     return res.status(200).json({
       success: true,
-      message: "COD PIN generated successfully.",
+      message: `${order.paymentMethod === "cheque" ? "Cheque" : "COD"} PIN generated successfully.`,
       codPin,
       order: {
         id: order._id,
@@ -69,11 +76,11 @@ await order.save();
       },
     });
   } catch (error) {
-    console.error("Generate COD PIN error:", error);
+    console.error("Generate payment PIN error:", error);
 
     return res.status(500).json({
       success: false,
-      message: "Unable to generate COD PIN.",
+      message: "Unable to generate payment PIN.",
     });
   }
 };
@@ -113,18 +120,35 @@ const verifyCodPin = async (req, res) => {
       });
     }
 
-    if (order.paymentMethod !== "cod") {
+    if (!["cod", "cheque"].includes(order.paymentMethod)) {
       return res.status(400).json({
         success: false,
-        message: "This order is not a COD order.",
+        message: "This order does not use PIN verification.",
       });
     }
 
     // Payment has already been completed.
-    if (order.paymentStatus === "collected") {
+    if (
+      order.paymentStatus === "collected" ||
+      (order.paymentMethod === "cheque" && order.paymentStatus === "paid")
+    ) {
       return res.status(400).json({
         success: false,
-        message: "COD payment has already been collected.",
+        message: "Payment has already been completed.",
+      });
+    }
+
+    if (order.codPinStatus === "expired") {
+      return res.status(400).json({
+        success: false,
+        message: "This PIN has expired. Ask an admin to generate a new PIN.",
+      });
+    }
+
+    if (["verified", "used"].includes(order.codPinStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: "This PIN has already been verified.",
       });
     }
 
@@ -132,7 +156,7 @@ const verifyCodPin = async (req, res) => {
     if (order.codPinStatus !== "active") {
       return res.status(400).json({
         success: false,
-        message: "This COD PIN is not active.",
+        message: "This PIN is not active.",
       });
     }
 
@@ -140,28 +164,28 @@ const verifyCodPin = async (req, res) => {
     if (order.codPin !== String(pin)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid COD PIN.",
+        message: "Invalid PIN.",
       });
     }
 
-    /*
-     * PIN verified successfully.
-     *
-     * In the current flow, successful PIN verification
-     * means the COD payment is completed.
-     */
-   const verifiedAt = new Date();
+    const verifiedAt = new Date();
+    const isChequeOrder = order.paymentMethod === "cheque";
 
-order.paymentStatus = "collected";
-order.codPinStatus = "used";
-order.codPinVerifiedAt = verifiedAt;
-order.codCollectedAt = verifiedAt;
+    if (!isChequeOrder) {
+      order.paymentStatus = "collected";
+      order.codCollectedAt = verifiedAt;
+    }
 
-await order.save();
+    order.codPinStatus = isChequeOrder ? "verified" : "used";
+    order.codPinVerifiedAt = verifiedAt;
+
+    await order.save();
 
     return res.status(200).json({
       success: true,
-      message: "COD payment completed successfully.",
+      message: isChequeOrder
+        ? "Cheque PIN verified. Payment status remains unchanged until payment is confirmed."
+        : "COD payment completed successfully.",
       order: {
         id: order._id,
         orderNumber: order.orderNumber,
@@ -173,11 +197,11 @@ await order.save();
       },
     });
   } catch (error) {
-    console.error("Verify COD PIN error:", error);
+    console.error("Verify payment PIN error:", error);
 
     return res.status(500).json({
       success: false,
-      message: "Unable to verify COD PIN.",
+      message: "Unable to verify payment PIN.",
     });
   }
 };

@@ -2,8 +2,11 @@ const Order = require("../models/Order");
 const Service = require("../models/Service");
 const generateOrderNumber = require("../utils/generateOrderNumber");
 const normalizeAdsService = require("../utils/normalizeAdsService");
-
-const ONLINE_GST_RATE = 18;
+const {
+  getGstRate,
+  getPaymentPricingConfig,
+  calculateOrderTotals,
+} = require("../utils/orderPricing");
 
 /* =========================================================
    BASIC HELPERS
@@ -15,6 +18,13 @@ const isEmptyValue = (value) => {
     value === null ||
     (typeof value === "string" && value.trim() === "")
   );
+};
+
+const getPaymentPricing = async (req, res) => {
+  return res.status(200).json({
+    success: true,
+    gstRates: getPaymentPricingConfig(),
+  });
 };
 
 const normalizeString = (value) => {
@@ -1104,15 +1114,20 @@ const getRepeatableItemFields = (
   selectedOptions = [],
 ) => {
   const fields = new Map();
+  const seenLabels = new Set();
 
   for (const field of group.fields || []) {
     if (!field?.name) {
       continue;
     }
 
-    fields.set(
-      String(field.name).trim(),
-      field,
+    const fieldName = String(field.name).trim();
+
+    fields.set(fieldName, field);
+    seenLabels.add(
+      String(field.label || field.name)
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, ""),
     );
   }
 
@@ -1122,10 +1137,17 @@ const getRepeatableItemFields = (
         continue;
       }
 
-      fields.set(
-        String(field.name).trim(),
-        field,
-      );
+      const fieldName = String(field.name).trim();
+      const normalizedLabel = String(field.label || field.name)
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+
+      if (fields.has(fieldName) || seenLabels.has(normalizedLabel)) {
+        continue;
+      }
+
+      fields.set(fieldName, field);
+      seenLabels.add(normalizedLabel);
     }
   }
 
@@ -2201,6 +2223,7 @@ const createOrder = async (
       formData = {},
       additionalRequirements = "",
       paymentMethod,
+      chequeType,
     } = req.body;
 
     if (!paymentMethod) {
@@ -2212,7 +2235,7 @@ const createOrder = async (
     }
 
     if (
-      !["cod", "online"].includes(
+      !["cod", "online", "cheque"].includes(
         paymentMethod,
       )
     ) {
@@ -2220,6 +2243,23 @@ const createOrder = async (
         success: false,
         message:
           "Invalid payment method.",
+      });
+    }
+
+    if (
+      paymentMethod === "cheque" &&
+      !["with_gst", "direct_collection"].includes(chequeType)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Select a valid cheque payment type.",
+      });
+    }
+
+    if (paymentMethod !== "cheque" && chequeType !== undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "Cheque type can only be selected for cheque payments.",
       });
     }
 
@@ -2354,42 +2394,23 @@ const createOrder = async (
     |--------------------------------------------------------------------------
     */
 
-    const subtotal =
-      roundCurrency(
-        items.reduce(
-          (total, item) =>
-            total +
-            Number(item.amount || 0),
-          0,
-        ),
-      );
+    const subtotal = items.reduce(
+      (total, item) => total + Number(item.amount || 0),
+      0,
+    );
 
     /*
     |--------------------------------------------------------------------------
     | GST
     |--------------------------------------------------------------------------
     |
-    | Online payment = 18%
-    | COD = 0%
+    | Online = 18%, cheque rate depends on chequeType,
+    | COD = 0%. Rates are determined by server configuration.
     |--------------------------------------------------------------------------
     */
 
-    const gstRate =
-      paymentMethod === "online"
-        ? ONLINE_GST_RATE
-        : 0;
-
-    const gstAmount =
-      roundCurrency(
-        subtotal *
-          (gstRate / 100),
-      );
-
-    const totalAmount =
-      roundCurrency(
-        subtotal +
-          gstAmount,
-      );
+    const { subtotal: roundedSubtotal, gstRate, gstAmount, amount } =
+      calculateOrderTotals(subtotal, getGstRate(paymentMethod, chequeType));
 
     /*
     |--------------------------------------------------------------------------
@@ -2432,16 +2453,17 @@ const createOrder = async (
           ? additionalRequirements.trim()
           : "",
 
-      subtotal,
+      subtotal: roundedSubtotal,
 
       gstRate,
 
       gstAmount,
 
-      amount:
-        totalAmount,
+      amount,
 
       paymentMethod,
+
+      ...(paymentMethod === "cheque" ? { chequeType } : {}),
 
       paymentStatus:
         "pending",
@@ -3179,7 +3201,7 @@ const getAdminCodOrders =
     try {
       const orders =
         await Order.find({
-          paymentMethod: "cod",
+          paymentMethod: { $in: ["cod", "cheque"] },
         })
           .select("-codPin")
           .populate(
@@ -3221,6 +3243,7 @@ const getAdminCodOrders =
 ========================================================= */
 
 module.exports = {
+  getPaymentPricing,
   createOrder,
   getMyOrders,
   getOrderById,

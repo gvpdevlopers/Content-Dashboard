@@ -140,7 +140,7 @@ const services = [
         "type": "textarea",
         "placeholder": "Provide the content, brand information, products, offers or topics that should be covered.",
         "helpText": "",
-        "required": true,
+        "required": false,
         "options": [],
         "order": 3
       },
@@ -374,9 +374,9 @@ const services = [
     "minQuantity": 1,
     "pricingOptions": [
       {
-        "name": "iPhone",
-        "description": "Professional reel shoot using iPhone with appropriate lighting and production setup.",
-        "price": 5000,
+        "name": "iPhone Shoot with Script, Strategy & High-End Editing",
+        "description": "Professional reel production using an iPhone, with strategic planning, scriptwriting, and high-quality editing.",
+        "price": 6000,
         "unit": "reel",
         "group": "shoot",
         "minQuantity": 1,
@@ -386,9 +386,9 @@ const services = [
         "_id": "6a9c0c15c5c693b1f9ec32ec"
       },
       {
-        "name": "Camera",
-        "description": "Professional reel shoot using a mirrorless camera with professional lighting.",
-        "price": 3000,
+        "name": "Camera Shoot with Script, Strategy & High-End Editing",
+        "description": "PProfessional reel production using a mirrorless camera, with professional lighting, strategic planning, scriptwriting, and high-quality editing.",
+        "price": 9200,
         "unit": "reel",
         "group": "shoot",
         "minQuantity": 2,
@@ -400,7 +400,7 @@ const services = [
       {
         "name": "Drone",
         "description": "Professional drone shoot with an experienced pilot.",
-        "price": 3500,
+        "price": 3800,
         "unit": "shoot",
         "group": "drone",
         "minQuantity": 1,
@@ -443,7 +443,7 @@ const services = [
       {
         "name": "Exclusive",
         "description": "Custom and exclusive host for professionally produced reels.",
-        "price": 4000,
+        "price": 4200,
         "unit": "reel",
         "group": "host",
         "minQuantity": 5,
@@ -476,7 +476,7 @@ const services = [
       {
         "name": "Local",
         "description": "Local host for professionally produced reels.",
-        "price": 2800,
+        "price": 3200,
         "unit": "reel",
         "group": "host",
         "minQuantity": 1,
@@ -522,6 +522,7 @@ const services = [
             "placeholder": "Enter the shoot location",
             "helpText": "",
             "required": true,
+            "includeValueInPrice": false,
             "options": [],
             "order": 1
           },
@@ -748,7 +749,7 @@ const services = [
 
 /*
 |--------------------------------------------------------------------------
-| Seed Services
+| Apply Targeted Service Configuration Updates
 |--------------------------------------------------------------------------
 */
 
@@ -756,29 +757,91 @@ const seedServices = async () => {
   try {
     await connectDB();
 
-    for (const service of services) {
-      await Service.findOneAndUpdate(
-        {
-          slug: service.slug,
-        },
-        service,
-        {
-          upsert: true,
-          new: true,
-          setDefaultsOnInsert: true,
-          runValidators: true,
-        }
+    const gridPostsSeed = services.find(
+      (service) => service.slug === "social-media-grid-posts",
+    );
+    const reelsSeed = services.find(
+      (service) => service.slug === "visual-content-reels",
+    );
+
+    const [gridPosts, reels] = await Promise.all([
+      Service.findOne({ slug: gridPostsSeed.slug }),
+      Service.findOne({ slug: reelsSeed.slug }),
+    ]);
+
+    if (!gridPosts) {
+      throw new Error(
+        "Social Media Grid Posts service was not found.",
       );
     }
 
-    console.log(
-      `${services.length} services seeded successfully.`
+    if (!reels) {
+      throw new Error(
+        "Visual Content - Reels service was not found.",
+      );
+    }
+
+    const brandInformationField = gridPosts.fields.find(
+      (field) => field.name === "brandInformation",
     );
 
+    if (!brandInformationField) {
+      throw new Error(
+        "Brand / Content Information field was not found on Social Media Grid Posts.",
+      );
+    }
+
+    brandInformationField.required = false;
+
+    const existingPricingOptions = [...reels.pricingOptions];
+    const configuredPricingOptions = reelsSeed.pricingOptions.map(
+      (pricingOptionSeed) => {
+        const existingOption = existingPricingOptions.find(
+          (option) =>
+            String(option._id) === String(pricingOptionSeed._id),
+        );
+
+        if (!existingOption) {
+          return pricingOptionSeed;
+        }
+
+        existingOption.name = pricingOptionSeed.name;
+        existingOption.description = pricingOptionSeed.description;
+        existingOption.price = pricingOptionSeed.price;
+        existingOption.unit = pricingOptionSeed.unit;
+        existingOption.group = pricingOptionSeed.group;
+        existingOption.minQuantity = pricingOptionSeed.minQuantity;
+        existingOption.maxQuantity = pricingOptionSeed.maxQuantity;
+        existingOption.isActive = pricingOptionSeed.isActive;
+        existingOption.fields = pricingOptionSeed.fields;
+        existingOption.order = pricingOptionSeed.order;
+
+        return existingOption;
+      },
+    );
+
+    reels.category = reelsSeed.category;
+    reels.description = reelsSeed.description;
+    reels.pricingType = reelsSeed.pricingType;
+    reels.basePrice = reelsSeed.basePrice;
+    reels.unit = reelsSeed.unit;
+    reels.minQuantity = reelsSeed.minQuantity;
+    reels.fields = reelsSeed.fields;
+    reels.pricingOptions = configuredPricingOptions;
+    reels.repeatableGroups = reelsSeed.repeatableGroups;
+    reels.displayOrder = reelsSeed.displayOrder;
+    reels.isActive = reelsSeed.isActive;
+
+    await gridPosts.save();
+    await reels.save();
+
+    console.log(
+      "Grid Posts and Reels configuration updates completed without replacing unrelated service configuration.",
+    );
     process.exit(0);
   } catch (error) {
     console.error(
-      "Service seeding failed:",
+      "Service configuration update failed:",
       error.message
     );
 

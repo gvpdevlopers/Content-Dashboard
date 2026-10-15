@@ -114,6 +114,7 @@ const AdminOrders = () => {
         serviceName.includes(searchValue) ||
         serviceSlug.includes(searchValue) ||
         paymentMethod.includes(searchValue) ||
+        String(order?.chequeType || "").toLowerCase().includes(searchValue) ||
         paymentStatus.includes(searchValue);
 
       const matchesStatus =
@@ -807,10 +808,17 @@ const AdminOrderRow = ({ order, orderPath }) => {
 
       {/* Payment */}
 
-      <PaymentBadge
-        method={order?.paymentMethod}
-        status={order?.paymentStatus}
-      />
+      <div>
+        <PaymentBadge
+          method={order?.paymentMethod}
+          status={order?.paymentStatus}
+        />
+        {order?.paymentMethod === "cheque" && (
+          <p className="mt-1 text-[10px] text-zinc-400">
+            {order.chequeType === "with_gst" ? "With GST" : "Direct Collection"}
+          </p>
+        )}
+      </div>
 
       {/* Status */}
 
@@ -1022,6 +1030,13 @@ const AdminOrderMobileCard = ({ order, orderPath }) => {
                 status={order?.paymentStatus}
               />
             </div>
+            {order?.paymentMethod === "cheque" && (
+              <p className="mt-1 text-[10px] text-zinc-400">
+                {order.chequeType === "with_gst"
+                  ? "With GST"
+                  : "Direct Collection"}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -1157,6 +1172,8 @@ const PaymentBadge = ({ method, status }) => {
       ? "COD"
       : method === "online"
         ? "Online"
+        : method === "cheque"
+          ? "Cheque"
         : method
           ? formatStatus(method)
           : "—";

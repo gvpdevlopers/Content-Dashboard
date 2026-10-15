@@ -6,6 +6,7 @@ import {
   ChevronUp,
   CreditCard,
   Info,
+  Landmark,
   Loader2,
   Minus,
   Plus,
@@ -25,8 +26,6 @@ import { toast } from "sonner";
 | Constants / Helpers
 |--------------------------------------------------------------------------
 */
-
-const ONLINE_GST_RATE = 18;
 
 const formatCurrency = (amount) => {
   return `₹${Number(amount || 0).toLocaleString("en-IN", {
@@ -210,8 +209,14 @@ const isRepeatableOnlyService = (service) => {
   );
 };
 
+const normalizeRepeatableFieldLabel = (field) =>
+  String(field?.label || field?.name || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
 const getActiveFieldsForRepeatableEntry = (service, group, entry) => {
   const fieldMap = new Map();
+  const seenLabels = new Set();
 
   // 1. Common fields defined on the repeatable group
   const groupFields = Array.isArray(group?.fields) ? group.fields : [];
@@ -221,6 +226,7 @@ const getActiveFieldsForRepeatableEntry = (service, group, entry) => {
 
     if (fieldName) {
       fieldMap.set(fieldName, field);
+      seenLabels.add(normalizeRepeatableFieldLabel(field));
     }
   }
 
@@ -248,10 +254,18 @@ const getActiveFieldsForRepeatableEntry = (service, group, entry) => {
 
         for (const field of optionFields) {
           const fieldName = String(field?.name || "").trim();
+          const normalizedLabel = normalizeRepeatableFieldLabel(field);
 
-          if (fieldName) {
-            fieldMap.set(fieldName, field);
+          if (
+            !fieldName ||
+            fieldMap.has(fieldName) ||
+            seenLabels.has(normalizedLabel)
+          ) {
+            continue;
           }
+
+          fieldMap.set(fieldName, field);
+          seenLabels.add(normalizedLabel);
         }
       }
     }
@@ -1091,8 +1105,9 @@ const PaymentOption = ({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-pressed={selected}
       className={`
-        group relative flex w-full items-start gap-3.5 rounded-2xl border p-4
+        group relative flex min-h-[142px] w-full flex-col items-start gap-3 rounded-2xl border p-4
         text-left transition-all duration-300 sm:p-5
         ${
           selected
@@ -1112,12 +1127,12 @@ const PaymentOption = ({
           }
         `}
       >
-        <Icon size={18} />
+        <Icon size={18} strokeWidth={1.8} />
       </div>
 
-      <div className="min-w-0 flex-1 pr-6">
+      <div className="min-w-0 w-full flex-1">
         <p
-          className={`text-sm font-medium ${
+          className={`pr-6 text-sm font-semibold tracking-[-0.01em] ${
             selected ? "text-white" : "text-zinc-900"
           }`}
         >
@@ -1125,7 +1140,7 @@ const PaymentOption = ({
         </p>
 
         <p
-          className={`mt-1 text-xs leading-5 ${
+          className={`mt-1.5 max-w-[28ch] text-xs leading-[1.45] ${
             selected ? "text-white/50" : "text-zinc-500"
           }`}
         >
@@ -1135,12 +1150,93 @@ const PaymentOption = ({
 
       {selected && (
         <div className="absolute right-4 top-4 flex h-5 w-5 items-center justify-center rounded-full bg-white text-zinc-900">
-          <Check size={12} />
+          <Check size={12} strokeWidth={2.5} />
         </div>
       )}
     </button>
   );
 };
+
+const PaymentMethodChip = ({ selected, onClick, icon: Icon, label, disabled }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    aria-pressed={selected}
+    className={`flex min-w-0 items-center justify-center gap-1.5 rounded-xl border px-2 py-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+      selected
+        ? "border-white bg-white text-zinc-950"
+        : "border-white/10 bg-white/[0.04] text-white/65 hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+    }`}
+  >
+    <Icon size={14} className="shrink-0" aria-hidden="true" />
+    <span className="truncate">{label}</span>
+  </button>
+);
+
+const ChequeOption = ({
+  selected,
+  onClick,
+  title,
+  description,
+  compact = false,
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-pressed={selected}
+    className={`${compact ? "rounded-xl p-2.5" : "rounded-2xl p-4"} border text-left transition-colors ${
+      selected
+        ? compact
+          ? "border-white bg-white/10"
+          : "border-zinc-900 bg-zinc-50 ring-1 ring-zinc-900"
+        : compact
+          ? "border-white/10 bg-white/[0.03] hover:border-white/20"
+          : "border-zinc-200 bg-white hover:border-zinc-400"
+    }`}
+  >
+    <span className="flex items-start gap-3">
+      <span
+        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+          selected
+            ? compact
+              ? "border-white"
+              : "border-zinc-900"
+            : compact
+              ? "border-white/30"
+              : "border-zinc-300"
+        }`}
+        aria-hidden="true"
+      >
+        {selected && (
+          <span
+            className={`h-2 w-2 rounded-full ${
+              compact ? "bg-white" : "bg-zinc-900"
+            }`}
+          />
+        )}
+      </span>
+      <span className="min-w-0">
+        <span
+          className={`block text-xs font-semibold leading-4 ${
+            compact ? "text-white" : "text-zinc-900"
+          }`}
+        >
+          {title}
+        </span>
+        {description && (
+          <span
+            className={`mt-1 block text-[11px] leading-4 ${
+              compact ? "text-white/50" : "text-zinc-500"
+            }`}
+          >
+            {description}
+          </span>
+        )}
+      </span>
+    </span>
+  </button>
+);
 
 /*
 |--------------------------------------------------------------------------
@@ -1508,6 +1604,10 @@ const NewOrder = () => {
   const [activeServiceIndex, setActiveServiceIndex] = useState(0);
 
   const [paymentMethod, setPaymentMethod] = useState("cod");
+  const [chequeType, setChequeType] = useState("");
+  const [paymentPricing, setPaymentPricing] = useState(null);
+  const [paymentPricingLoading, setPaymentPricingLoading] = useState(true);
+  const [paymentPricingError, setPaymentPricingError] = useState("");
 
   const [additionalRequirements, setAdditionalRequirements] = useState("");
 
@@ -1560,6 +1660,49 @@ const NewOrder = () => {
     };
 
     loadServices();
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadPaymentPricing = async () => {
+      try {
+        const response = await orderService.getPaymentPricing();
+        const rates = response?.gstRates;
+
+        if (
+          !rates ||
+          !["cod", "online", "chequeWithGst", "chequeDirectCollection"].every(
+            (key) => Number.isFinite(rates[key]) && rates[key] >= 0,
+          )
+        ) {
+          throw new Error("Payment tax configuration is unavailable.");
+        }
+
+        if (mounted) {
+          setPaymentPricing(rates);
+          setPaymentPricingError("");
+        }
+      } catch (loadError) {
+        console.error("Failed to load payment pricing:", loadError);
+        if (mounted) {
+          setPaymentPricingError(
+            loadError.response?.data?.message ||
+              loadError.message ||
+              "Unable to load payment tax information.",
+          );
+        }
+      } finally {
+        if (mounted) {
+          setPaymentPricingLoading(false);
+        }
+      }
+    };
+
+    loadPaymentPricing();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   /*
@@ -2196,15 +2339,46 @@ const NewOrder = () => {
     [orderItems],
   );
 
-  const gstAmount = useMemo(() => {
-    if (paymentMethod !== "online") {
-      return 0;
+  const gstRate = useMemo(() => {
+    if (paymentMethod === "cod") {
+      return paymentPricing?.cod ?? 0;
     }
 
-    return Number(((subtotal * ONLINE_GST_RATE) / 100).toFixed(2));
-  }, [paymentMethod, subtotal]);
+    if (!paymentPricing) {
+      return null;
+    }
 
-  const estimatedTotal = subtotal + gstAmount;
+    if (paymentMethod === "online") {
+      return paymentPricing.online;
+    }
+
+    if (paymentMethod === "cheque") {
+      return chequeType === "with_gst"
+        ? paymentPricing.chequeWithGst
+        : chequeType === "direct_collection"
+          ? paymentPricing.chequeDirectCollection
+          : null;
+    }
+
+    return null;
+  }, [paymentPricing, paymentMethod, chequeType]);
+
+  const gstAmount = useMemo(
+    () =>
+      gstRate === null
+        ? 0
+        : Number(((subtotal * gstRate) / 100).toFixed(2)),
+    [gstRate, subtotal],
+  );
+
+  const estimatedTotal = gstRate === null ? null : subtotal + gstAmount;
+
+  const selectPaymentMethod = (method) => {
+    setPaymentMethod(method);
+    if (method !== "cheque") {
+      setChequeType("");
+    }
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -2786,8 +2960,20 @@ const NewOrder = () => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-
     setError("");
+
+    if (paymentMethod === "cheque" && !chequeType) {
+      setError("Choose a cheque payment type before placing your order.");
+      return;
+    }
+
+    if (paymentMethod !== "cod" && !paymentPricing) {
+      setError(
+        paymentPricingError ||
+          "Payment tax information is still loading. Please try again.",
+      );
+      return;
+    }
 
     if (!orderItems.length) {
       setError("Please select at least one service.");
@@ -2850,6 +3036,7 @@ const NewOrder = () => {
         services: servicesPayload,
         additionalRequirements: additionalRequirements.trim(),
         paymentMethod,
+        ...(paymentMethod === "cheque" ? { chequeType } : {}),
       });
 
       const createdOrder = orderResponse?.order;
@@ -3077,7 +3264,7 @@ const NewOrder = () => {
   return (
     <div className="mx-auto w-full max-w-[1180px] px-2 py-6 sm:px-5 sm:py-10">
       <form onSubmit={handleSubmit}>
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           {/* ================================================================
               LEFT COLUMN
           ================================================================= */}
@@ -3955,10 +4142,10 @@ const NewOrder = () => {
                     Choose how you'd like to complete the payment.
                   </p>
 
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
                     <PaymentOption
                       selected={paymentMethod === "cod"}
-                      onClick={() => setPaymentMethod("cod")}
+                      onClick={() => selectPaymentMethod("cod")}
                       icon={Banknote}
                       title="Cash on Delivery"
                       description="Pay after your order is processed."
@@ -3966,21 +4153,50 @@ const NewOrder = () => {
 
                     <PaymentOption
                       selected={paymentMethod === "online"}
-                      onClick={() => setPaymentMethod("online")}
+                      onClick={() => selectPaymentMethod("online")}
                       icon={CreditCard}
-                      title="Online Payment"
+                      title="Pay Online"
                       description={
                         hasCustomUnpricedService
                           ? "Available when the order has a payable amount."
-                          : `Secure Razorpay payment · ${ONLINE_GST_RATE}% GST`
+                          : `Secure Razorpay payment · ${paymentPricing?.online ?? "Loading"}% GST`
                       }
                       disabled={hasCustomUnpricedService && subtotal <= 0}
                     />
+
+                    <PaymentOption
+                      selected={paymentMethod === "cheque"}
+                      onClick={() => selectPaymentMethod("cheque")}
+                      icon={Landmark}
+                      title="Cheque"
+                      description="Choose how the cheque will be collected."
+                    />
                   </div>
 
-                  {error && (
+                  {paymentMethod === "cheque" && (
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <ChequeOption
+                        selected={chequeType === "with_gst"}
+                        onClick={() => setChequeType("with_gst")}
+                        title="Cheque — With GST"
+                        description={`Bank-deposited cheque with ${paymentPricing?.chequeWithGst ?? "Loading"}% GST.`}
+                      />
+                      <ChequeOption
+                        selected={chequeType === "direct_collection"}
+                        onClick={() => setChequeType("direct_collection")}
+                        title="Cheque — Direct Collection"
+                        description="Cheque collected directly. Applicable GST is shown in the order total."
+                      />
+                    </div>
+                  )}
+
+                  {(error ||
+                    (paymentMethod !== "cod" && paymentPricingError)) && (
                     <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-                      <p className="text-xs leading-5 text-red-700">{error}</p>
+                      <p className="text-xs leading-5 text-red-700">
+                        {error ||
+                          (paymentMethod !== "cod" && paymentPricingError)}
+                      </p>
                     </div>
                   )}
 
@@ -3988,6 +4204,8 @@ const NewOrder = () => {
                     type="submit"
                     disabled={
                       submitting ||
+                      (paymentMethod !== "cod" &&
+                        (paymentPricingLoading || !paymentPricing)) ||
                       Boolean(loadingServiceId) ||
                       !orderItems.length ||
                       (paymentMethod === "online" && estimatedTotal <= 0)
@@ -4015,7 +4233,8 @@ const NewOrder = () => {
                     )}
                   </button>
 
-                  {paymentMethod === "online" && (
+                  {(paymentMethod === "online" ||
+                    (paymentMethod === "cheque" && chequeType)) && (
                     <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-zinc-100 bg-zinc-50 px-4 py-3.5">
                       <Info
                         size={15}
@@ -4023,9 +4242,11 @@ const NewOrder = () => {
                       />
 
                       <p className="text-xs leading-5 text-zinc-500">
-                        Online payments include {ONLINE_GST_RATE}% GST on the
-                        order subtotal. Cash on Delivery currently uses 0% GST
-                        in the order calculation.
+                        {paymentMethod === "online"
+                          ? `Online payments include ${gstRate}% GST on the order subtotal.`
+                          : chequeType === "with_gst"
+                            ? `This cheque option includes ${gstRate}% GST on the order subtotal.`
+                            : `Direct Collection currently uses ${gstRate}% GST. Confirm this treatment with your accountant.`}
                       </p>
                     </div>
                   )}
@@ -4038,8 +4259,8 @@ const NewOrder = () => {
               RIGHT SUMMARY
           ================================================================= */}
 
-          <aside className="min-w-0">
-            <div className="sticky top-6">
+          <aside className="min-w-0 self-start">
+            <div className="lg:sticky lg:top-24">
               {orderItems.length === 0 ? (
                 <section className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-6 sm:p-7">
                   <div className="flex min-h-[280px] flex-col items-center justify-center text-center">
@@ -4210,14 +4431,23 @@ const NewOrder = () => {
                           <p className="text-xs text-white/40">GST</p>
 
                           <p className="mt-0.5 text-[10px] text-white/25">
-                            {paymentMethod === "online"
-                              ? `${ONLINE_GST_RATE}% on subtotal`
-                              : "0% for COD"}
+                            {gstRate === null
+                              ? paymentMethod === "cheque" && chequeType
+                                ? "Loading tax rate"
+                                : paymentMethod === "cheque"
+                                  ? "Choose a cheque type"
+                                  : "Loading tax rate"
+                              : paymentMethod === "cod"
+                                ? `${gstRate}% for COD`
+                                : paymentMethod === "cheque" &&
+                                    chequeType === "direct_collection"
+                                  ? `${gstRate}% for Direct Collection`
+                                  : `${gstRate}% on subtotal`}
                           </p>
                         </div>
 
                         <p className="text-sm font-medium text-white">
-                          {formatCurrency(gstAmount)}
+                          {gstRate === null ? "—" : formatCurrency(gstAmount)}
                         </p>
                       </div>
 
@@ -4237,9 +4467,87 @@ const NewOrder = () => {
                         <p className="shrink-0 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
                           {hasCustomUnpricedService
                             ? "Custom"
-                            : formatCurrency(estimatedTotal)}
+                            : estimatedTotal === null
+                              ? "Loading"
+                              : formatCurrency(estimatedTotal)}
                         </p>
                       </div>
+                    </div>
+
+                    <div className="mt-5 border-t border-white/10 pt-4">
+                      <p className="mb-2.5 text-[10px] font-medium uppercase tracking-[0.14em] text-white/35">
+                        Payment method
+                      </p>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <PaymentMethodChip
+                          selected={paymentMethod === "cod"}
+                          onClick={() => selectPaymentMethod("cod")}
+                          icon={Banknote}
+                          label="COD"
+                        />
+                        <PaymentMethodChip
+                          selected={paymentMethod === "online"}
+                          onClick={() => selectPaymentMethod("online")}
+                          icon={CreditCard}
+                          label="Pay Online"
+                          disabled={
+                            hasCustomUnpricedService && subtotal <= 0
+                          }
+                        />
+                        <PaymentMethodChip
+                          selected={paymentMethod === "cheque"}
+                          onClick={() => selectPaymentMethod("cheque")}
+                          icon={Landmark}
+                          label="Cheque"
+                        />
+                      </div>
+
+                      {paymentMethod === "cheque" && (
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <ChequeOption
+                            compact
+                            selected={chequeType === "with_gst"}
+                            onClick={() => setChequeType("with_gst")}
+                            title="With GST"
+                          />
+                          <ChequeOption
+                            compact
+                            selected={chequeType === "direct_collection"}
+                            onClick={() => setChequeType("direct_collection")}
+                            title="Direct collection"
+                          />
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={
+                          submitting ||
+                          (paymentMethod !== "cod" &&
+                            (paymentPricingLoading || !paymentPricing)) ||
+                          Boolean(loadingServiceId) ||
+                          !orderItems.length ||
+                          (paymentMethod === "online" &&
+                            estimatedTotal !== null &&
+                            estimatedTotal <= 0)
+                        }
+                        className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-zinc-950 transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {submitting ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            {paymentMethod === "online"
+                              ? "Continue to payment"
+                              : "Place Order"}
+                            <ArrowRight size={14} aria-hidden="true" />
+                          </>
+                        )}
+                      </button>
                     </div>
 
                   </div>

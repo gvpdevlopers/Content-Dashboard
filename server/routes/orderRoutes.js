@@ -1,6 +1,7 @@
 const express = require("express");
 
 const {
+  getPaymentPricing,
   createOrder,
   getMyOrders,
   getOrderById,
@@ -21,6 +22,12 @@ const adminOnly = require("../middleware/admin");
 const orderStaff = require("../middleware/orderStaff");
 
 const router = express.Router();
+
+router.get(
+  "/payment-pricing",
+  protect,
+  getPaymentPricing
+);
 
 /*
 |--------------------------------------------------------------------------

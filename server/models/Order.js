@@ -703,8 +703,8 @@ const orderSchema = new mongoose.Schema(
     |
     | subtotal = sum of all selected service item amounts
     |
-    | gstRate = 18 for online orders
-    | gstRate = 0 for COD
+    | gstRate = 18 for online and cheque-with-GST orders
+    | other rates come from server payment pricing configuration
     |
     | gstAmount = calculated GST
     |
@@ -757,8 +757,17 @@ const orderSchema = new mongoose.Schema(
 
     paymentMethod: {
       type: String,
-      enum: ["cod", "online"],
+      enum: ["cod", "online", "cheque"],
       required: true,
+    },
+
+    chequeType: {
+      type: String,
+      enum: ["with_gst", "direct_collection"],
+      required: function () {
+        return this.paymentMethod === "cheque";
+      },
+      default: undefined,
     },
 
     paymentStatus: {

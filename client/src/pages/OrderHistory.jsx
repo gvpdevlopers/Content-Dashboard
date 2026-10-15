@@ -377,8 +377,23 @@ const OrderTableRow = ({ order }) => {
         )}
 
         <p className="mt-1 text-[11px] text-zinc-400">
-          {formatStatus(order.paymentMethod)}
+          {order.paymentMethod === "online"
+            ? "Pay Online"
+            : order.paymentMethod === "cheque"
+              ? "Cheque"
+              : "Cash on Delivery"}
         </p>
+        {order.paymentMethod === "cheque" && (
+          <p className="mt-1 text-[11px] text-zinc-500">
+            {order.chequeType === "with_gst" ? "With GST" : "Direct Collection"}
+          </p>
+        )}
+        {order.paymentMethod === "cheque" && (
+          <p className="mt-1 text-[10px] leading-4 text-zinc-400">
+            Subtotal {formatCurrency(order.subtotal)} · GST{" "}
+            {formatCurrency(order.gstAmount)}
+          </p>
+        )}
       </div>
 
       {/* Order Status */}
@@ -541,10 +556,28 @@ const OrderMobileCard = ({ order }) => {
           />
 
           <MobileDetail label="Amount" value={formatCurrency(order.amount)} />
+          {order.paymentMethod === "cheque" && (
+            <>
+              <MobileDetail
+                label="Subtotal"
+                value={formatCurrency(order.subtotal)}
+              />
+              <MobileDetail
+                label={`GST (${Number(order.gstRate || 0)}%)`}
+                value={formatCurrency(order.gstAmount)}
+              />
+            </>
+          )}
 
           <MobileDetail
             label="Payment"
-            value={formatStatus(order.paymentMethod)}
+            value={
+              order.paymentMethod === "online"
+                ? "Pay Online"
+                : order.paymentMethod === "cheque"
+                  ? `Cheque — ${order.chequeType === "with_gst" ? "With GST" : "Direct Collection"}`
+                  : "Cash on Delivery"
+            }
           />
 
           <MobileDetail
@@ -894,8 +927,8 @@ const isPaymentCompleted = (order) => {
   return (
     order?.paymentStatus === "paid" ||
     order?.paymentStatus === "collected" ||
-    order?.codPinStatus === "verified" ||
-    order?.codPinStatus === "used"
+    (order?.paymentMethod === "cod" &&
+      (order?.codPinStatus === "verified" || order?.codPinStatus === "used"))
   );
 };
 

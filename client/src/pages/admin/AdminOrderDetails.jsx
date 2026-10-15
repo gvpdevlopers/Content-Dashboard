@@ -297,12 +297,17 @@ const AdminOrderDetails = () => {
         codPinStatus: data.order?.codPinStatus || "active",
       }));
 
-      toast.success("COD PIN generated successfully.");
+      toast.success(
+        order.paymentMethod === "cheque"
+          ? "Cheque PIN generated successfully."
+          : "COD PIN generated successfully.",
+      );
     } catch (error) {
       console.error("Generate COD PIN error:", error);
 
       toast.error(
-        error.response?.data?.message || "Unable to generate COD PIN.",
+        error.response?.data?.message ||
+          `Unable to generate ${order.paymentMethod === "cheque" ? "cheque" : "COD"} PIN.`,
       );
     } finally {
       setCodLoading(false);
@@ -847,9 +852,30 @@ const AdminOrderDetails = () => {
                 />
               </div>
 
+              {order?.paymentMethod === "cheque" && (
+                <DetailItem
+                  label="Cheque Type"
+                  value={
+                    order?.chequeType === "with_gst"
+                      ? "With GST"
+                      : "Direct Collection"
+                  }
+                />
+              )}
+              <DetailItem label="Subtotal" value={formatCurrency(order?.subtotal)} />
+              <DetailItem
+                label={`GST (${Number(order?.gstRate || 0)}%)`}
+                value={formatCurrency(order?.gstAmount)}
+              />
+              <DetailItem
+                label="Final Total"
+                value={formatCurrency(order?.amount)}
+              />
+
               <p className="mb-4 text-xs leading-5 text-zinc-400">
-                Online payment statuses can be updated here. COD collection is
-                completed through PIN verification.
+                Payment status can be confirmed here. COD PIN verification
+                completes collection; cheque PIN verification does not mark
+                payment as paid.
               </p>
 
               <div className="min-w-0">
@@ -1153,7 +1179,8 @@ const AdminOrderDetails = () => {
             min-w-0
             gap-6
             ${
-              !staffMode && order?.paymentMethod === "cod"
+              !staffMode &&
+              ["cod", "cheque"].includes(order?.paymentMethod)
                 ? "xl:grid-cols-2"
                 : "xl:grid-cols-1"
             }
@@ -1390,11 +1417,20 @@ const AdminOrderDetails = () => {
               COD PAYMENT
           ================================================== */}
 
-          {!staffMode && order?.paymentMethod === "cod" && (
+          {!staffMode &&
+            ["cod", "cheque"].includes(order?.paymentMethod) && (
             <InfoCard
               icon={KeyRound}
-              eyebrow="Cash on Delivery"
-              title="COD Payment"
+              eyebrow={
+                order?.paymentMethod === "cheque"
+                  ? "Cheque"
+                  : "Cash on Delivery"
+              }
+              title={
+                order?.paymentMethod === "cheque"
+                  ? "Cheque PIN"
+                  : "COD Payment"
+              }
             >
               <div
                 className="
@@ -1449,7 +1485,7 @@ const AdminOrderDetails = () => {
                       text-zinc-400
                     "
                   >
-                    COD PIN
+                    {order?.paymentMethod === "cheque" ? "Cheque PIN" : "COD PIN"}
                   </p>
 
                   <div className="flex min-w-0 gap-2">
@@ -1521,7 +1557,10 @@ const AdminOrderDetails = () => {
                     "
                   >
                     Share this PIN with the payment collector. The client uses
-                    the PIN to complete COD verification.
+                    the PIN to verify{" "}
+                    {order?.paymentMethod === "cheque"
+                      ? "the cheque collection."
+                      : "the COD payment."}
                   </p>
                 </div>
               ) : (
@@ -1530,7 +1569,10 @@ const AdminOrderDetails = () => {
                     type="button"
                     onClick={handleGenerateCodPin}
                     disabled={
-                      codLoading || order?.paymentStatus === "collected"
+                      codLoading ||
+                      order?.paymentStatus === "collected" ||
+                      order?.paymentStatus === "paid" ||
+                      ["verified", "used"].includes(order?.codPinStatus)
                     }
                     className="
                       group
@@ -1563,7 +1605,9 @@ const AdminOrderDetails = () => {
                     ) : (
                       <>
                         <KeyRound size={16} />
-                        Generate COD PIN
+                        {order?.paymentMethod === "cheque"
+                          ? "Generate Cheque PIN"
+                          : "Generate COD PIN"}
                       </>
                     )}
                   </button>
@@ -1577,7 +1621,11 @@ const AdminOrderDetails = () => {
                       text-zinc-400
                     "
                   >
-                    Generate a PIN when the COD payment needs to be verified.
+                    Generate a PIN when the{" "}
+                    {order?.paymentMethod === "cheque"
+                      ? "cheque collection"
+                      : "COD payment"}{" "}
+                    needs to be verified.
                   </p>
                 </div>
               )}
@@ -1603,7 +1651,9 @@ const AdminOrderDetails = () => {
                   <Check size={16} className="shrink-0" />
 
                   <span className="break-words">
-                    COD payment has been collected.
+                    {order?.paymentMethod === "cheque"
+                      ? "Cheque payment has been confirmed."
+                      : "COD payment has been collected."}
                   </span>
                 </div>
               )}

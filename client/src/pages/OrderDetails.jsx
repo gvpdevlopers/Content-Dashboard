@@ -62,7 +62,7 @@ const OrderDetails = () => {
 
   const handleCodVerification = async () => {
     if (codPin.length !== 6) {
-      setCodError("Please enter the 6-digit COD PIN.");
+      setCodError(`Please enter the 6-digit ${order.paymentMethod === "cheque" ? "cheque" : "COD"} PIN.`);
       return;
     }
 
@@ -78,9 +78,8 @@ const OrderDetails = () => {
         setOrder((currentOrder) => ({
           ...currentOrder,
 
-          paymentStatus: response.order.paymentStatus || "collected",
-
-          codPinStatus: response.order.codPinStatus || "used",
+          paymentStatus: response.order.paymentStatus || currentOrder.paymentStatus,
+          codPinStatus: response.order.codPinStatus || currentOrder.codPinStatus,
 
           codCollectedAt: response.order.codCollectedAt || null,
 
@@ -90,13 +89,24 @@ const OrderDetails = () => {
       } else {
         setOrder((currentOrder) => ({
           ...currentOrder,
-          paymentStatus: "collected",
-          codPinStatus: "used",
-          codCollectedAt: new Date().toISOString(),
+          paymentStatus:
+            currentOrder.paymentMethod === "cod"
+              ? "collected"
+              : currentOrder.paymentStatus,
+          codPinStatus:
+            currentOrder.paymentMethod === "cheque" ? "verified" : "used",
+          codCollectedAt:
+            currentOrder.paymentMethod === "cod"
+              ? new Date().toISOString()
+              : currentOrder.codCollectedAt,
         }));
       }
 
-      toast.success("COD payment verified.");
+      toast.success(
+        order.paymentMethod === "cheque"
+          ? "Cheque PIN verified. Payment remains pending until confirmed."
+          : "COD payment verified.",
+      );
     } catch (error) {
       console.error("COD verification error:", error);
 
@@ -269,18 +279,23 @@ const OrderDetails = () => {
   // ---------------------------------------------------------
 
   const isCodOrder = order.paymentMethod === "cod";
+  const isChequeOrder = order.paymentMethod === "cheque";
+  const hasPinVerification = isCodOrder || isChequeOrder;
 
-  const isCodPaymentDone =
-    order.paymentStatus === "collected" ||
+  const isPinVerificationComplete =
     order.codPinStatus === "used" ||
-    order.codPinStatus === "verified";
+    order.codPinStatus === "verified" ||
+    (isCodOrder && order.paymentStatus === "collected") ||
+    (isChequeOrder &&
+      ["paid", "collected"].includes(order.paymentStatus));
 
   const isCodPinActive = order.codPinStatus === "active";
 
   const isCodPinPending =
     order.codPinStatus === "not_generated" || !order.codPinStatus;
 
-  const showCodVerification = isCodOrder && !isCodPaymentDone;
+  const showCodVerification =
+    hasPinVerification && !isPinVerificationComplete;
 
   return (
     <div className="mx-auto max-w-[1100px] animate-fade-up">
@@ -640,16 +655,16 @@ const OrderDetails = () => {
                     text-amber-600/70
                   "
                 >
-                  Cash on Delivery
+                  {isChequeOrder ? "Cheque" : "Cash on Delivery"}
                 </p>
 
                 <h2 className="mt-1 text-lg font-medium text-zinc-900">
-                  Verify COD Payment
+                  {isChequeOrder ? "Verify Cheque PIN" : "Verify COD Payment"}
                 </h2>
 
                 <p className="mt-1 max-w-xl text-xs leading-5 text-zinc-500">
                   Enter the 6-digit PIN provided by the payment collector to
-                  complete your payment.
+                  verify {isChequeOrder ? "cheque collection" : "your COD payment"}.
                 </p>
               </div>
             </div>
@@ -730,7 +745,7 @@ const OrderDetails = () => {
                           text-zinc-400
                         "
                       >
-                        COD PIN
+                        {isChequeOrder ? "Cheque PIN" : "COD PIN"}
                       </label>
 
                       <div className="relative">
@@ -897,7 +912,34 @@ const OrderDetails = () => {
           title="Payment Information"
           description="Payment details for this order."
         >
-          <InfoRow label="Method" value={formatStatus(order.paymentMethod)} />
+          <InfoRow
+            label="Method"
+            value={
+              order.paymentMethod === "online"
+                ? "Pay Online"
+                : order.paymentMethod === "cheque"
+                  ? "Cheque"
+                  : "Cash on Delivery"
+            }
+          />
+
+          {isChequeOrder && (
+            <InfoRow
+              label="Cheque Type"
+              value={
+                order.chequeType === "with_gst"
+                  ? "With GST"
+                  : "Direct Collection"
+              }
+            />
+          )}
+
+          <InfoRow label="Subtotal" value={formatCurrency(order.subtotal)} />
+
+          <InfoRow
+            label={`GST (${Number(order.gstRate || 0)}%)`}
+            value={formatCurrency(order.gstAmount)}
+          />
 
           <InfoRow
             label="Payment Status"
@@ -905,18 +947,26 @@ const OrderDetails = () => {
               <PaymentStatus
                 status={order.paymentStatus}
                 codPinStatus={order.codPinStatus}
+                paymentMethod={order.paymentMethod}
               />
             }
           />
 
           <InfoRow
-            label="Amount"
+            label="Final Total"
             value={
               <span className="font-medium text-zinc-900">
                 ₹{Number(order.amount || 0).toLocaleString("en-IN")}
               </span>
             }
           />
+
+          {hasPinVerification && (
+            <InfoRow
+              label="PIN Verification"
+              value={formatStatus(order.codPinStatus || "not_generated")}
+            />
+          )}
 
           {isCodOrder && order.codCollectedAt && (
             <InfoRow
@@ -1548,15 +1598,15 @@ const StatusBadge = ({ status }) => {
    PAYMENT STATUS
 ========================================================= */
 
-const PaymentStatus = ({ status, codPinStatus }) => {
+const PaymentStatus = ({ status, codPinStatus, paymentMethod }) => {
   const normalizedStatus = status || "unknown";
 
   const successful =
     ["paid", "collected", "completed", "success", "successful"].includes(
       normalizedStatus,
     ) ||
-    codPinStatus === "verified" ||
-    codPinStatus === "used";
+    (paymentMethod === "cod" &&
+      (codPinStatus === "verified" || codPinStatus === "used"));
 
   return (
     <span
@@ -1693,6 +1743,12 @@ const formatDateTime = (date) => {
     hour: "2-digit",
     minute: "2-digit",
   });
+};
+
+const formatCurrency = (amount) => {
+  return `₹${Number(amount || 0).toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+  })}`;
 };
 
 export default OrderDetails;

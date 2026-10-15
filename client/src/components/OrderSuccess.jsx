@@ -115,22 +115,15 @@ const OrderSuccess = ({ order }) => {
             </span>
           </div>
 
-          <div
-            className="
-              flex
-              items-center
-              justify-between
-              gap-4
-              border-b border-zinc-200
-              py-4
-            "
-          >
-            <span className="text-sm text-zinc-500">
-              Amount
-            </span>
+          <div className="space-y-3 border-b border-zinc-200 py-4">
+            <PriceRow label="Subtotal" value={order.subtotal ?? order.amount} />
+            <PriceRow label={`GST (${order.gstRate ?? 0}%)`} value={order.gstAmount ?? 0} />
+          </div>
 
-            <span className="text-sm font-medium text-zinc-900">
-              ₹{Number(order.amount).toLocaleString("en-IN")}
+          <div className="flex items-center justify-between gap-4 border-b border-zinc-200 py-4">
+            <span className="text-sm font-medium text-zinc-700">Final total</span>
+            <span className="text-sm font-semibold text-zinc-900">
+              ₹{Number(order.amount || 0).toLocaleString("en-IN")}
             </span>
           </div>
 
@@ -148,9 +141,23 @@ const OrderSuccess = ({ order }) => {
             </span>
 
             <span className="text-sm font-medium uppercase text-zinc-900">
-              {order.paymentMethod}
+              {order.paymentMethod === "online"
+                ? "Pay Online"
+                : order.paymentMethod === "cheque"
+                  ? "Cheque"
+                  : "COD"}
             </span>
           </div>
+          {order.paymentMethod === "cheque" && (
+            <div className="flex items-center justify-between gap-4 pt-4">
+              <span className="text-sm text-zinc-500">Cheque type</span>
+              <span className="text-sm font-medium text-zinc-900">
+                {order.chequeType === "with_gst"
+                  ? "With GST"
+                  : "Direct Collection"}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* ACTIONS */}
@@ -239,5 +246,14 @@ const OrderSuccess = ({ order }) => {
     </div>
   );
 };
+
+const PriceRow = ({ label, value }) => (
+  <div className="flex items-center justify-between gap-4">
+    <span className="text-sm text-zinc-500">{label}</span>
+    <span className="text-sm font-medium text-zinc-900">
+      ₹{Number(value || 0).toLocaleString("en-IN")}
+    </span>
+  </div>
+);
 
 export default OrderSuccess;

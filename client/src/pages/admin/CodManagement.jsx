@@ -40,9 +40,11 @@ const CodManagement = () => {
 
       setOrders(response.orders || []);
     } catch (error) {
-      console.error("Load COD orders error:", error);
+      console.error("Load COD and cheque orders error:", error);
 
-      setError(error.response?.data?.message || "Unable to load COD orders.");
+      setError(
+        error.response?.data?.message || "Unable to load COD and cheque orders.",
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -72,24 +74,12 @@ const CodManagement = () => {
         clientEmail.includes(query) ||
         username.includes(query);
 
-      let matchesFilter = true;
-
-      switch (filter) {
-        case "pending":
-          matchesFilter = order.paymentStatus !== "collected";
-          break;
-
-        case "active":
-          matchesFilter = order.codPinStatus === "active";
-          break;
-
-        case "collected":
-          matchesFilter = order.paymentStatus === "collected";
-          break;
-
-        default:
-          matchesFilter = true;
-      }
+      const paymentDone = ["paid", "collected"].includes(order.paymentStatus);
+      const matchesFilter =
+        filter === "all" ||
+        (filter === "pending" && !paymentDone) ||
+        (filter === "active" && order.codPinStatus === "active") ||
+        (filter === "collected" && paymentDone);
 
       return matchesSearch && matchesFilter;
     });
@@ -99,12 +89,16 @@ const CodManagement = () => {
     return {
       total: orders.length,
 
-      pending: orders.filter((order) => order.paymentStatus !== "collected")
+      pending: orders.filter(
+        (order) => !["paid", "collected"].includes(order.paymentStatus),
+      )
         .length,
 
       active: orders.filter((order) => order.codPinStatus === "active").length,
 
-      collected: orders.filter((order) => order.paymentStatus === "collected")
+      collected: orders.filter((order) =>
+        ["paid", "collected"].includes(order.paymentStatus),
+      )
         .length,
     };
   }, [orders]);
@@ -143,7 +137,7 @@ const CodManagement = () => {
 
           <div>
             <p className="text-sm font-medium text-zinc-700">
-              Loading COD orders
+              Loading COD and cheque orders
             </p>
 
             <p className="mt-1 text-xs text-zinc-400">
@@ -285,7 +279,7 @@ const CodManagement = () => {
                 sm:text-4xl
               "
             >
-              COD Payments
+              COD & Cheque Payments
             </h1>
 
             <p
@@ -298,8 +292,8 @@ const CodManagement = () => {
                 sm:text-base
               "
             >
-              Generate COD payment PINs, monitor verification status and track
-              completed cash payments.
+              Generate PINs for COD and cheque orders, monitor verification
+              status, and track confirmed payments.
             </p>
           </div>
 
@@ -407,7 +401,7 @@ const CodManagement = () => {
       >
         <StatCard
           icon={KeyRound}
-          label="Total COD Orders"
+          label="COD & Cheque Orders"
           value={stats.total}
         />
 
@@ -417,7 +411,7 @@ const CodManagement = () => {
 
         <StatCard
           icon={CheckCircle2}
-          label="Payment Done"
+          label="Payment Confirmed"
           value={stats.collected}
         />
       </div>
@@ -507,7 +501,7 @@ const CodManagement = () => {
               options={[
                 {
                   value: "all",
-                  label: "All COD Orders",
+                  label: "All COD & Cheque Orders",
                 },
                 {
                   value: "pending",
@@ -519,7 +513,7 @@ const CodManagement = () => {
                 },
                 {
                   value: "collected",
-                  label: "Payment Done",
+                  label: "Payment Confirmed",
                 },
               ]}
             />
@@ -544,7 +538,7 @@ const CodManagement = () => {
             </span>{" "}
             of{" "}
             <span className="font-medium text-zinc-700">{orders.length}</span>{" "}
-            COD orders
+            COD and cheque orders
           </p>
 
           {(search || filter !== "all") && (
@@ -622,7 +616,7 @@ const CodManagement = () => {
                 text-zinc-900
               "
             >
-              No COD orders found
+              No COD or cheque orders found
             </h2>
 
             <p
@@ -637,7 +631,7 @@ const CodManagement = () => {
             >
               {search || filter !== "all"
                 ? "Try changing your search or filter."
-                : "COD orders will appear here."}
+                : "COD and cheque orders will appear here."}
             </p>
           </div>
         </div>
@@ -653,7 +647,7 @@ const CodManagement = () => {
 };
 
 /* =========================================================
-   COD ORDER CARD
+   COD / CHEQUE ORDER CARD
 ========================================================= */
 
 const CodOrderCard = ({ order }) => {
@@ -667,11 +661,15 @@ const CodOrderCard = ({ order }) => {
 
   const [copied, setCopied] = useState(false);
 
-  const isCollected = order.paymentStatus === "collected";
+  const isPaymentDone = ["paid", "collected"].includes(order.paymentStatus);
 
   const isPinActive = order.codPinStatus === "active";
 
-  const canGenerate = !isCollected && !isPinActive;
+  const isPinVerified = ["verified", "used"].includes(order.codPinStatus);
+
+  const isChequeOrder = order.paymentMethod === "cheque";
+
+  const canGenerate = !isPaymentDone && !isPinActive && !isPinVerified;
 
   const generatePin = async () => {
     try {
@@ -682,16 +680,16 @@ const CodOrderCard = ({ order }) => {
       const response = await codService.generateCodPin(order._id || order.id);
 
       if (!response?.codPin) {
-        throw new Error("COD PIN was not returned by the server.");
+        throw new Error("PIN was not returned by the server.");
       }
 
       setPin(String(response.codPin));
 
       setMessage(
-        "COD PIN generated successfully. Share this PIN with the payment collector.",
+        `${isChequeOrder ? "Cheque" : "COD"} PIN generated successfully. Share this PIN with the payment collector.`,
       );
     } catch (error) {
-      console.error("Generate COD PIN error:", error);
+      console.error("Generate payment PIN error:", error);
 
       setError(
         error.response?.data?.message ||
@@ -813,6 +811,12 @@ const CodOrderCard = ({ order }) => {
             {order.orderNumber}
           </p>
 
+          <p className="mt-1 text-xs font-medium text-zinc-500">
+            {isChequeOrder
+              ? `Cheque — ${order.chequeType === "with_gst" ? "With GST" : "Direct Collection"}`
+              : "Cash on Delivery"}
+          </p>
+
           <div
             className="
               mt-3
@@ -825,7 +829,16 @@ const CodOrderCard = ({ order }) => {
             "
           >
             <span>
-              Amount: ₹{Number(order.amount || 0).toLocaleString("en-IN")}
+              Subtotal: ₹{Number(order.subtotal || 0).toLocaleString("en-IN")}
+            </span>
+
+            <span>
+              GST ({Number(order.gstRate || 0)}%): ₹
+              {Number(order.gstAmount || 0).toLocaleString("en-IN")}
+            </span>
+
+            <span className="font-medium text-zinc-600">
+              Final: ₹{Number(order.amount || 0).toLocaleString("en-IN")}
             </span>
 
             <span>Created: {formatDateTime(order.createdAt)}</span>
@@ -835,7 +848,7 @@ const CodOrderCard = ({ order }) => {
         {/* Generate / PIN */}
 
         <div className="w-full xl:w-auto">
-          {isCollected ? (
+          {isPaymentDone ? (
             <div
               className="
                 flex
@@ -852,10 +865,15 @@ const CodOrderCard = ({ order }) => {
               "
             >
               <CheckCircle2 size={17} />
-              Payment Done
+              Payment Confirmed
             </div>
           ) : pin ? (
-            <PinDisplay pin={pin} copied={copied} onCopy={copyPin} />
+            <PinDisplay
+              pin={pin}
+              copied={copied}
+              onCopy={copyPin}
+              paymentMethod={order.paymentMethod}
+            />
           ) : isPinActive ? (
             <div
               className="
@@ -870,6 +888,10 @@ const CodOrderCard = ({ order }) => {
               "
             >
               PIN Active
+            </div>
+          ) : isPinVerified ? (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
+              PIN Verified · Payment Pending
             </div>
           ) : canGenerate ? (
             <button
@@ -995,7 +1017,7 @@ const CodOrderCard = ({ order }) => {
           label="PIN Generated"
           value={
             order.codPinStatus !== "not_generated" && order.codPinStatus
-              ? formatDateTime(order.updatedAt)
+              ? formatDateTime(order.codPinGeneratedAt || order.updatedAt)
               : "Not generated"
           }
         />
@@ -1010,11 +1032,15 @@ const CodOrderCard = ({ order }) => {
         />
 
         <InfoItem
-          label="Payment Collected"
+          label={isChequeOrder ? "Payment Status" : "Payment Collected"}
           value={
-            order.codCollectedAt
-              ? formatDateTime(order.codCollectedAt)
-              : "Not collected"
+            isChequeOrder
+              ? isPaymentDone
+                ? "Confirmed"
+                : "Pending"
+              : order.codCollectedAt
+                ? formatDateTime(order.codCollectedAt)
+                : "Not collected"
           }
         />
       </div>
@@ -1044,7 +1070,9 @@ const CodOrderCard = ({ order }) => {
           "
         >
           <div>
-            <p className="text-xs text-zinc-400">COD Payment Status</p>
+            <p className="text-xs text-zinc-400">
+              {isChequeOrder ? "Cheque Payment Status" : "COD Payment Status"}
+            </p>
 
             <p
               className="
@@ -1054,7 +1082,7 @@ const CodOrderCard = ({ order }) => {
                 text-zinc-800
               "
             >
-              {isCollected ? "Payment Done" : "Payment Pending"}
+              {isPaymentDone ? "Payment Confirmed" : "Payment Pending"}
             </p>
           </div>
 
@@ -1122,7 +1150,7 @@ const CodOrderCard = ({ order }) => {
    PIN DISPLAY
 ========================================================= */
 
-const PinDisplay = ({ pin, copied, onCopy }) => {
+const PinDisplay = ({ pin, copied, onCopy, paymentMethod }) => {
   return (
     <div>
       <p
@@ -1135,7 +1163,7 @@ const PinDisplay = ({ pin, copied, onCopy }) => {
           text-zinc-400
         "
       >
-        COD PIN
+        {paymentMethod === "cheque" ? "Cheque PIN" : "COD PIN"}
       </p>
 
       <div className="flex items-center gap-2">
@@ -1173,7 +1201,7 @@ const PinDisplay = ({ pin, copied, onCopy }) => {
             hover:text-white
           "
           title="Copy PIN"
-          aria-label="Copy COD PIN"
+          aria-label={`Copy ${paymentMethod === "cheque" ? "cheque" : "COD"} PIN`}
         >
           {copied ? <Check size={17} /> : <Copy size={17} />}
         </button>
