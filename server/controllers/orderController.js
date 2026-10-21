@@ -1824,6 +1824,7 @@ const createServiceSnapshot = ({
   service,
   selectedOptions = [],
   groupedQuantities = {},
+  quantity = 1,
   repeatableGroups = [],
 }) => {
   const selectedOptionSnapshots =
@@ -1844,10 +1845,10 @@ const createServiceSnapshot = ({
           group:
             option.group || "",
           quantity:
-            groupedQuantities[group] ??
-            Number(
-              option.minQuantity || 1,
-            ),
+            group
+              ? groupedQuantities[group] ??
+                Number(option.minQuantity || 1)
+              : quantity,
           minQuantity:
             option.minQuantity,
           maxQuantity:
@@ -1859,8 +1860,9 @@ const createServiceSnapshot = ({
     );
 
   return {
-    id: service._id,
+    serviceId: service._id,
     name: service.name,
+    slug: service.slug || "",
     description:
       service.description || "",
     category:
@@ -1873,9 +1875,9 @@ const createServiceSnapshot = ({
       service.minQuantity,
     maxQuantity:
       service.maxQuantity,
-
-    pricingOptions:
-      selectedOptionSnapshots,
+    unit: service.unit || "",
+    selectedOption: selectedOptionSnapshots[0] || null,
+    selectedOptions: selectedOptionSnapshots,
 
     repeatableGroups,
   };
@@ -1938,6 +1940,267 @@ const calculateOrderAmount = ({
   amount += Number(repeatableAmount || 0);
 
   return roundCurrency(amount);
+};
+
+const timeBasedServiceSlugs = new Set([
+  "social-media-profile-management",
+  "festival-stories-animated-graphics",
+  "google-business-profile-seo-reviews",
+  "ads",
+]);
+
+const getServiceProgressDefinition = (item) => {
+  const snapshot = item?.serviceSnapshot || {};
+  const slug = normalizeString(
+    snapshot.slug || item?.service?.slug || "",
+  ).toLowerCase();
+  const name = normalizeString(
+    snapshot.name || item?.service?.name || "",
+  ).toLowerCase();
+  const resolvedSlug =
+    slug ||
+    name
+      .replace(/[–—]/g, "-")
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "");
+
+  if (timeBasedServiceSlugs.has(resolvedSlug)) {
+    return { type: "time_based", durationDays: 30 };
+  }
+
+  if (
+    resolvedSlug === "social-media-grid-posts" ||
+    name === "social media grid posts"
+  ) {
+    const total = Math.max(1, Number(item?.quantity) || 1);
+    return {
+      type: "quantity_based",
+      deliverables: Array.from({ length: total }, (_, index) => ({
+        key: String(index + 1),
+        name: `Grid ${index + 1}`,
+      })),
+    };
+  }
+
+  if (resolvedSlug === "visual-content-reels" || name === "visual content - reels") {
+    const formData =
+      item?.formData instanceof Map
+        ? Object.fromEntries(item.formData)
+        : item?.formData || {};
+    const reelGroup = Array.isArray(formData.reels) ? formData.reels : [];
+    const snapshotGroup = (snapshot.repeatableGroups || []).find(
+      (group) => group.name === "reels",
+    );
+    const total = Math.max(
+      1,
+      reelGroup.length || snapshotGroup?.items?.length || 0,
+    );
+
+    return {
+      type: "quantity_based",
+      deliverables: Array.from({ length: total }, (_, index) => ({
+        key: String(index + 1),
+        name: `Reel ${index + 1}`,
+      })),
+    };
+  }
+
+  return null;
+};
+
+const createInitialServiceProgress = (item) => {
+  const definition = getServiceProgressDefinition(item);
+
+  if (!definition) {
+    return undefined;
+  }
+
+  if (definition.type === "time_based") {
+    return {
+      type: definition.type,
+      status: "pending_start",
+      startAt: null,
+      durationDays: definition.durationDays,
+      deliverables: [],
+    };
+  }
+
+  return {
+    type: definition.type,
+    status: "pending_start",
+    startAt: null,
+    durationDays: null,
+    deliverables: definition.deliverables.map((deliverable) => ({
+      ...deliverable,
+      status: "pending",
+      completedAt: null,
+    })),
+  };
+};
+
+const getOrderItemServiceProgress = (item) => {
+  const initialProgress = createInitialServiceProgress(item);
+
+  if (!initialProgress) {
+    return undefined;
+  }
+
+  const existingProgress =
+    typeof item?.serviceProgress?.toObject === "function"
+      ? item.serviceProgress.toObject()
+      : item?.serviceProgress;
+
+  if (initialProgress.type === "time_based") {
+    return {
+      ...initialProgress,
+      ...existingProgress,
+      type: initialProgress.type,
+      durationDays: initialProgress.durationDays,
+      deliverables: [],
+    };
+  }
+
+  const previousDeliverables = new Map(
+    (existingProgress?.deliverables || []).map((deliverable) => [
+      deliverable.key,
+      deliverable,
+    ]),
+  );
+
+  return {
+    ...initialProgress,
+    ...existingProgress,
+    type: initialProgress.type,
+    deliverables: initialProgress.deliverables.map((deliverable) => ({
+      ...deliverable,
+      ...previousDeliverables.get(deliverable.key),
+      key: deliverable.key,
+      name: deliverable.name,
+    })),
+  };
+};
+
+const getCalendarDayInKolkata = (date) => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value]),
+  );
+
+  return Date.UTC(
+    Number(values.year),
+    Number(values.month) - 1,
+    Number(values.day),
+  );
+};
+
+const toServiceProgressView = (progress, now = new Date()) => {
+  if (!progress) {
+    return undefined;
+  }
+
+  if (progress.type === "time_based") {
+    if (progress.status === "completed") {
+      return {
+        ...progress,
+        displayStatus: "completed",
+        elapsedDays: progress.durationDays,
+        dayNumber: progress.durationDays,
+        remainingDays: 0,
+        progressPercent: 100,
+      };
+    }
+
+    if (!progress.startAt) {
+      return {
+        ...progress,
+        displayStatus: "pending_start",
+        elapsedDays: 0,
+        dayNumber: 0,
+        remainingDays: progress.durationDays,
+        progressPercent: 0,
+      };
+    }
+
+    const elapsedDays = Math.max(
+      0,
+      Math.floor(
+        (getCalendarDayInKolkata(now) -
+          getCalendarDayInKolkata(new Date(progress.startAt))) /
+          86400000,
+      ),
+    );
+    const periodEnded = elapsedDays >= progress.durationDays;
+
+    return {
+      ...progress,
+      displayStatus: periodEnded ? "period_ended" : "in_progress",
+      elapsedDays,
+      dayNumber: Math.min(elapsedDays + 1, progress.durationDays),
+      remainingDays: Math.max(
+        progress.durationDays - (elapsedDays + 1),
+        0,
+      ),
+      progressPercent: Math.min(
+        100,
+        ((elapsedDays + 1) / progress.durationDays) * 100,
+      ),
+    };
+  }
+
+  const deliverables = progress.deliverables || [];
+  const completedCount = deliverables.filter(
+    (deliverable) => deliverable.status === "completed",
+  ).length;
+  const totalCount = deliverables.length;
+  const allCompleted = totalCount > 0 && completedCount === totalCount;
+  const anyStarted = deliverables.some(
+    (deliverable) => deliverable.status !== "pending",
+  );
+
+  return {
+    ...progress,
+    displayStatus: allCompleted
+      ? "completed"
+      : anyStarted
+        ? "in_progress"
+        : "pending_start",
+    completedCount,
+    totalCount,
+    progressPercent: totalCount ? (completedCount / totalCount) * 100 : 0,
+  };
+};
+
+const toOrderWithServiceProgress = (order) => {
+  const visibleOrder =
+    typeof order?.toObject === "function"
+      ? order.toObject({ flattenMaps: true })
+      : { ...order };
+
+  if (Array.isArray(visibleOrder.items)) {
+    visibleOrder.items = visibleOrder.items.map((item) => {
+      const progress = getOrderItemServiceProgress(item);
+
+      return progress
+        ? { ...item, serviceProgress: toServiceProgressView(progress) }
+        : item;
+    });
+  }
+
+  if (!visibleOrder.items?.length) {
+    const legacyProgress = getOrderItemServiceProgress(visibleOrder);
+
+    if (legacyProgress) {
+      visibleOrder.serviceProgress =
+        toServiceProgressView(legacyProgress);
+    }
+  }
+
+  return visibleOrder;
 };
 
 /* =========================================================
@@ -2163,6 +2426,7 @@ const processOrderServiceItem = async ({
       service,
       selectedOptions,
       groupedQuantities,
+      quantity: parsedQuantity,
       repeatableGroups:
         repeatableSnapshot,
     });
@@ -2187,6 +2451,12 @@ const processOrderServiceItem = async ({
 
     formData:
       cleanedFormData,
+
+    serviceProgress: createInitialServiceProgress({
+      serviceSnapshot,
+      formData: cleanedFormData,
+      quantity: isGroupedPricing ? 1 : parsedQuantity,
+    }),
 
     amount,
   };
@@ -2511,7 +2781,7 @@ const createOrder = async (
       message:
         "Order created successfully.",
       order:
-        populatedOrder,
+        toOrderWithServiceProgress(populatedOrder),
     });
   } catch (error) {
     console.error(
@@ -2623,8 +2893,7 @@ const getOrderById = async (
 };
 
 const toClientVisibleOrder = (order) => {
-  const visibleOrder =
-    typeof order?.toObject === "function" ? order.toObject() : { ...order };
+  const visibleOrder = toOrderWithServiceProgress(order);
 
   if (visibleOrder.orderStatus !== "completed") {
     delete visibleOrder.deliveryLink;
@@ -2664,7 +2933,7 @@ const getAdminOrders = async (
 
     return res.status(200).json({
       success: true,
-      orders,
+      orders: orders.map(toOrderWithServiceProgress),
     });
   } catch (error) {
     console.error(
@@ -2717,7 +2986,7 @@ const getAdminOrderById = async (
 
     return res.status(200).json({
       success: true,
-      order,
+      order: toOrderWithServiceProgress(order),
     });
   } catch (error) {
     console.error(
@@ -2742,7 +3011,10 @@ const getStaffOrders = async (req, res) => {
       .populate("items.service", "name category")
       .sort({ createdAt: -1 });
 
-    return res.status(200).json({ success: true, orders });
+    return res.status(200).json({
+      success: true,
+      orders: orders.map(toOrderWithServiceProgress),
+    });
   } catch (error) {
     console.error("Get staff orders error:", error);
     return res.status(500).json({
@@ -2767,12 +3039,125 @@ const getStaffOrderById = async (req, res) => {
       });
     }
 
-    return res.status(200).json({ success: true, order });
+    return res.status(200).json({
+      success: true,
+      order: toOrderWithServiceProgress(order),
+    });
   } catch (error) {
     console.error("Get staff order error:", error);
     return res.status(500).json({
       success: false,
       message: "Unable to fetch order.",
+    });
+  }
+};
+
+const updateServiceProgress = async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const { action, deliverableKey, status } = req.body;
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found.",
+      });
+    }
+
+    const item = order.items.id(itemId);
+    const legacyOrderItem =
+      !item && itemId === "legacy"
+        ? {
+            serviceSnapshot: order.serviceSnapshot,
+            quantity: order.quantity,
+            formData: order.formData,
+            serviceProgress: order.serviceProgress,
+          }
+        : null;
+    const progressItem = item || legacyOrderItem;
+
+    if (!progressItem) {
+      return res.status(404).json({
+        success: false,
+        message: "Order service was not found.",
+      });
+    }
+
+    const progress = getOrderItemServiceProgress(progressItem);
+
+    if (!progress) {
+      return res.status(400).json({
+        success: false,
+        message: "Service progress is not supported for this service.",
+      });
+    }
+
+    if (progress.type === "time_based") {
+      if (
+        action === "start" &&
+        progress.status === "pending_start" &&
+        !progress.startAt
+      ) {
+        progress.startAt = new Date();
+        progress.status = "in_progress";
+      } else if (
+        action === "complete" &&
+        progress.status !== "completed" &&
+        progress.startAt
+      ) {
+        progress.status = "completed";
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid service progress action.",
+        });
+      }
+    } else {
+      const validStatuses = ["pending", "in_progress", "completed"];
+      const deliverable = progress.deliverables.find(
+        (entry) => entry.key === deliverableKey,
+      );
+
+      if (
+        action !== "set_deliverable_status" ||
+        !deliverable ||
+        !validStatuses.includes(status)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Select a valid deliverable and status.",
+        });
+      }
+
+      deliverable.status = status;
+      deliverable.completedAt =
+        status === "completed" ? new Date() : null;
+    }
+
+    if (item) {
+      item.serviceProgress = progress;
+    } else {
+      order.serviceProgress = progress;
+    }
+    await order.save();
+
+    const updatedOrder = await Order.findById(order._id)
+      .select(req.user?.role === "employee" ? "-codPin -notes" : "-codPin")
+      .populate("client", "name email username")
+      .populate("service", "name category")
+      .populate("items.service", "name category");
+
+    return res.status(200).json({
+      success: true,
+      message: "Service progress updated successfully.",
+      order: toOrderWithServiceProgress(updatedOrder),
+    });
+  } catch (error) {
+    console.error("Update service progress error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to update service progress.",
     });
   }
 };
@@ -3251,6 +3636,7 @@ module.exports = {
   getAdminOrderById,
   getStaffOrders,
   getStaffOrderById,
+  updateServiceProgress,
   updateOrderStatus,
   updatePaymentStatus,
   updateDeliveryLink,

@@ -367,7 +367,7 @@ const services = [
     "name": "Visual Content - Reels",
     "slug": "visual-content-reels",
     "category": "Visual Content",
-    "description": "Professional reel production with flexible shoot, drone and host options.",
+    "description": "Professional reel production with flexible shoot, drone, host and voice-over options.",
     "pricingType": "custom",
     "basePrice": 0,
     "unit": "reel",
@@ -539,6 +539,18 @@ const services = [
         ],
         "order": 6,
         "_id": "6a9c0c15c5c693b1f9ec32f1"
+      },
+      {
+        "name": "Voice Over (Professional RJ/FM Audio — Male/Female)",
+        "description": "Professional male or female RJ/FM voice-over audio for your reel.",
+        "price": 2500,
+        "unit": "reel",
+        "group": "voiceOver",
+        "minQuantity": 1,
+        "maxQuantity": 1,
+        "isActive": true,
+        "fields": [],
+        "order": 7
       }
     ],
     "fields": [],
@@ -550,7 +562,8 @@ const services = [
         "pricingGroups": [
           "shoot",
           "drone",
-          "host"
+          "host",
+          "voiceOver"
         ],
         "requiredPricingGroups": [
           "shoot"
@@ -798,7 +811,11 @@ const seedServices = async () => {
       (pricingOptionSeed) => {
         const existingOption = existingPricingOptions.find(
           (option) =>
-            String(option._id) === String(pricingOptionSeed._id),
+            (pricingOptionSeed._id &&
+              String(option._id) === String(pricingOptionSeed._id)) ||
+            (!pricingOptionSeed._id &&
+              option.name === pricingOptionSeed.name &&
+              option.group === pricingOptionSeed.group),
         );
 
         if (!existingOption) {

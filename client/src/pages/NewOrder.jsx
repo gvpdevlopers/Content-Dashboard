@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronUp,
   CreditCard,
+  History,
   Info,
   Landmark,
   Loader2,
@@ -18,7 +19,7 @@ import orderService from "../services/orderService";
 import serviceService from "../services/serviceService";
 import paymentService from "../services/paymentService";
 import CustomSelect from "../components/CustomSelect";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 /*
@@ -671,6 +672,336 @@ const createOrderItem = (service) => {
   };
 };
 
+const asPlainObject = (value) => {
+  if (value instanceof Map) {
+    return Object.fromEntries(value);
+  }
+
+  if (value && typeof value.toObject === "function") {
+    return value.toObject();
+  }
+
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value
+    : {};
+};
+
+const getSavedOrderItems = (order) => {
+  if (Array.isArray(order?.items) && order.items.length > 0) {
+    return order.items;
+  }
+
+  return order?.service || order?.serviceSnapshot
+    ? [
+        {
+          service: order.service,
+          serviceSnapshot: order.serviceSnapshot,
+          quantity: order.quantity,
+          formData: order.formData,
+        },
+      ]
+    : [];
+};
+
+const getSavedOptionId = (option) =>
+  option?.id || option?._id || option?.optionId || "";
+
+const restoreOrderItems = (order, activeServices) => {
+  const restoredItems = [];
+  const issues = [];
+  const savedItems = getSavedOrderItems(order);
+
+  const findCurrentService = (savedItem) => {
+    const snapshot = savedItem?.serviceSnapshot || {};
+    const savedService = savedItem?.service;
+    const savedId =
+      savedService?._id ||
+      savedService ||
+      snapshot.serviceId ||
+      snapshot.id;
+    const savedSlug = snapshot.slug || savedService?.slug;
+
+    return (
+      activeServices.find(
+        (service) => savedId && String(service._id) === String(savedId),
+      ) ||
+      activeServices.find(
+        (service) => savedSlug && service.slug === savedSlug,
+      ) ||
+      (() => {
+        const savedName = snapshot.name || savedService?.name;
+        const matches = activeServices.filter(
+          (service) => savedName && service.name === savedName,
+        );
+        return matches.length === 1 ? matches[0] : null;
+      })()
+    );
+  };
+
+  for (const [itemIndex, savedItem] of savedItems.entries()) {
+    const service = findCurrentService(savedItem);
+
+    if (!service) {
+      issues.push(
+        `Service ${itemIndex + 1} from the previous order is no longer available and was skipped.`,
+      );
+      continue;
+    }
+
+    const snapshot = savedItem.serviceSnapshot || {};
+    const savedFormData = asPlainObject(savedItem.formData);
+    const savedSnapshotOptions = [
+      ...(Array.isArray(snapshot.selectedOptions) ? snapshot.selectedOptions : []),
+      ...(Array.isArray(snapshot.pricingOptions) ? snapshot.pricingOptions : []),
+    ];
+    const savedSingleOption =
+      snapshot.selectedOption || savedSnapshotOptions[0] || null;
+    const nextItem = createOrderItem(service);
+
+    if (nextItem.isGroupedPricing) {
+      const missingPricingGroups = [];
+      const currentGroups = getPricingGroups(service);
+      const currentGroupNames = new Set(
+        currentGroups.map((group) => group.name),
+      );
+
+      const savedGroupNames = new Set([
+        ...savedSnapshotOptions
+          .map((option) => String(option.group || ""))
+          .filter(Boolean),
+        ...Object.keys(asPlainObject(savedFormData.pricingQuantities)),
+      ]);
+
+      for (const groupName of savedGroupNames) {
+        if (!currentGroupNames.has(groupName)) {
+          issues.push(
+            `${service.name}: the previous ${groupName} option is no longer available and was not restored.`,
+          );
+        }
+      }
+
+      for (const group of currentGroups) {
+        const savedOption = savedSnapshotOptions.find(
+          (option) => String(option.group || "") === String(group.name),
+        );
+        const savedOptionId =
+          savedFormData[group.name] || getSavedOptionId(savedOption);
+        const currentOption = group.options.find(
+          (option) => String(option._id) === String(savedOptionId),
+        );
+
+        if (currentOption) {
+          nextItem.selectedPricingOptions[group.key] = currentOption;
+          const rules = getQuantityRules(service, currentOption);
+          const rawQuantity =
+            asPlainObject(savedFormData.pricingQuantities)[group.name] ??
+            savedOption?.quantity ??
+            rules.minQuantity;
+          const quantity = Number(rawQuantity);
+
+          nextItem.pricingQuantities[group.key] =
+            Number.isInteger(quantity) &&
+            quantity >= rules.minQuantity &&
+            (rules.maxQuantity === undefined ||
+              quantity <= rules.maxQuantity)
+              ? quantity
+              : rules.minQuantity;
+          nextItem.formData[group.name] = String(currentOption._id);
+        } else if (savedOptionId) {
+          missingPricingGroups.push(group.name || group.key);
+          issues.push(
+            `${service.name}: the previous ${group.name || "pricing"} option is no longer available. Choose a replacement before submitting.`,
+          );
+        }
+      }
+
+      if (missingPricingGroups.length > 0) {
+        nextItem._missingPricingGroups = missingPricingGroups;
+      }
+    } else if (getPricingOptions(service).length > 0) {
+      const savedOptionId = getSavedOptionId(savedSingleOption);
+      const currentOption = getPricingOptions(service).find(
+        (option) => String(option._id) === String(savedOptionId),
+      );
+
+      if (currentOption) {
+        nextItem.selectedPricingOption = currentOption;
+        const rules = getQuantityRules(service, currentOption);
+        const rawQuantity = Number(savedItem.quantity || rules.minQuantity);
+        nextItem.formData.quantity =
+          Number.isInteger(rawQuantity) &&
+          rawQuantity >= rules.minQuantity &&
+          (rules.maxQuantity === undefined ||
+            rawQuantity <= rules.maxQuantity)
+            ? rawQuantity
+            : rules.minQuantity;
+      } else if (savedOptionId || savedItem.amount > 0) {
+        nextItem._requiresPricingOption = true;
+        issues.push(
+          `${service.name}: its previous pricing option could not be restored. Choose a current option before submitting.`,
+        );
+      }
+    } else if (
+      service.pricingType === "per_unit" ||
+      service.pricingType === "starting_from"
+    ) {
+      const rules = getQuantityRules(service, null);
+      const rawQuantity = Number(savedItem.quantity || rules.minQuantity);
+      nextItem.formData.quantity =
+        Number.isInteger(rawQuantity) &&
+        rawQuantity >= rules.minQuantity &&
+        (rules.maxQuantity === undefined ||
+          rawQuantity <= rules.maxQuantity)
+          ? rawQuantity
+          : rules.minQuantity;
+    } else if (savedSingleOption || savedSnapshotOptions.length > 0) {
+      issues.push(
+        `${service.name}: its previous pricing option is no longer available and was not restored.`,
+      );
+    }
+
+    const savedRepeatableGroups = savedFormData;
+    const snapshotRepeatableGroups = Array.isArray(snapshot.repeatableGroups)
+      ? snapshot.repeatableGroups
+      : [];
+
+    for (const group of getRepeatableGroups(service)) {
+      const savedGroupSnapshot = snapshotRepeatableGroups.find(
+        (savedGroup) => savedGroup.name === group.name,
+      );
+      const savedEntries = Array.isArray(savedRepeatableGroups[group.name])
+        ? savedRepeatableGroups[group.name]
+        : Array.isArray(savedGroupSnapshot?.items)
+          ? savedGroupSnapshot.items
+          : [];
+
+      if (savedEntries.length === 0) {
+        continue;
+      }
+
+      const currentPricingGroups = getRepeatableGroupPricingGroups(
+        service,
+        group,
+      );
+      const restoredEntries = savedEntries.map((savedEntry, entryIndex) => {
+        const savedPricingOptions = asPlainObject(savedEntry?.pricingOptions);
+        const savedQuantities = asPlainObject(savedEntry?.pricingQuantities);
+        const savedPricingSnapshots = asPlainObject(
+          savedEntry?.pricingSnapshots,
+        );
+        const restoredEntry = createEmptyRepeatableItem(group);
+        const missingPricingGroups = [];
+        const currentPricingGroupNames = new Set(
+          currentPricingGroups.map((pricingGroup) => pricingGroup.name),
+        );
+        const savedPricingGroupNames = new Set([
+          ...Object.entries(savedPricingOptions)
+            .filter(([, optionId]) => Boolean(optionId))
+            .map(([name]) => name),
+          ...Object.entries(savedPricingSnapshots)
+            .filter(([, optionSnapshot]) =>
+              Boolean(getSavedOptionId(optionSnapshot)),
+            )
+            .map(([name]) => name),
+        ]);
+
+        for (const pricingGroupName of savedPricingGroupNames) {
+          if (!currentPricingGroupNames.has(pricingGroupName)) {
+            issues.push(
+              `${service.name}, ${group.label || group.name} ${entryIndex + 1}: the previous ${pricingGroupName} option is no longer available and was not restored.`,
+            );
+          }
+        }
+
+        for (const pricingGroup of currentPricingGroups) {
+          const savedPricingSnapshot =
+            savedPricingSnapshots[pricingGroup.name];
+          const savedOptionId =
+            savedPricingOptions[pricingGroup.name] ||
+            getSavedOptionId(savedPricingSnapshot);
+          const currentOption = pricingGroup.options.find(
+            (option) => String(option._id) === String(savedOptionId),
+          );
+
+          if (currentOption) {
+            restoredEntry.pricingOptions[pricingGroup.name] = String(
+              currentOption._id,
+            );
+            const rules = getQuantityRules(service, currentOption);
+            const quantity = Number(
+              savedQuantities[pricingGroup.name] ??
+                savedPricingSnapshot?.quantity ??
+                rules.minQuantity,
+            );
+            restoredEntry.pricingQuantities[pricingGroup.name] =
+              Number.isInteger(quantity) &&
+              quantity >= rules.minQuantity &&
+              (rules.maxQuantity === undefined ||
+                quantity <= rules.maxQuantity)
+                ? quantity
+                : rules.minQuantity;
+          } else if (savedOptionId) {
+            missingPricingGroups.push(pricingGroup.name);
+            issues.push(
+              `${service.name}, ${group.label || group.name} ${entryIndex + 1}: the previous ${pricingGroup.name} option is no longer available. Choose a replacement before submitting.`,
+            );
+          }
+        }
+
+        if (missingPricingGroups.length > 0) {
+          restoredEntry._missingPricingGroups = missingPricingGroups;
+        }
+
+        const savedFields = asPlainObject(savedEntry?.fields);
+        const activeFields = getActiveFieldsForRepeatableEntry(
+          service,
+          group,
+          restoredEntry,
+        );
+
+        for (const field of activeFields) {
+          if (savedFields[field.name] !== undefined) {
+            restoredEntry.fields[field.name] = savedFields[field.name];
+          }
+        }
+
+        return restoredEntry;
+      });
+
+      const { minItems, maxItems } = getRepeatableGroupRules(group);
+      nextItem.formData[group.name] = restoredEntries
+        .slice(0, maxItems)
+        .concat(
+          Array.from(
+            { length: Math.max(0, minItems - restoredEntries.length) },
+            () => createEmptyRepeatableItem(group),
+          ),
+        );
+
+      if (restoredEntries.length > maxItems) {
+        issues.push(
+          `${service.name}: only the first ${maxItems} ${group.label || "items"} were restored because that is the current limit.`,
+        );
+      }
+    }
+
+    const activeFields = getActiveFieldsForItem(nextItem);
+
+    for (const field of activeFields) {
+      if (
+        savedFormData[field.name] !== undefined &&
+        field.name !== "quantity"
+      ) {
+        nextItem.formData[field.name] = savedFormData[field.name];
+      }
+    }
+
+    restoredItems.push(nextItem);
+  }
+
+  return { items: restoredItems, issues };
+};
+
 /*
 |--------------------------------------------------------------------------
 | Selection Field
@@ -1259,6 +1590,9 @@ const RepeatableGroup = ({
 }) => {
   const safeEntries = Array.isArray(entries) ? entries : [];
   const { minItems, maxItems } = getRepeatableGroupRules(group);
+  const lastEntryRef = useRef(null);
+  const previousEntryCount = useRef(safeEntries.length);
+  const [collapsedEntries, setCollapsedEntries] = useState(() => new Set());
 
   const pricingGroups = getRepeatableGroupPricingGroups(service, group);
 
@@ -1270,6 +1604,44 @@ const RepeatableGroup = ({
 
   const canRemove = safeEntries.length > minItems;
   const canAdd = safeEntries.length < maxItems;
+
+  const toggleEntry = (entryIndex) => {
+    setCollapsedEntries((current) => {
+      const next = new Set(current);
+      if (next.has(entryIndex)) {
+        next.delete(entryIndex);
+      } else {
+        next.add(entryIndex);
+      }
+      return next;
+    });
+  };
+
+  const removeEntry = (entryIndex) => {
+    setCollapsedEntries((current) => {
+      const next = new Set();
+      current.forEach((index) => {
+        if (index < entryIndex) {
+          next.add(index);
+        } else if (index > entryIndex) {
+          next.add(index - 1);
+        }
+      });
+      return next;
+    });
+    onRemove(entryIndex);
+  };
+
+  useEffect(() => {
+    if (safeEntries.length > previousEntryCount.current) {
+      lastEntryRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    }
+
+    previousEntryCount.current = safeEntries.length;
+  }, [safeEntries.length]);
 
   return (
     <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 p-3 sm:px-3 py-4">
@@ -1322,20 +1694,42 @@ const RepeatableGroup = ({
           return (
             <div
               key={`${group.name}-${entryIndex}`}
+              ref={
+                entryIndex === safeEntries.length - 1 ? lastEntryRef : undefined
+              }
               className="rounded-2xl border border-zinc-200 bg-white p-3 sm:px-3 py-4"
             >
-              <div className="flex items-center justify-between gap-3 border-b border-zinc-100 pb-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-400">
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => toggleEntry(entryIndex)}
+                  aria-expanded={!collapsedEntries.has(entryIndex)}
+                  aria-controls={`repeatable-${group.name}-${entryIndex}`}
+                  className="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1 text-left transition hover:text-zinc-700"
+                >
+                  <span className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">
                     {group.label || "Item"} {entryIndex + 1}
-                  </p>
-                </div>
+                  </span>
+                  {collapsedEntries.has(entryIndex) ? (
+                    <ChevronDown
+                      size={15}
+                      className="shrink-0 text-zinc-400"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <ChevronUp
+                      size={15}
+                      className="shrink-0 text-zinc-400"
+                      aria-hidden="true"
+                    />
+                  )}
+                </button>
 
                 {canRemove && (
                   <button
                     type="button"
                     disabled={disabled}
-                    onClick={() => onRemove(entryIndex)}
+                    onClick={() => removeEntry(entryIndex)}
                     className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40"
                     aria-label={`Remove ${
                       group.label || "item"
@@ -1346,8 +1740,16 @@ const RepeatableGroup = ({
                 )}
               </div>
 
+              <div
+                id={`repeatable-${group.name}-${entryIndex}`}
+                className={
+                  collapsedEntries.has(entryIndex)
+                    ? "hidden"
+                    : "mt-4 border-t border-zinc-100 pt-1"
+                }
+              >
               {pricingGroups.length > 0 && (
-                <div className="mt-4 space-y-4">
+                <div className="space-y-4">
                   {pricingGroups.map((pricingGroup) => {
                     const title = pricingGroup.name
                       ? pricingGroup.name.charAt(0).toUpperCase() +
@@ -1584,9 +1986,24 @@ const RepeatableGroup = ({
                 </div>
               )}
             </div>
+            </div>
           );
         })}
       </div>
+
+      {canAdd && (
+        <div className="mt-4 border-t border-zinc-200 pt-4">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onAdd}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-700 transition-colors hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Plus size={15} />
+            Add Another {group.label || "Item"}
+          </button>
+        </div>
+      )}
     </div>
   );
 };
@@ -1612,6 +2029,11 @@ const NewOrder = () => {
   const [additionalRequirements, setAdditionalRequirements] = useState("");
 
   const [loadingServices, setLoadingServices] = useState(true);
+  const [previousOrders, setPreviousOrders] = useState([]);
+  const [loadingPreviousOrders, setLoadingPreviousOrders] = useState(true);
+  const [previousOrdersError, setPreviousOrdersError] = useState("");
+  const [showPreviousOrders, setShowPreviousOrders] = useState(false);
+  const [repeatOrderIssues, setRepeatOrderIssues] = useState([]);
 
   const [loadingServiceId, setLoadingServiceId] = useState("");
 
@@ -1700,6 +2122,42 @@ const NewOrder = () => {
     };
 
     loadPaymentPricing();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadPreviousOrders = async () => {
+      try {
+        const response = await orderService.getMyOrders();
+
+        if (mounted) {
+          setPreviousOrders(
+            Array.isArray(response?.orders) ? response.orders : [],
+          );
+          setPreviousOrdersError("");
+        }
+      } catch (loadError) {
+        console.error("Failed to load previous orders:", loadError);
+
+        if (mounted) {
+          setPreviousOrdersError(
+            loadError.response?.data?.message ||
+              "Previous orders could not be loaded.",
+          );
+        }
+      } finally {
+        if (mounted) {
+          setLoadingPreviousOrders(false);
+        }
+      }
+    };
+
+    loadPreviousOrders();
+
     return () => {
       mounted = false;
     };
@@ -1823,6 +2281,31 @@ const NewOrder = () => {
     setActiveServiceIndex(existingIndex);
   };
 
+  const handleRepeatPreviousOrder = (previousOrder) => {
+    const restored = restoreOrderItems(previousOrder, services);
+
+    if (restored.items.length === 0) {
+      setRepeatOrderIssues(
+        restored.issues.length > 0
+          ? restored.issues
+          : ["No active services from this order could be restored."],
+      );
+      return;
+    }
+
+    setOrderItems(restored.items);
+    setActiveServiceIndex(0);
+    setOpenServiceIds(
+      Object.fromEntries(
+        restored.items.map((item) => [String(item.service._id), true]),
+      ),
+    );
+    setAdditionalRequirements(previousOrder.additionalRequirements || "");
+    setRepeatOrderIssues(restored.issues);
+    setShowPreviousOrders(false);
+    setError("");
+  };
+
   /*
   |--------------------------------------------------------------------------
   | Pricing
@@ -1836,6 +2319,7 @@ const NewOrder = () => {
       return {
         ...current,
         selectedPricingOption: option,
+        _requiresPricingOption: false,
         formData: {
           ...(current.formData || {}),
           quantity: rules.minQuantity,
@@ -1880,6 +2364,9 @@ const NewOrder = () => {
       return {
         ...current,
         selectedPricingOptions: nextSelectedOptions,
+        _missingPricingGroups: (current._missingPricingGroups || []).filter(
+          (name) => name !== group,
+        ),
         pricingQuantities: nextQuantities,
         formData: nextFormData,
       };
@@ -2055,6 +2542,9 @@ const NewOrder = () => {
 
       const nextEntry = {
         ...existingEntry,
+        _missingPricingGroups: (
+          existingEntry._missingPricingGroups || []
+        ).filter((name) => name !== pricingGroupName),
 
         pricingOptions: {
           ...(existingEntry.pricingOptions || {}),
@@ -2531,6 +3021,12 @@ const NewOrder = () => {
       for (let entryIndex = 0; entryIndex < entries.length; entryIndex += 1) {
         const entry = entries[entryIndex] || {};
 
+        if (entry._missingPricingGroups?.length > 0) {
+          return `${group.label || group.name} ${
+            entryIndex + 1
+          }: choose a current replacement for the unavailable ${entry._missingPricingGroups[0]} option.`;
+        }
+
         for (const pricingGroup of repeatablePricingGroups) {
           const selectedOptionId = entry?.pricingOptions?.[pricingGroup.name];
 
@@ -2718,6 +3214,10 @@ const NewOrder = () => {
       return "";
     }
 
+    if (item._missingPricingGroups?.length > 0) {
+      return `Choose a current replacement for the unavailable ${item._missingPricingGroups[0]} option.`;
+    }
+
     const groups = getPricingGroups(item.service);
 
     for (const group of groups) {
@@ -2765,7 +3265,7 @@ const NewOrder = () => {
     } else if (
       !repeatableOnly &&
       itemPricingOptions.length > 0 &&
-      !item.selectedPricingOption
+      (!item.selectedPricingOption || item._requiresPricingOption)
     ) {
       return "Please select a service option.";
     }
@@ -2967,7 +3467,7 @@ const NewOrder = () => {
       return;
     }
 
-    if (paymentMethod !== "cod" && !paymentPricing) {
+    if (paymentMethod === "online" && !paymentPricing) {
       setError(
         paymentPricingError ||
           "Payment tax information is still loading. Please try again.",
@@ -3053,7 +3553,7 @@ const NewOrder = () => {
       |--------------------------------------------------------------------------
       */
 
-      if (paymentMethod === "cod") {
+      if (paymentMethod === "cod" || paymentMethod === "cheque") {
         setOrderSuccess(createdOrder);
         return;
       }
@@ -3270,6 +3770,45 @@ const NewOrder = () => {
           ================================================================= */}
 
           <div className="min-w-0 space-y-6">
+            {(previousOrders.length > 0 ||
+              loadingPreviousOrders ||
+              previousOrdersError) && (
+              <section className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3.5 shadow-[0_8px_24px_rgba(0,0,0,0.035)] sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-500">
+                    {loadingPreviousOrders ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <History size={16} />
+                    )}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-zinc-900">
+                      Ordering again?
+                    </p>
+                    <p className="mt-0.5 text-xs leading-5 text-zinc-500">
+                      Repeat a previous order and review its current pricing.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={loadingPreviousOrders || loadingServices}
+                  onClick={() =>
+                    setShowPreviousOrders((current) => !current)
+                  }
+                  aria-expanded={showPreviousOrders}
+                  className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-zinc-900 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                >
+                  {showPreviousOrders ? "Close previous orders" : "Repeat a previous order"}
+                  {!showPreviousOrders && (
+                    <ArrowRight size={14} aria-hidden="true" />
+                  )}
+                </button>
+              </section>
+            )}
+
             {/* ==============================================================
                 SERVICE CHECKLIST
             ============================================================== */}
@@ -3292,11 +3831,125 @@ const NewOrder = () => {
                     </p>
                   </div>
 
-                  <div className="shrink-0 rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs font-medium text-zinc-500">
+                  <div className="shrink-0 self-start rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-xs font-medium text-zinc-500 sm:self-auto">
                     {orderItems.length} selected
                   </div>
                 </div>
               </div>
+
+              {showPreviousOrders && (
+                <div className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-sm font-semibold text-zinc-900">
+                        Choose an order to repeat
+                      </h2>
+                      <p className="mt-1 text-xs leading-5 text-zinc-500">
+                        Services and options will be checked against current
+                        availability and repriced for this new order.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowPreviousOrders(false)}
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white hover:text-zinc-700"
+                      aria-label="Close previous orders"
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+
+                  {previousOrdersError ? (
+                    <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                      {previousOrdersError}
+                    </p>
+                  ) : previousOrders.length === 0 ? (
+                    <p className="mt-3 text-xs text-zinc-500">
+                      No previous orders are available.
+                    </p>
+                  ) : (
+                    <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
+                      {previousOrders.slice(0, 10).map((previousOrder) => {
+                        const previousItems = getSavedOrderItems(previousOrder);
+                        const itemNames = previousItems
+                          .map(
+                            (item) =>
+                              item?.serviceSnapshot?.name ||
+                              item?.service?.name ||
+                              "Service",
+                          )
+                          .filter(Boolean);
+                        const orderLabel =
+                          previousOrder.orderNumber ||
+                          `Order ${String(previousOrder._id || "").slice(-6)}`;
+                        const date = previousOrder.createdAt
+                          ? new Date(
+                              previousOrder.createdAt,
+                            ).toLocaleDateString("en-IN", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : "Date unavailable";
+
+                        return (
+                          <button
+                            type="button"
+                            key={previousOrder._id || orderLabel}
+                            onClick={() =>
+                              handleRepeatPreviousOrder(previousOrder)
+                            }
+                            className="flex w-full items-center justify-between gap-4 rounded-xl border border-zinc-200 bg-white px-3.5 py-3 text-left transition hover:border-zinc-400"
+                          >
+                            <span className="min-w-0">
+                              <span className="flex flex-wrap items-center gap-2">
+                                <span className="text-xs font-semibold text-zinc-900">
+                                  {orderLabel}
+                                </span>
+                                <span className="text-[11px] text-zinc-400">
+                                  {date}
+                                </span>
+                              </span>
+                              <span className="mt-1 block truncate text-xs text-zinc-500">
+                                {itemNames.join(", ") || "No services listed"}
+                              </span>
+                            </span>
+                            <span className="shrink-0 text-right">
+                              <span className="block text-xs font-semibold text-zinc-900">
+                                {formatCurrency(previousOrder.amount)}
+                              </span>
+                              <span className="mt-1 block text-[10px] text-zinc-400">
+                                Recalculate
+                              </span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {repeatOrderIssues.length > 0 && (
+                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      {repeatOrderIssues.map((issue) => (
+                        <p key={issue} className="text-xs leading-5 text-amber-900">
+                          {issue}
+                        </p>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setRepeatOrderIssues([])}
+                      className="shrink-0 text-xs font-medium text-amber-800 underline underline-offset-2"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="mt-6 space-y-4">
                 {services.map((service) => {
@@ -3418,7 +4071,7 @@ const NewOrder = () => {
                             type="button"
                             disabled={!selected}
                             onClick={() => handleServiceNameClick(serviceId)}
-                            className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
+                            className="flex min-w-0 flex-1 items-center text-left disabled:cursor-default"
                           >
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-sm font-semibold text-zinc-900 sm:text-[15px]">
@@ -3434,22 +4087,10 @@ const NewOrder = () => {
                               )} */}
                             </span>
 
-                            {selected &&
-                              (openServiceIds[serviceId] ? (
-                                <ChevronUp
-                                  size={16}
-                                  className="shrink-0 text-zinc-400"
-                                />
-                              ) : (
-                                <ChevronDown
-                                  size={16}
-                                  className="shrink-0 text-zinc-400"
-                                />
-                              ))}
                           </button>
                         </div>
 
-                        <div className="flex items-center justify-between gap-3 sm:justify-end">
+                        <div className="flex items-center justify-between gap-2 sm:justify-end">
                           {selected && quantityInfo?.hasQuantity && (
                             <div className="flex items-center gap-2">
                               <span className="hidden text-[10px] font-medium uppercase tracking-wide text-zinc-400 sm:block">
@@ -3489,6 +4130,24 @@ const NewOrder = () => {
                                     : "Configure"}
                               </p>
                             </div>
+                          )}
+
+                          {selected && (
+                            <button
+                              type="button"
+                              onClick={() => handleServiceNameClick(serviceId)}
+                              aria-label={`${
+                                openServiceIds[serviceId] ? "Collapse" : "Expand"
+                              } ${service.name} configuration`}
+                              aria-expanded={Boolean(openServiceIds[serviceId])}
+                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-500 transition hover:border-zinc-300 hover:text-zinc-900"
+                            >
+                              {openServiceIds[serviceId] ? (
+                                <ChevronUp size={16} />
+                              ) : (
+                                <ChevronDown size={16} />
+                              )}
+                            </button>
                           )}
                         </div>
                       </div>
@@ -4185,17 +4844,17 @@ const NewOrder = () => {
                         selected={chequeType === "direct_collection"}
                         onClick={() => setChequeType("direct_collection")}
                         title="Cheque — Direct Collection"
-                        description="Cheque collected directly. Applicable GST is shown in the order total."
+                        description={`${paymentPricing?.chequeDirectCollection ?? "Loading"}% GST for direct collection.`}
                       />
                     </div>
                   )}
 
                   {(error ||
-                    (paymentMethod !== "cod" && paymentPricingError)) && (
+                    (paymentMethod === "online" && paymentPricingError)) && (
                     <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
                       <p className="text-xs leading-5 text-red-700">
                         {error ||
-                          (paymentMethod !== "cod" && paymentPricingError)}
+                          (paymentMethod === "online" && paymentPricingError)}
                       </p>
                     </div>
                   )}
@@ -4204,7 +4863,7 @@ const NewOrder = () => {
                     type="submit"
                     disabled={
                       submitting ||
-                      (paymentMethod !== "cod" &&
+                      (paymentMethod === "online" &&
                         (paymentPricingLoading || !paymentPricing)) ||
                       Boolean(loadingServiceId) ||
                       !orderItems.length ||
@@ -4259,8 +4918,7 @@ const NewOrder = () => {
               RIGHT SUMMARY
           ================================================================= */}
 
-          <aside className="min-w-0 self-start">
-            <div className="lg:sticky lg:top-24">
+          <aside className="order-summary-scroll min-w-0 self-start lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
               {orderItems.length === 0 ? (
                 <section className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-6 sm:p-7">
                   <div className="flex min-h-[280px] flex-col items-center justify-center text-center">
@@ -4524,7 +5182,7 @@ const NewOrder = () => {
                         type="submit"
                         disabled={
                           submitting ||
-                          (paymentMethod !== "cod" &&
+                          (paymentMethod === "online" &&
                             (paymentPricingLoading || !paymentPricing)) ||
                           Boolean(loadingServiceId) ||
                           !orderItems.length ||
@@ -4553,7 +5211,6 @@ const NewOrder = () => {
                   </div>
                 </section>
               )}
-            </div>
           </aside>
         </div>
       </form>

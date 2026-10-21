@@ -581,7 +581,7 @@ const OrderDetails = () => {
         </div>
       )}
 
-      {order.items?.length > 0 && (
+      {(order.items?.length > 0 || order.serviceProgress) && (
         <div className="mt-6">
           <OrderItemsOverview order={order} />
         </div>

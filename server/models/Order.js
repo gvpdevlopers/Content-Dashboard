@@ -526,6 +526,69 @@ const serviceSnapshotSchema = new mongoose.Schema(
 |
 */
 
+const serviceDeliverableProgressSchema = new mongoose.Schema(
+  {
+    key: {
+      type: String,
+      required: true,
+    },
+
+    name: {
+      type: String,
+      required: true,
+    },
+
+    status: {
+      type: String,
+      enum: ["pending", "in_progress", "completed"],
+      default: "pending",
+    },
+
+    completedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
+const serviceProgressSchema = new mongoose.Schema(
+  {
+    type: {
+      type: String,
+      enum: ["time_based", "quantity_based"],
+      required: true,
+    },
+
+    status: {
+      type: String,
+      enum: ["pending_start", "in_progress", "completed"],
+      default: "pending_start",
+    },
+
+    startAt: {
+      type: Date,
+      default: null,
+    },
+
+    durationDays: {
+      type: Number,
+      default: null,
+      min: 1,
+    },
+
+    deliverables: {
+      type: [serviceDeliverableProgressSchema],
+      default: [],
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
 const orderItemSchema = new mongoose.Schema(
   {
     service: {
@@ -585,6 +648,11 @@ const orderItemSchema = new mongoose.Schema(
       type: Map,
       of: mongoose.Schema.Types.Mixed,
       default: {},
+    },
+
+    serviceProgress: {
+      type: serviceProgressSchema,
+      default: undefined,
     },
 
     /*
@@ -682,6 +750,11 @@ const orderSchema = new mongoose.Schema(
       type: Map,
       of: mongoose.Schema.Types.Mixed,
       default: {},
+    },
+
+    serviceProgress: {
+      type: serviceProgressSchema,
+      default: undefined,
     },
 
     /*

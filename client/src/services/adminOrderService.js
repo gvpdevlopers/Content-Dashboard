@@ -27,6 +27,19 @@ const updateOrderStatus = async (orderId, status, staffMode = false) => {
   return response.data;
 };
 
+const updateServiceProgress = async (
+  orderId,
+  itemId,
+  progressUpdate,
+  staffMode = false,
+) => {
+  const response = await api.patch(
+    `${getOrderRoot(staffMode)}/${orderId}/items/${itemId}/service-progress`,
+    progressUpdate,
+  );
+  return response.data;
+};
+
 const updatePaymentStatus = async (
   orderId,
   paymentStatus,
@@ -81,6 +94,7 @@ const adminOrderService = {
   getAdminOrders,
   getAdminOrderById,
   updateOrderStatus,
+  updateServiceProgress,
   updatePaymentStatus,
   updateDeliveryLink,
   updateInvoice,

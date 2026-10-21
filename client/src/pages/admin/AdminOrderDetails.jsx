@@ -40,6 +40,7 @@ const AdminOrderDetails = () => {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [notesLoading, setNotesLoading] = useState(false);
   const [codLoading, setCodLoading] = useState(false);
+  const [progressUpdatingKey, setProgressUpdatingKey] = useState("");
 
   const [error, setError] = useState("");
 
@@ -171,6 +172,40 @@ const AdminOrderDetails = () => {
       );
     } finally {
       setStatusLoading(false);
+    }
+  };
+
+  const handleServiceProgressUpdate = async (itemId, progressUpdate) => {
+    if (!order || !itemId) {
+      return;
+    }
+
+    const progressKey =
+      progressUpdate.action === "set_deliverable_status"
+        ? `${itemId}:${progressUpdate.deliverableKey}`
+        : `${itemId}:${progressUpdate.action}`;
+
+    try {
+      setProgressUpdatingKey(progressKey);
+      const data = await adminOrderService.updateServiceProgress(
+        order._id,
+        itemId,
+        progressUpdate,
+        staffMode,
+      );
+      setOrder((currentOrder) => ({
+        ...currentOrder,
+        ...data.order,
+      }));
+      toast.success(data.message || "Service progress updated.");
+    } catch (updateError) {
+      console.error("Update service progress error:", updateError);
+      toast.error(
+        updateError.response?.data?.message ||
+          "Unable to update service progress.",
+      );
+    } finally {
+      setProgressUpdatingKey("");
     }
   };
 
@@ -1087,7 +1122,14 @@ const AdminOrderDetails = () => {
             ORDER ITEMS
         ================================================== */}
 
-        {order?.items?.length > 0 && <OrderItemsOverview order={order} />}
+        {(order?.items?.length > 0 || order?.serviceProgress) && (
+          <OrderItemsOverview
+            order={order}
+            canManageProgress
+            updatingProgressKey={progressUpdatingKey}
+            onProgressUpdate={handleServiceProgressUpdate}
+          />
+        )}
 
         {/* =================================================
             CLIENT SUBMISSION

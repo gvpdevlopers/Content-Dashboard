@@ -9,6 +9,7 @@ const {
   getAdminOrderById,
   getStaffOrders,
   getStaffOrderById,
+  updateServiceProgress,
   updateOrderStatus,
   updatePaymentStatus,
   updateDeliveryLink,
@@ -56,6 +57,13 @@ router.get(
   protect,
   adminOnly,
   getAdminOrderById
+);
+
+router.patch(
+  "/admin/:id/items/:itemId/service-progress",
+  protect,
+  adminOnly,
+  updateServiceProgress
 );
 
 router.patch(
@@ -113,6 +121,13 @@ router.get(
   protect,
   orderStaff,
   getStaffOrderById
+);
+
+router.patch(
+  "/staff/:id/items/:itemId/service-progress",
+  protect,
+  orderStaff,
+  updateServiceProgress
 );
 
 router.patch(
