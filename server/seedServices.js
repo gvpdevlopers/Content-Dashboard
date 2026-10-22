@@ -547,7 +547,6 @@ const services = [
         "unit": "reel",
         "group": "voiceOver",
         "minQuantity": 1,
-        "maxQuantity": 1,
         "isActive": true,
         "fields": [],
         "order": 7

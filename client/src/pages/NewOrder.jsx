@@ -408,17 +408,11 @@ const getActiveFieldsForItem = (item) => {
   return getSortedItems(Array.from(fieldMap.values()));
 };
 
-const getSelectedFieldsPrice = (item) => {
-  const activeFields = getActiveFieldsForItem(item);
-
-  if (!activeFields.length) {
-    return 0;
-  }
-
+const getFieldValuesPrice = (activeFields, values = {}) => {
   let total = 0;
 
   for (const field of activeFields) {
-    const fieldValue = item.formData?.[field.name];
+    const fieldValue = values?.[field.name];
 
     if (isEmptyValue(fieldValue)) {
       continue;
@@ -450,6 +444,9 @@ const getSelectedFieldsPrice = (item) => {
   return total;
 };
 
+const getSelectedFieldsPrice = (item) =>
+  getFieldValuesPrice(getActiveFieldsForItem(item), item.formData);
+
 const getRepeatableGroupsPrice = (item) => {
   const groups = getRepeatableGroups(item?.service);
 
@@ -474,40 +471,7 @@ const getRepeatableGroupsPrice = (item) => {
         group,
         entry,
       );
-
-      for (const field of activeFields) {
-        const fieldName = String(field?.name || "").trim();
-
-        if (!fieldName) {
-          continue;
-        }
-
-        const value = entry?.fields?.[fieldName];
-
-        if (isEmptyValue(value)) {
-          continue;
-        }
-
-        const selectedValues = Array.isArray(value) ? value : [value];
-
-        for (const selectedValue of selectedValues) {
-          const selectedOption = (field.options || []).find(
-            (option) => String(option.value) === String(selectedValue),
-          );
-
-          if (selectedOption) {
-            total += Number(selectedOption.price || 0);
-          }
-        }
-
-        if (field.includeValueInPrice) {
-          const numericValue = Number(value);
-
-          if (Number.isFinite(numericValue)) {
-            total += numericValue;
-          }
-        }
-      }
+      total += getFieldValuesPrice(activeFields, entry?.fields || entry);
 
       total += getRepeatableEntryPricingTotal(item.service, group, entry);
     }
@@ -2019,6 +1983,9 @@ const NewOrder = () => {
   const [orderItems, setOrderItems] = useState([]);
 
   const [activeServiceIndex, setActiveServiceIndex] = useState(0);
+  const [expandedSummaryServices, setExpandedSummaryServices] = useState(
+    () => new Set(),
+  );
 
   const [paymentMethod, setPaymentMethod] = useState("cod");
   const [chequeType, setChequeType] = useState("");
@@ -4959,6 +4926,8 @@ const NewOrder = () => {
                     <div className="mt-6 space-y-3">
                       {orderItems.map((item, index) => {
                         const itemAmount = itemEstimates[index] || 0;
+                        const serviceId = String(item.service._id);
+                        const expanded = expandedSummaryServices.has(serviceId);
 
                         const selectedOptions = item.isGroupedPricing
                           ? Object.values(
@@ -4969,24 +4938,31 @@ const NewOrder = () => {
                             : [];
 
                         const quantityInfo = getQuantityInfo(item);
+                        const repeatableGroups = getRepeatableGroups(item.service);
+                        const hasBasePriceLine =
+                          selectedOptions.length === 0 &&
+                          Number(item.service.basePrice || 0) > 0 &&
+                          item.service.pricingType !== "custom";
 
                         return (
-                          <button
-                            type="button"
-                            key={item.service._id}
-                            onClick={() => setActiveServiceIndex(index)}
+                          <article
+                            key={serviceId}
                             className={`
-                                w-full rounded-2xl border p-3.5 text-left
-                                transition-all duration-200
-                                ${
-                                  index === activeServiceIndex
-                                    ? "border-white/20 bg-white/10"
-                                    : "border-white/5 bg-white/[0.03] hover:bg-white/[0.06]"
-                                }
-                              `}
+                              w-full rounded-2xl border p-3.5
+                              transition-all duration-200
+                              ${
+                                index === activeServiceIndex
+                                  ? "border-white/20 bg-white/10"
+                                  : "border-white/5 bg-white/[0.03]"
+                              }
+                            `}
                           >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
+                            <div className="flex items-start gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setActiveServiceIndex(index)}
+                                className="min-w-0 flex-1 rounded-lg text-left"
+                              >
                                 <p className="text-[10px] uppercase tracking-wide text-white/35">
                                   Service {index + 1}
                                 </p>
@@ -5000,77 +4976,255 @@ const NewOrder = () => {
                                     Qty {quantityInfo.quantity}
                                   </p>
                                 )}
-                              </div>
+                              </button>
 
-                              <p className="shrink-0 text-sm font-medium text-white">
+                              <p className="shrink-0 pt-4 text-sm font-medium text-white">
                                 {isCustomUnpricedItem(item)
                                   ? "Custom"
                                   : formatCurrency(itemAmount)}
                               </p>
+
+                              <button
+                                type="button"
+                                aria-expanded={expanded}
+                                aria-label={`${expanded ? "Hide" : "Show"} ${item.service.name} pricing details`}
+                                onClick={() =>
+                                  setExpandedSummaryServices((current) => {
+                                    const next = new Set(current);
+                                    if (next.has(serviceId)) {
+                                      next.delete(serviceId);
+                                    } else {
+                                      next.add(serviceId);
+                                    }
+                                    return next;
+                                  })
+                                }
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/50 transition hover:bg-white/10 hover:text-white"
+                              >
+                                {expanded ? (
+                                  <ChevronUp size={16} aria-hidden="true" />
+                                ) : (
+                                  <ChevronDown size={16} aria-hidden="true" />
+                                )}
+                              </button>
                             </div>
 
-                            {selectedOptions.length > 0 && (
-                              <div className="mt-3 space-y-1.5 border-t border-white/10 pt-3">
-                                {selectedOptions.map((option) => {
-                                  const groupKey =
-                                    String(option.group || "").trim() ||
-                                    "__ungrouped__";
+                            {expanded && (
+                              <div className="mt-3 space-y-3 border-t border-white/10 pt-3">
+                                {selectedOptions.length > 0 &&
+                                  selectedOptions.map((option) => {
+                                    const groupKey =
+                                      String(option.group || "").trim() ||
+                                      "__ungrouped__";
+                                    const optionQuantity = item.isGroupedPricing
+                                      ? getGroupedOptionQuantity(
+                                          item,
+                                          groupKey,
+                                          option,
+                                        )
+                                      : getItemQuantity(item);
+                                    const lineTotal =
+                                      Number(option.price || 0) * optionQuantity;
 
-                                  const optionQuantity = item.isGroupedPricing
-                                    ? getGroupedOptionQuantity(
-                                        item,
-                                        groupKey,
-                                        option,
-                                      )
-                                    : getItemQuantity(item);
+                                    return (
+                                      <div
+                                        key={option._id}
+                                        className="flex items-start justify-between gap-3"
+                                      >
+                                        <div className="min-w-0">
+                                          <p className="truncate text-xs text-white/75">
+                                            {option.name}
+                                          </p>
+                                          <p className="mt-0.5 text-[10px] text-white/35">
+                                            {optionQuantity} ×{" "}
+                                            {formatCurrency(option.price)} /{" "}
+                                            {option.unit || "unit"}
+                                          </p>
+                                        </div>
+                                        <p className="shrink-0 text-xs text-white/70">
+                                          {formatCurrency(lineTotal)}
+                                        </p>
+                                      </div>
+                                    );
+                                  })}
 
-                                  return (
-                                    <div
-                                      key={option._id}
-                                      className="flex items-center justify-between gap-3"
-                                    >
-                                      <p className="min-w-0 truncate text-xs text-white/50">
-                                        {option.name}
+                                {hasBasePriceLine && (
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <p className="text-xs text-white/75">
+                                        {item.service.pricingType === "fixed"
+                                          ? "Service price"
+                                          : item.service.name}
                                       </p>
-
-                                      <p className="shrink-0 text-[11px] text-white/35">
-                                        {optionQuantity} ×{" "}
-                                        {formatCurrency(option.price)}
+                                      <p className="mt-0.5 text-[10px] text-white/35">
+                                        {quantityInfo.quantity} ×{" "}
+                                        {formatCurrency(item.service.basePrice)}{" "}
+                                        / {item.service.unit || "unit"}
                                       </p>
                                     </div>
-                                  );
+                                    <p className="shrink-0 text-xs text-white/70">
+                                      {formatCurrency(
+                                        Number(item.service.basePrice || 0) *
+                                          (item.service.pricingType === "fixed"
+                                            ? 1
+                                            : quantityInfo.quantity),
+                                      )}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {repeatableGroups.map((group) => {
+                                  const entries = Array.isArray(
+                                    item.formData?.[group.name],
+                                  )
+                                    ? item.formData[group.name]
+                                    : [];
+                                  const pricingGroups =
+                                    getRepeatableGroupPricingGroups(
+                                      item.service,
+                                      group,
+                                    );
+
+                                  return entries.map((entry, entryIndex) => {
+                                    const selectedEntryOptions =
+                                      pricingGroups.flatMap(
+                                        (pricingGroup) => {
+                                          const selectedId =
+                                            entry?.pricingOptions?.[
+                                              pricingGroup.name
+                                            ];
+                                          const option =
+                                            pricingGroup.options.find(
+                                              (candidate) =>
+                                                String(candidate._id) ===
+                                                String(selectedId),
+                                            );
+
+                                          if (!option) {
+                                            return [];
+                                          }
+
+                                          const rules = getQuantityRules(
+                                            item.service,
+                                            option,
+                                          );
+                                          const rawQuantity =
+                                            entry?.pricingQuantities?.[
+                                              pricingGroup.name
+                                            ];
+                                          const optionQuantity =
+                                            rawQuantity !== undefined &&
+                                            rawQuantity !== null
+                                              ? Number(rawQuantity)
+                                              : rules.minQuantity;
+
+                                          return [
+                                            {
+                                              option,
+                                              quantity: optionQuantity,
+                                              lineTotal:
+                                                Number(option.price || 0) *
+                                                optionQuantity,
+                                            },
+                                          ];
+                                        },
+                                      );
+                                    const entryFieldPrice =
+                                      getFieldValuesPrice(
+                                        getActiveFieldsForRepeatableEntry(
+                                          item.service,
+                                          group,
+                                          entry,
+                                        ),
+                                        entry?.fields || entry,
+                                      );
+                                    const entryPricingTotal =
+                                      getRepeatableEntryPricingTotal(
+                                        item.service,
+                                        group,
+                                        entry,
+                                      ) + entryFieldPrice;
+
+                                    return (
+                                      <div
+                                        key={`${group.name}-${entryIndex}`}
+                                        className="rounded-xl border border-white/10 bg-black/10 p-3"
+                                      >
+                                        <div className="mb-2 flex items-center justify-between gap-3">
+                                          <p className="text-[11px] font-semibold text-white/75">
+                                            {group.label || "Item"}{" "}
+                                            {entryIndex + 1}
+                                          </p>
+                                          <p className="text-[10px] text-white/35">
+                                            Reel subtotal{" "}
+                                            {formatCurrency(entryPricingTotal)}
+                                          </p>
+                                        </div>
+
+                                        {selectedEntryOptions.map(
+                                          ({ option, quantity, lineTotal }) => (
+                                            <div
+                                              key={option._id}
+                                              className="flex items-start justify-between gap-3 py-1"
+                                            >
+                                              <div className="min-w-0">
+                                                <p className="truncate text-xs text-white/65">
+                                                  {option.name}
+                                                </p>
+                                                <p className="mt-0.5 text-[10px] text-white/35">
+                                                  {quantity} ×{" "}
+                                                  {formatCurrency(option.price)}{" "}
+                                                  / {option.unit || "unit"}
+                                                </p>
+                                              </div>
+                                              <p className="shrink-0 text-xs text-white/55">
+                                                {formatCurrency(lineTotal)}
+                                              </p>
+                                            </div>
+                                          ),
+                                        )}
+
+                                        {entryFieldPrice > 0 && (
+                                          <div className="flex items-center justify-between gap-3 border-t border-white/10 pt-2">
+                                            <p className="text-[10px] text-white/40">
+                                              Applicable charges
+                                            </p>
+                                            <p className="text-xs text-white/55">
+                                              {formatCurrency(entryFieldPrice)}
+                                            </p>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  });
                                 })}
+
+                                {getSelectedFieldsPrice(item) > 0 && (
+                                  <div className="flex items-center justify-between gap-3">
+                                    <p className="text-xs text-white/45">
+                                      Applicable charges
+                                    </p>
+                                    <p className="text-xs text-white/65">
+                                      {formatCurrency(
+                                        getSelectedFieldsPrice(item),
+                                      )}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {itemAmount > 0 && (
+                                  <div className="flex items-center justify-between gap-3 border-t border-white/10 pt-2">
+                                    <p className="text-[10px] uppercase tracking-wide text-white/35">
+                                      Service subtotal
+                                    </p>
+                                    <p className="text-xs font-medium text-white/75">
+                                      {formatCurrency(itemAmount)}
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                             )}
-
-                            {getSelectedFieldsPrice(item) > 0 && (
-                              <div className="mt-2 flex items-center justify-between gap-3">
-                                <p className="text-[11px] text-white/35">
-                                  Selected add-ons
-                                </p>
-
-                                <p className="text-[11px] text-white/50">
-                                  +
-                                  {formatCurrency(getSelectedFieldsPrice(item))}
-                                </p>
-                              </div>
-                            )}
-
-                            {getRepeatableGroupsPrice(item) > 0 && (
-                              <div className="mt-2 flex items-center justify-between gap-3">
-                                <p className="text-[11px] text-white/35">
-                                  Repeated add-ons
-                                </p>
-
-                                <p className="text-[11px] text-white/50">
-                                  +
-                                  {formatCurrency(
-                                    getRepeatableGroupsPrice(item),
-                                  )}
-                                </p>
-                              </div>
-                            )}
-                          </button>
+                          </article>
                         );
                       })}
                     </div>
