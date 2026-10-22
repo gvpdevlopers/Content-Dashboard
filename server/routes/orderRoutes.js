@@ -2,8 +2,10 @@ const express = require("express");
 
 const {
   getPaymentPricing,
+  getCouponQuote,
   createOrder,
   getMyOrders,
+  getLatestMyOrder,
   getOrderById,
   getAdminOrders,
   getAdminOrderById,
@@ -28,6 +30,12 @@ router.get(
   "/payment-pricing",
   protect,
   getPaymentPricing
+);
+
+router.post(
+  "/coupon-quote",
+  protect,
+  getCouponQuote,
 );
 
 /*
@@ -168,6 +176,12 @@ router.get(
   "/",
   protect,
   getMyOrders
+);
+
+router.get(
+  "/latest",
+  protect,
+  getLatestMyOrder
 );
 
 router.get(

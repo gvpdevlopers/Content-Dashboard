@@ -990,3 +990,9 @@ a {
 button:disabled {
   cursor: not-allowed;
 }
+
+#order-coupon-code {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff;
+  caret-color: #fff;
+}

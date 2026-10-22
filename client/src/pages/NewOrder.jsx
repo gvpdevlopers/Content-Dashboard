@@ -1986,6 +1986,12 @@ const NewOrder = () => {
   const [expandedSummaryServices, setExpandedSummaryServices] = useState(
     () => new Set(),
   );
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCouponCode, setAppliedCouponCode] = useState("");
+  const [couponQuote, setCouponQuote] = useState(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState("");
+  const [couponErrorRequestKey, setCouponErrorRequestKey] = useState("");
 
   const [paymentMethod, setPaymentMethod] = useState("cod");
   const [chequeType, setChequeType] = useState("");
@@ -1996,10 +2002,9 @@ const NewOrder = () => {
   const [additionalRequirements, setAdditionalRequirements] = useState("");
 
   const [loadingServices, setLoadingServices] = useState(true);
-  const [previousOrders, setPreviousOrders] = useState([]);
+  const [latestPreviousOrder, setLatestPreviousOrder] = useState(null);
   const [loadingPreviousOrders, setLoadingPreviousOrders] = useState(true);
   const [previousOrdersError, setPreviousOrdersError] = useState("");
-  const [showPreviousOrders, setShowPreviousOrders] = useState(false);
   const [repeatOrderIssues, setRepeatOrderIssues] = useState([]);
 
   const [loadingServiceId, setLoadingServiceId] = useState("");
@@ -2095,16 +2100,65 @@ const NewOrder = () => {
   }, []);
 
   useEffect(() => {
+    if (!appliedCouponCode) {
+      return undefined;
+    }
+
+    const requestKey = JSON.stringify({
+      code: appliedCouponCode,
+      orderItems,
+      paymentMethod,
+      chequeType,
+    });
+    let cancelled = false;
+
+    const timeoutId = window.setTimeout(async () => {
+      setCouponLoading(true);
+      setCouponError("");
+      setCouponErrorRequestKey("");
+      try {
+        if (orderItems.length === 0) {
+          throw new Error("Select at least one service to use a coupon.");
+        }
+        const response = await orderService.validateCoupon({
+          code: appliedCouponCode,
+          services: buildServicesPayload(),
+          paymentMethod,
+          ...(paymentMethod === "cheque" ? { chequeType } : {}),
+        });
+        if (!cancelled) {
+          setCouponQuote({ ...response.quote, _requestKey: requestKey });
+        }
+      } catch (validationError) {
+        if (!cancelled) {
+          setCouponError(
+            validationError.response?.data?.message ||
+              "Unable to validate this coupon.",
+          );
+          setCouponErrorRequestKey(requestKey);
+        }
+      } finally {
+        if (!cancelled) {
+          setCouponLoading(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [appliedCouponCode, orderItems, paymentMethod, chequeType]);
+
+  useEffect(() => {
     let mounted = true;
 
     const loadPreviousOrders = async () => {
       try {
-        const response = await orderService.getMyOrders();
+        const response = await orderService.getLatestMyOrder();
 
         if (mounted) {
-          setPreviousOrders(
-            Array.isArray(response?.orders) ? response.orders : [],
-          );
+          setLatestPreviousOrder(response?.order || null);
           setPreviousOrdersError("");
         }
       } catch (loadError) {
@@ -2269,7 +2323,6 @@ const NewOrder = () => {
     );
     setAdditionalRequirements(previousOrder.additionalRequirements || "");
     setRepeatOrderIssues(restored.issues);
-    setShowPreviousOrders(false);
     setError("");
   };
 
@@ -2820,15 +2873,45 @@ const NewOrder = () => {
     return null;
   }, [paymentPricing, paymentMethod, chequeType]);
 
+  const currentCouponRequestKey = appliedCouponCode
+    ? JSON.stringify({
+        code: appliedCouponCode,
+        orderItems,
+        paymentMethod,
+        chequeType,
+      })
+    : "";
+  const currentCouponQuote =
+    couponQuote?._requestKey === currentCouponRequestKey
+      ? couponQuote
+      : null;
+  const currentCouponError =
+    couponErrorRequestKey === currentCouponRequestKey ? couponError : "";
+  const hasCurrentCouponQuote = Boolean(currentCouponQuote);
+  const couponDiscountTotal = Number(currentCouponQuote?.discountTotal || 0);
+  const taxableSubtotal = currentCouponQuote
+    ? Number(currentCouponQuote.taxableSubtotal || 0)
+    : Math.max(0, subtotal - couponDiscountTotal);
+  const currentCouponLoading =
+    couponLoading ||
+    Boolean(appliedCouponCode && !currentCouponQuote && !currentCouponError);
+
   const gstAmount = useMemo(
     () =>
-      gstRate === null
+      hasCurrentCouponQuote
+        ? Number(currentCouponQuote.gstAmount || 0)
+        : gstRate === null
         ? 0
-        : Number(((subtotal * gstRate) / 100).toFixed(2)),
-    [gstRate, subtotal],
+        : Number(((taxableSubtotal * gstRate) / 100).toFixed(2)),
+    [currentCouponQuote, gstRate, hasCurrentCouponQuote, taxableSubtotal],
   );
 
-  const estimatedTotal = gstRate === null ? null : subtotal + gstAmount;
+  const estimatedTotal =
+    hasCurrentCouponQuote
+      ? Number(currentCouponQuote.finalTotal)
+      : gstRate === null
+        ? null
+        : taxableSubtotal + gstAmount;
 
   const selectPaymentMethod = (method) => {
     setPaymentMethod(method);
@@ -3419,6 +3502,25 @@ const NewOrder = () => {
     return cleanFormData;
   };
 
+  function buildServicesPayload() {
+    return orderItems.map((item) => ({
+      serviceId: item.service._id,
+      ...(item.isGroupedPricing
+        ? {}
+        : {
+            pricingOptionId: item.selectedPricingOption?._id || undefined,
+          }),
+      quantity: item.isGroupedPricing
+        ? 1
+        : item.selectedPricingOption ||
+            item.service?.pricingType === "per_unit" ||
+            item.service?.pricingType === "starting_from"
+          ? getItemQuantity(item)
+          : 1,
+      formData: buildCleanFormData(item),
+    }));
+  }
+
   /*
   |--------------------------------------------------------------------------
   | Submit
@@ -3439,6 +3541,14 @@ const NewOrder = () => {
         paymentPricingError ||
           "Payment tax information is still loading. Please try again.",
       );
+      return;
+    }
+
+    if (
+      appliedCouponCode &&
+      (currentCouponLoading || !currentCouponQuote || currentCouponError)
+    ) {
+      setError("Wait for the coupon to finish validating before placing your order.");
       return;
     }
 
@@ -3479,31 +3589,14 @@ const NewOrder = () => {
     try {
       setSubmitting(true);
 
-      const servicesPayload = orderItems.map((item) => ({
-        serviceId: item.service._id,
-
-        ...(item.isGroupedPricing
-          ? {}
-          : {
-              pricingOptionId: item.selectedPricingOption?._id || undefined,
-            }),
-
-        quantity: item.isGroupedPricing
-          ? 1
-          : item.selectedPricingOption ||
-              item.service?.pricingType === "per_unit" ||
-              item.service?.pricingType === "starting_from"
-            ? getItemQuantity(item)
-            : 1,
-
-        formData: buildCleanFormData(item),
-      }));
+      const servicesPayload = buildServicesPayload();
 
       const orderResponse = await orderService.createOrder({
         services: servicesPayload,
         additionalRequirements: additionalRequirements.trim(),
         paymentMethod,
         ...(paymentMethod === "cheque" ? { chequeType } : {}),
+        ...(appliedCouponCode ? { couponCode: appliedCouponCode } : {}),
       });
 
       const createdOrder = orderResponse?.order;
@@ -3737,10 +3830,7 @@ const NewOrder = () => {
           ================================================================= */}
 
           <div className="min-w-0 space-y-6">
-            {(previousOrders.length > 0 ||
-              loadingPreviousOrders ||
-              previousOrdersError) && (
-              <section className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3.5 shadow-[0_8px_24px_rgba(0,0,0,0.035)] sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <section className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3.5 shadow-[0_8px_24px_rgba(0,0,0,0.035)] sm:flex-row sm:items-center sm:justify-between sm:px-5">
                 <div className="flex min-w-0 items-start gap-3">
                   <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-500">
                     {loadingPreviousOrders ? (
@@ -3759,22 +3849,28 @@ const NewOrder = () => {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  disabled={loadingPreviousOrders || loadingServices}
-                  onClick={() =>
-                    setShowPreviousOrders((current) => !current)
-                  }
-                  aria-expanded={showPreviousOrders}
-                  className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-zinc-900 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-                >
-                  {showPreviousOrders ? "Close previous orders" : "Repeat a previous order"}
-                  {!showPreviousOrders && (
+                {loadingPreviousOrders ? (
+                  <p className="text-xs text-zinc-500">Checking your latest order…</p>
+                ) : previousOrdersError ? (
+                  <p className="text-xs text-red-700">{previousOrdersError}</p>
+                ) : latestPreviousOrder ? (
+                  <button
+                    type="button"
+                    disabled={loadingServices}
+                    onClick={() =>
+                      handleRepeatPreviousOrder(latestPreviousOrder)
+                    }
+                    className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-zinc-900 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                  >
+                    Repeat Previous Order
                     <ArrowRight size={14} aria-hidden="true" />
-                  )}
-                </button>
-              </section>
-            )}
+                  </button>
+                ) : (
+                  <p className="text-xs text-zinc-500">
+                    You haven’t placed any orders yet.
+                  </p>
+                )}
+            </section>
 
             {/* ==============================================================
                 SERVICE CHECKLIST
@@ -3803,99 +3899,6 @@ const NewOrder = () => {
                   </div>
                 </div>
               </div>
-
-              {showPreviousOrders && (
-                <div className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-sm font-semibold text-zinc-900">
-                        Choose an order to repeat
-                      </h2>
-                      <p className="mt-1 text-xs leading-5 text-zinc-500">
-                        Services and options will be checked against current
-                        availability and repriced for this new order.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowPreviousOrders(false)}
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white hover:text-zinc-700"
-                      aria-label="Close previous orders"
-                    >
-                      <X size={15} />
-                    </button>
-                  </div>
-
-                  {previousOrdersError ? (
-                    <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                      {previousOrdersError}
-                    </p>
-                  ) : previousOrders.length === 0 ? (
-                    <p className="mt-3 text-xs text-zinc-500">
-                      No previous orders are available.
-                    </p>
-                  ) : (
-                    <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
-                      {previousOrders.slice(0, 10).map((previousOrder) => {
-                        const previousItems = getSavedOrderItems(previousOrder);
-                        const itemNames = previousItems
-                          .map(
-                            (item) =>
-                              item?.serviceSnapshot?.name ||
-                              item?.service?.name ||
-                              "Service",
-                          )
-                          .filter(Boolean);
-                        const orderLabel =
-                          previousOrder.orderNumber ||
-                          `Order ${String(previousOrder._id || "").slice(-6)}`;
-                        const date = previousOrder.createdAt
-                          ? new Date(
-                              previousOrder.createdAt,
-                            ).toLocaleDateString("en-IN", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })
-                          : "Date unavailable";
-
-                        return (
-                          <button
-                            type="button"
-                            key={previousOrder._id || orderLabel}
-                            onClick={() =>
-                              handleRepeatPreviousOrder(previousOrder)
-                            }
-                            className="flex w-full items-center justify-between gap-4 rounded-xl border border-zinc-200 bg-white px-3.5 py-3 text-left transition hover:border-zinc-400"
-                          >
-                            <span className="min-w-0">
-                              <span className="flex flex-wrap items-center gap-2">
-                                <span className="text-xs font-semibold text-zinc-900">
-                                  {orderLabel}
-                                </span>
-                                <span className="text-[11px] text-zinc-400">
-                                  {date}
-                                </span>
-                              </span>
-                              <span className="mt-1 block truncate text-xs text-zinc-500">
-                                {itemNames.join(", ") || "No services listed"}
-                              </span>
-                            </span>
-                            <span className="shrink-0 text-right">
-                              <span className="block text-xs font-semibold text-zinc-900">
-                                {formatCurrency(previousOrder.amount)}
-                              </span>
-                              <span className="mt-1 block text-[10px] text-zinc-400">
-                                Recalculate
-                              </span>
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
 
               {repeatOrderIssues.length > 0 && (
                 <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
@@ -4830,6 +4833,11 @@ const NewOrder = () => {
                     type="submit"
                     disabled={
                       submitting ||
+                      currentCouponLoading ||
+                      Boolean(
+                        appliedCouponCode &&
+                          (!hasCurrentCouponQuote || currentCouponError),
+                      ) ||
                       (paymentMethod === "online" &&
                         (paymentPricingLoading || !paymentPricing)) ||
                       Boolean(loadingServiceId) ||
@@ -4928,6 +4936,13 @@ const NewOrder = () => {
                         const itemAmount = itemEstimates[index] || 0;
                         const serviceId = String(item.service._id);
                         const expanded = expandedSummaryServices.has(serviceId);
+                        const serviceCouponLine =
+                          currentCouponQuote?.serviceBreakdown?.find(
+                            (line) => String(line.serviceId) === serviceId,
+                          );
+                        const discountedItemAmount = serviceCouponLine
+                          ? Number(serviceCouponLine.discountedAmount)
+                          : itemAmount;
 
                         const selectedOptions = item.isGroupedPricing
                           ? Object.values(
@@ -4978,11 +4993,18 @@ const NewOrder = () => {
                                 )}
                               </button>
 
-                              <p className="shrink-0 pt-4 text-sm font-medium text-white">
+                              <div className="shrink-0 pt-3 text-right">
+                                {serviceCouponLine?.discountAmount > 0 && (
+                                  <p className="text-[10px] text-white/35 line-through">
+                                    {formatCurrency(itemAmount)}
+                                  </p>
+                                )}
+                                <p className="text-sm font-medium text-white">
                                 {isCustomUnpricedItem(item)
                                   ? "Custom"
-                                  : formatCurrency(itemAmount)}
-                              </p>
+                                  : formatCurrency(discountedItemAmount)}
+                                </p>
+                              </div>
 
                               <button
                                 type="button"
@@ -5212,13 +5234,42 @@ const NewOrder = () => {
                                   </div>
                                 )}
 
+                                {serviceCouponLine && (
+                                  <div className="flex items-start justify-between gap-3 rounded-lg bg-white/[0.04] px-2.5 py-2">
+                                    <div>
+                                      <p className="text-xs text-emerald-200/80">
+                                        Coupon discount (
+                                        {serviceCouponLine.discountPercent}%)
+                                      </p>
+                                      {serviceCouponLine.eligibleAmount <
+                                        serviceCouponLine.originalAmount && (
+                                        <p className="mt-0.5 text-[10px] text-white/35">
+                                          Applied to{" "}
+                                          {formatCurrency(
+                                            serviceCouponLine.eligibleAmount,
+                                          )}{" "}
+                                          eligible charges
+                                        </p>
+                                      )}
+                                    </div>
+                                    <p className="shrink-0 text-xs font-medium text-emerald-200">
+                                      −
+                                      {formatCurrency(
+                                        serviceCouponLine.discountAmount,
+                                      )}
+                                    </p>
+                                  </div>
+                                )}
+
                                 {itemAmount > 0 && (
                                   <div className="flex items-center justify-between gap-3 border-t border-white/10 pt-2">
                                     <p className="text-[10px] uppercase tracking-wide text-white/35">
-                                      Service subtotal
+                                      {serviceCouponLine
+                                        ? "After discount"
+                                        : "Service subtotal"}
                                     </p>
                                     <p className="text-xs font-medium text-white/75">
-                                      {formatCurrency(itemAmount)}
+                                      {formatCurrency(discountedItemAmount)}
                                     </p>
                                   </div>
                                 )}
@@ -5229,18 +5280,151 @@ const NewOrder = () => {
                       })}
                     </div>
 
+                    <div className="mt-5 border-t border-white/10 pt-4">
+                      <label
+                        htmlFor="order-coupon-code"
+                        className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/35"
+                      >
+                        Discount coupon
+                      </label>
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          id="order-coupon-code"
+                          value={couponInput}
+                          disabled={Boolean(appliedCouponCode) || submitting}
+                          onChange={(event) =>
+                            setCouponInput(event.target.value.toUpperCase())
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              if (couponInput.trim()) {
+                                setCouponError("");
+                                setAppliedCouponCode(
+                                  couponInput.trim().toUpperCase(),
+                                );
+                              }
+                            }
+                          }}
+                          placeholder="Enter coupon code"
+                          className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm uppercase !text-white caret-white outline-none placeholder:normal-case placeholder:text-white/25 focus:border-white/25 disabled:opacity-60"
+                        />
+                        {appliedCouponCode ? (
+                          <button
+                            type="button"
+                            disabled={submitting}
+                            onClick={() => {
+                              setAppliedCouponCode("");
+                              setCouponInput("");
+                              setCouponQuote(null);
+                              setCouponError("");
+                              setCouponErrorRequestKey("");
+                              setCouponLoading(false);
+                            }}
+                            className="shrink-0 rounded-xl border border-white/15 px-3 py-2.5 text-xs font-medium text-white/70 hover:bg-white/10"
+                          >
+                            Remove
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={
+                              !couponInput.trim() ||
+                              !orderItems.length ||
+                              currentCouponLoading ||
+                              submitting
+                            }
+                            onClick={() => {
+                              setCouponError("");
+                              setAppliedCouponCode(
+                                couponInput.trim().toUpperCase(),
+                              );
+                            }}
+                            className="shrink-0 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Apply
+                          </button>
+                        )}
+                      </div>
+                      {currentCouponLoading && (
+                        <p className="mt-2 flex items-center gap-1.5 text-xs text-white/45">
+                          <Loader2 size={13} className="animate-spin" />
+                          Checking coupon against your order...
+                        </p>
+                      )}
+                      {currentCouponError && !currentCouponLoading && (
+                        <p className="mt-2 text-xs text-red-300">
+                          {currentCouponError}
+                        </p>
+                      )}
+                      {hasCurrentCouponQuote && !currentCouponLoading && (
+                        <p className="mt-2 text-xs text-emerald-200">
+                          {currentCouponQuote.code} applied successfully.
+                        </p>
+                      )}
+                    </div>
+
                     <div className="mt-5 space-y-3 border-t border-white/10 pt-5">
                       <div className="flex items-center justify-between gap-4">
-                        <p className="text-xs text-white/40">Subtotal</p>
+                        <p className="text-xs text-white/40">
+                          {hasCurrentCouponQuote
+                            ? "Original subtotal"
+                            : "Subtotal"}
+                        </p>
 
                         <p className="text-sm font-medium text-white">
                           {formatCurrency(subtotal)}
                         </p>
                       </div>
 
+                      {hasCurrentCouponQuote && (
+                        <>
+                          <div className="flex items-center justify-between gap-4">
+                            <div>
+                              <p className="text-xs text-emerald-200/80">
+                                Coupon {currentCouponQuote.code}
+                              </p>
+                              <p className="mt-0.5 text-[10px] text-white/30">
+                                Service-specific discounts
+                              </p>
+                            </div>
+                            <p className="text-sm font-medium text-emerald-200">
+                              −{formatCurrency(couponDiscountTotal)}
+                            </p>
+                          </div>
+                          <div className="flex items-center justify-between gap-4">
+                            <p className="text-xs text-white/40">
+                              Taxable subtotal
+                            </p>
+                            <p className="text-sm font-medium text-white">
+                              {formatCurrency(taxableSubtotal)}
+                            </p>
+                          </div>
+                          <div className="space-y-1 border-l border-white/10 pl-3">
+                            {currentCouponQuote.serviceBreakdown
+                              .filter((line) => line.discountAmount > 0)
+                              .map((line) => (
+                                <div
+                                  key={line.serviceId}
+                                  className="flex justify-between gap-3 text-[10px] text-white/40"
+                                >
+                                  <span className="truncate">
+                                    {line.serviceName} ({line.discountPercent}%)
+                                  </span>
+                                  <span className="shrink-0">
+                                    −{formatCurrency(line.discountAmount)}
+                                  </span>
+                                </div>
+                              ))}
+                          </div>
+                        </>
+                      )}
+
                       <div className="flex items-center justify-between gap-4">
                         <div>
-                          <p className="text-xs text-white/40">GST</p>
+                          <p className="text-xs text-white/40">
+                            GST{hasCurrentCouponQuote ? " on taxable subtotal" : ""}
+                          </p>
 
                           <p className="mt-0.5 text-[10px] text-white/25">
                             {gstRate === null
@@ -5336,6 +5520,11 @@ const NewOrder = () => {
                         type="submit"
                         disabled={
                           submitting ||
+                          currentCouponLoading ||
+                          Boolean(
+                            appliedCouponCode &&
+                              (!hasCurrentCouponQuote || currentCouponError),
+                          ) ||
                           (paymentMethod === "online" &&
                             (paymentPricingLoading || !paymentPricing)) ||
                           Boolean(loadingServiceId) ||

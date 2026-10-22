@@ -897,7 +897,31 @@ const AdminOrderDetails = () => {
                   }
                 />
               )}
-              <DetailItem label="Subtotal" value={formatCurrency(order?.subtotal)} />
+              {order?.couponSnapshot && (
+                <>
+                  <DetailItem
+                    label="Original subtotal"
+                    value={formatCurrency(order?.originalSubtotal)}
+                  />
+                  <DetailItem
+                    label={`Coupon (${order.couponSnapshot.code})`}
+                    value={`−${formatCurrency(order?.discountTotal)}`}
+                  />
+                  {order.couponSnapshot.serviceBreakdown
+                    ?.filter((entry) => entry.discountAmount > 0)
+                    .map((entry) => (
+                      <DetailItem
+                        key={entry.serviceId}
+                        label={`${entry.serviceName} (${entry.discountPercent}%)`}
+                        value={`−${formatCurrency(entry.discountAmount)}`}
+                      />
+                    ))}
+                </>
+              )}
+              <DetailItem
+                label={order?.couponSnapshot ? "Taxable subtotal" : "Subtotal"}
+                value={formatCurrency(order?.subtotal)}
+              />
               <DetailItem
                 label={`GST (${Number(order?.gstRate || 0)}%)`}
                 value={formatCurrency(order?.gstAmount)}

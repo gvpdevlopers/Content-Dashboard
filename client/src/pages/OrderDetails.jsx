@@ -934,7 +934,23 @@ const OrderDetails = () => {
             />
           )}
 
-          <InfoRow label="Subtotal" value={formatCurrency(order.subtotal)} />
+          {order.couponSnapshot && (
+            <>
+              <InfoRow
+                label="Original subtotal"
+                value={formatCurrency(order.originalSubtotal)}
+              />
+              <InfoRow
+                label={`Coupon (${order.couponSnapshot.code})`}
+                value={`−${formatCurrency(order.discountTotal)}`}
+              />
+            </>
+          )}
+
+          <InfoRow
+            label={order.couponSnapshot ? "Taxable subtotal" : "Subtotal"}
+            value={formatCurrency(order.subtotal)}
+          />
 
           <InfoRow
             label={`GST (${Number(order.gstRate || 0)}%)`}

@@ -589,6 +589,106 @@ const serviceProgressSchema = new mongoose.Schema(
   }
 );
 
+const couponDiscountSnapshotSchema = new mongoose.Schema(
+  {
+    serviceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+
+    serviceName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    discountPercent: {
+      type: Number,
+      required: true,
+      min: 0,
+      max: 100,
+    },
+
+    originalAmount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    eligibleAmount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    discountAmount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    discountedAmount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+  },
+  { _id: false },
+);
+
+const couponSnapshotSchema = new mongoose.Schema(
+  {
+    code: {
+      type: String,
+      required: true,
+      uppercase: true,
+      trim: true,
+    },
+
+    serviceBreakdown: {
+      type: [couponDiscountSnapshotSchema],
+      default: [],
+    },
+
+    originalSubtotal: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    discountTotal: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    taxableSubtotal: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    gstRate: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    gstAmount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    finalTotal: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+  },
+  { _id: false },
+);
+
 const orderItemSchema = new mongoose.Schema(
   {
     service: {
@@ -665,6 +765,25 @@ const orderItemSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 0,
+    },
+
+    originalAmount: {
+      type: Number,
+      default: undefined,
+      min: 0,
+    },
+
+    discountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    couponDiscountPercent: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
     },
   },
   {
@@ -789,6 +908,23 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 0,
+    },
+
+    originalSubtotal: {
+      type: Number,
+      default: undefined,
+      min: 0,
+    },
+
+    discountTotal: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    couponSnapshot: {
+      type: couponSnapshotSchema,
+      default: undefined,
     },
 
     gstRate: {

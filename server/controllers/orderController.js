@@ -1,5 +1,9 @@
 const Order = require("../models/Order");
 const Service = require("../models/Service");
+const Coupon = require("../models/Coupon");
+const CouponUsage = require("../models/CouponUsage");
+const CouponClientUsage = require("../models/CouponClientUsage");
+const mongoose = require("mongoose");
 const generateOrderNumber = require("../utils/generateOrderNumber");
 const normalizeAdsService = require("../utils/normalizeAdsService");
 const {
@@ -1942,6 +1946,42 @@ const calculateOrderAmount = ({
   return roundCurrency(amount);
 };
 
+const calculateCouponEligibleAmount = ({
+  service,
+  selectedOptions,
+  groupedQuantities,
+  quantity,
+  isGroupedPricing,
+  amount,
+}) => {
+  if (String(service.slug || "").toLowerCase() !== "ads") {
+    return roundCurrency(amount);
+  }
+
+  if (isGroupedPricing) {
+    return roundCurrency(
+      selectedOptions.reduce((total, option) => {
+        const group = normalizeString(option.group);
+        const optionQuantity =
+          groupedQuantities[group] ?? Number(option.minQuantity || 1);
+        return total + Number(option.price || 0) * optionQuantity;
+      }, 0),
+    );
+  }
+
+  if (selectedOptions.length > 0) {
+    return roundCurrency(
+      selectedOptions.reduce(
+        (total, option) =>
+          total + Number(option.price || 0) * Number(quantity || 1),
+        0,
+      ),
+    );
+  }
+
+  return 0;
+};
+
 const timeBasedServiceSlugs = new Set([
   "social-media-profile-management",
   "festival-stories-animated-graphics",
@@ -2421,6 +2461,15 @@ const processOrderServiceItem = async ({
       repeatableAmount,
     });
 
+  const couponEligibleAmount = calculateCouponEligibleAmount({
+    service,
+    selectedOptions,
+    groupedQuantities,
+    quantity: parsedQuantity,
+    isGroupedPricing,
+    amount,
+  });
+
   const serviceSnapshot =
     createServiceSnapshot({
       service,
@@ -2466,7 +2515,313 @@ const processOrderServiceItem = async ({
     item,
     service,
     amount,
+    couponEligibleAmount,
   };
+};
+
+const normalizeCouponCode = (value) =>
+  String(value || "")
+    .trim()
+    .toUpperCase();
+
+const couponRequestError = (message, statusCode = 400) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+};
+
+const validateCouponAvailability = async (coupon, clientId) => {
+  if (!coupon || !coupon.isActive) {
+    throw couponRequestError("This coupon is invalid or inactive.");
+  }
+
+  if (coupon.expiresAt && new Date(coupon.expiresAt) <= new Date()) {
+    throw couponRequestError("This coupon has expired.");
+  }
+
+  if (
+    coupon.totalUsageLimit !== null &&
+    coupon.totalUsageLimit !== undefined &&
+    coupon.usageCount >= coupon.totalUsageLimit
+  ) {
+    throw couponRequestError("This coupon has reached its usage limit.");
+  }
+
+  if (
+    clientId &&
+    coupon.perClientUsageLimit !== null &&
+    coupon.perClientUsageLimit !== undefined
+  ) {
+    const clientUsage = await CouponClientUsage.findOne({
+      coupon: coupon._id,
+      client: clientId,
+    }).lean();
+
+    if (
+      Number(clientUsage?.usageCount || 0) >= coupon.perClientUsageLimit
+    ) {
+      throw couponRequestError("You have reached this coupon's usage limit.");
+    }
+  }
+};
+
+const calculateCouponQuote = ({
+  coupon,
+  serviceResults,
+  paymentMethod,
+  chequeType,
+}) => {
+  const originalSubtotal = roundCurrency(
+    serviceResults.reduce(
+      (sum, result) => sum + Number(result.amount || 0),
+      0,
+    ),
+  );
+
+  if (originalSubtotal < Number(coupon.minimumOrderAmount || 0)) {
+    throw couponRequestError(
+      `This coupon requires a minimum order amount of ₹${Number(
+        coupon.minimumOrderAmount,
+      ).toLocaleString("en-IN")}.`,
+    );
+  }
+
+  const discountByService = new Map(
+    (coupon.serviceDiscounts || []).map((discount) => [
+      String(discount.serviceId),
+      Number(discount.discountPercent || 0),
+    ]),
+  );
+
+  let discountTotal = 0;
+  const serviceBreakdown = serviceResults.map((result) => {
+    const serviceId = String(result.item.service);
+    const discountPercent = discountByService.get(serviceId) || 0;
+    const originalAmount = roundCurrency(result.amount || 0);
+    const eligibleAmount = Math.min(
+      originalAmount,
+      roundCurrency(result.couponEligibleAmount || 0),
+    );
+    const discountAmount = roundCurrency(
+      eligibleAmount * (discountPercent / 100),
+    );
+    const discountedAmount = roundCurrency(originalAmount - discountAmount);
+
+    discountTotal += discountAmount;
+    return {
+      serviceId: result.item.service,
+      serviceName: result.service.name,
+      discountPercent,
+      originalAmount,
+      eligibleAmount,
+      discountAmount,
+      discountedAmount,
+    };
+  });
+
+  discountTotal = roundCurrency(discountTotal);
+  if (discountTotal <= 0) {
+    throw couponRequestError("This coupon does not apply to the selected services.");
+  }
+  const taxableSubtotal = roundCurrency(originalSubtotal - discountTotal);
+  const { gstRate, gstAmount, amount } = calculateOrderTotals(
+    taxableSubtotal,
+    getGstRate(paymentMethod, chequeType),
+  );
+
+  return {
+    code: coupon.code,
+    serviceBreakdown,
+    originalSubtotal,
+    discountTotal,
+    taxableSubtotal,
+    gstRate,
+    gstAmount,
+    finalTotal: amount,
+  };
+};
+
+const buildProcessedServiceResults = async (serviceRequests) => {
+  if (!Array.isArray(serviceRequests) || serviceRequests.length === 0) {
+    throw new Error("At least one service is required.");
+  }
+
+  if (serviceRequests.length > 50) {
+    throw new Error("Too many services in one order.");
+  }
+
+  const serviceIds = new Set();
+  const results = [];
+
+  for (const request of serviceRequests) {
+    if (!request?.serviceId) {
+      throw new Error("Each service must contain a serviceId.");
+    }
+
+    const serviceId = String(request.serviceId);
+    if (serviceIds.has(serviceId)) {
+      throw new Error(
+        "The same service cannot be added more than once to an order.",
+      );
+    }
+    serviceIds.add(serviceId);
+
+    const result = await processOrderServiceItem({
+      serviceId: request.serviceId,
+      pricingOptionId: request.pricingOptionId,
+      quantity: request.quantity ?? 1,
+      formData: request.formData || {},
+    });
+
+    if (!result.success) {
+      throw new Error(result.message || "Unable to process service.");
+    }
+
+    results.push(result);
+  }
+
+  return results;
+};
+
+const getCouponQuote = async (req, res) => {
+  try {
+    if (!req.user?._id || req.user.role !== "client") {
+      return res.status(403).json({
+        success: false,
+        message: "Only clients can validate checkout coupons.",
+      });
+    }
+
+    const { services, code, paymentMethod, chequeType } = req.body || {};
+    if (!["cod", "online", "cheque"].includes(paymentMethod)) {
+      return res.status(400).json({
+        success: false,
+        message: "Select a valid payment method.",
+      });
+    }
+    if (
+      paymentMethod === "cheque" &&
+      !["with_gst", "direct_collection"].includes(chequeType)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Select a valid cheque payment type.",
+      });
+    }
+    const serviceResults = await buildProcessedServiceResults(services);
+    const normalizedCode = normalizeCouponCode(code);
+    const coupon = await Coupon.findOne({ code: normalizedCode });
+
+    await validateCouponAvailability(coupon, req.user._id);
+    const quote = calculateCouponQuote({
+      coupon,
+      serviceResults,
+      paymentMethod,
+      chequeType,
+    });
+
+    return res.status(200).json({
+      success: true,
+      quote,
+    });
+  } catch (error) {
+    if (error instanceof mongoose.Error || error.name?.startsWith("Mongo")) {
+      console.error("Validate coupon error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Unable to validate coupon right now.",
+      });
+    }
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Unable to validate coupon.",
+    });
+  }
+};
+
+const reserveCouponUsage = async ({
+  coupon,
+  clientId,
+  session,
+}) => {
+  const now = new Date();
+  const couponFilter = {
+    _id: coupon._id,
+    isActive: true,
+    $and: [
+      {
+        $or: [
+          { expiresAt: null },
+          { expiresAt: { $gt: now } },
+        ],
+      },
+      {
+        $expr: {
+          $or: [
+            {
+              $eq: [
+                { $ifNull: ["$totalUsageLimit", null] },
+                null,
+              ],
+            },
+            { $lt: ["$usageCount", "$totalUsageLimit"] },
+          ],
+        },
+      },
+    ],
+  };
+
+  const reservedCoupon = await Coupon.findOneAndUpdate(
+    couponFilter,
+    { $inc: { usageCount: 1 } },
+    { new: true, session },
+  );
+
+  if (!reservedCoupon) {
+    throw couponRequestError("This coupon is no longer available.", 409);
+  }
+
+  const clientFilter = {
+    coupon: coupon._id,
+    client: clientId,
+  };
+  if (coupon.perClientUsageLimit !== null &&
+      coupon.perClientUsageLimit !== undefined) {
+    clientFilter.$expr = {
+      $lt: ["$usageCount", coupon.perClientUsageLimit],
+    };
+  }
+
+  try {
+    const clientReservation = await CouponClientUsage.findOneAndUpdate(
+      clientFilter,
+      {
+        $inc: { usageCount: 1 },
+        $setOnInsert: { coupon: coupon._id, client: clientId },
+      },
+      {
+        new: true,
+        upsert: true,
+        session,
+        setDefaultsOnInsert: false,
+      },
+    );
+
+    if (!clientReservation) {
+      throw couponRequestError(
+        "You have reached this coupon's usage limit.",
+        409,
+      );
+    }
+  } catch (error) {
+    if (error.code === 11000) {
+      throw couponRequestError(
+        "You have reached this coupon's usage limit.",
+        409,
+      );
+    }
+    throw error;
+  }
 };
 
 /* =========================================================
@@ -2494,6 +2849,7 @@ const createOrder = async (
       additionalRequirements = "",
       paymentMethod,
       chequeType,
+      couponCode,
     } = req.body;
 
     if (!paymentMethod) {
@@ -2664,23 +3020,67 @@ const createOrder = async (
     |--------------------------------------------------------------------------
     */
 
-    const subtotal = items.reduce(
+    const originalSubtotal = items.reduce(
       (total, item) => total + Number(item.amount || 0),
       0,
     );
 
-    /*
-    |--------------------------------------------------------------------------
-    | GST
-    |--------------------------------------------------------------------------
-    |
-    | Online = 18%, cheque rate depends on chequeType,
-    | COD = 0%. Rates are determined by server configuration.
-    |--------------------------------------------------------------------------
-    */
+    let coupon = null;
+    let couponSnapshot;
+    let orderTotals = calculateOrderTotals(
+      originalSubtotal,
+      getGstRate(paymentMethod, chequeType),
+    );
 
-    const { subtotal: roundedSubtotal, gstRate, gstAmount, amount } =
-      calculateOrderTotals(subtotal, getGstRate(paymentMethod, chequeType));
+    if (couponCode !== undefined && String(couponCode).trim()) {
+      coupon = await Coupon.findOne({
+        code: normalizeCouponCode(couponCode),
+      });
+
+      try {
+        await validateCouponAvailability(coupon, req.user._id);
+        couponSnapshot = calculateCouponQuote({
+          coupon,
+          serviceResults,
+          paymentMethod,
+          chequeType,
+        });
+      } catch (couponError) {
+        return res.status(400).json({
+          success: false,
+          message: couponError.message,
+        });
+      }
+
+      orderTotals = {
+        subtotal: couponSnapshot.taxableSubtotal,
+        gstRate: couponSnapshot.gstRate,
+        gstAmount: couponSnapshot.gstAmount,
+        amount: couponSnapshot.finalTotal,
+      };
+
+      const discountsByService = new Map(
+        couponSnapshot.serviceBreakdown.map((line) => [
+          String(line.serviceId),
+          line,
+        ]),
+      );
+
+      for (const item of items) {
+        const discount = discountsByService.get(String(item.service));
+        item.originalAmount = item.amount;
+        item.discountAmount = discount?.discountAmount || 0;
+        item.couponDiscountPercent = discount?.discountPercent || 0;
+        item.amount = discount?.discountedAmount ?? item.amount;
+      }
+    }
+
+    const {
+      subtotal: roundedSubtotal,
+      gstRate,
+      gstAmount,
+      amount,
+    } = orderTotals;
 
     /*
     |--------------------------------------------------------------------------
@@ -2725,6 +3125,14 @@ const createOrder = async (
 
       subtotal: roundedSubtotal,
 
+      ...(couponSnapshot
+        ? {
+            originalSubtotal: couponSnapshot.originalSubtotal,
+            discountTotal: couponSnapshot.discountTotal,
+            couponSnapshot,
+          }
+        : {}),
+
       gstRate,
 
       gstAmount,
@@ -2748,10 +3156,46 @@ const createOrder = async (
     |--------------------------------------------------------------------------
     */
 
-    const order =
-      await Order.create(
-        orderData,
-      );
+    let order;
+    if (coupon && couponSnapshot) {
+      const session = await mongoose.startSession();
+
+      try {
+        await session.withTransaction(async () => {
+          await reserveCouponUsage({
+            coupon,
+            clientId: req.user._id,
+            session,
+          });
+
+          const [createdOrder] = await Order.create([orderData], { session });
+          order = createdOrder;
+
+          await CouponUsage.create(
+            [
+              {
+                coupon: coupon._id,
+                couponCode: coupon.code,
+                client: req.user._id,
+                order: createdOrder._id,
+                serviceBreakdown: couponSnapshot.serviceBreakdown,
+                originalSubtotal: couponSnapshot.originalSubtotal,
+                discountTotal: couponSnapshot.discountTotal,
+                taxableSubtotal: couponSnapshot.taxableSubtotal,
+                gstRate: couponSnapshot.gstRate,
+                gstAmount: couponSnapshot.gstAmount,
+                finalTotal: couponSnapshot.finalTotal,
+              },
+            ],
+            { session },
+          );
+        });
+      } finally {
+        await session.endSession();
+      }
+    } else {
+      order = await Order.create(orderData);
+    }
 
     /*
     |--------------------------------------------------------------------------
@@ -2789,7 +3233,7 @@ const createOrder = async (
       error,
     );
 
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
       message:
         error.message ||
@@ -2838,6 +3282,37 @@ const getMyOrders = async (
       success: false,
       message:
         "Unable to fetch orders.",
+    });
+  }
+};
+
+const getLatestMyOrder = async (req, res) => {
+  try {
+    if (!req.user?._id) {
+      return res.status(401).json({
+        success: false,
+        message: "Not authorized. User identity is unavailable.",
+      });
+    }
+
+    const order = await Order.findOne({
+      client: req.user._id,
+    })
+      .select("-codPin")
+      .populate("service", "name category")
+      .populate("items.service", "name category")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      order: order ? toClientVisibleOrder(order) : null,
+    });
+  } catch (error) {
+    console.error("Get latest order error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to fetch your latest order.",
     });
   }
 };
@@ -3629,8 +4104,12 @@ const getAdminCodOrders =
 
 module.exports = {
   getPaymentPricing,
+  getCouponQuote,
+  calculateCouponQuote,
+  calculateCouponEligibleAmount,
   createOrder,
   getMyOrders,
+  getLatestMyOrder,
   getOrderById,
   getAdminOrders,
   getAdminOrderById,
