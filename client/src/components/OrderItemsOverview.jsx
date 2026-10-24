@@ -241,6 +241,7 @@ const OrderItemsOverview = ({
           ([name, value]) =>
             !repeatableNames.has(name) &&
             name !== "pricingQuantities" &&
+            name !== "pricingMode" &&
             value !== undefined &&
             value !== null &&
             value !== "",
@@ -288,6 +289,27 @@ const OrderItemsOverview = ({
                     {option.name}
                   </span>
                 ))}
+              </div>
+            )}
+
+            {snapshot.selectedPricingMode && (
+              <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                <p className="text-xs font-semibold text-zinc-800">
+                  {snapshot.selectedPricingMode.label} pricing
+                </p>
+                <p className="mt-1 text-xs leading-5 text-zinc-600">
+                  {Number(item?.quantity || 1)}{" "}
+                  {snapshot.selectedPricingMode.unit}
+                  {Number(item?.quantity || 1) === 1 ? "" : "s"} × ₹
+                  {Number(
+                    snapshot.selectedPricingMode.unitPrice || 0,
+                  ).toLocaleString("en-IN")}{" "}
+                  per {snapshot.selectedPricingMode.unit}
+                  {" · "}
+                  {Number(item?.quantity || 1) *
+                    Number(snapshot.selectedPricingMode.itemsPerUnit || 1)}{" "}
+                  posts
+                </p>
               </div>
             )}
 

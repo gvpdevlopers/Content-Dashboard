@@ -17,6 +17,11 @@ const validateCoupon = async (couponData) => {
   return response.data;
 };
 
+const getOrderQuote = async (quoteData) => {
+  const response = await api.post("/orders/quote", quoteData);
+  return response.data;
+};
+
 const getMyOrders = async () => {
   const response = await api.get("/orders");
 
@@ -39,6 +44,7 @@ const orderService = {
   getPaymentPricing,
   createOrder,
   validateCoupon,
+  getOrderQuote,
   getMyOrders,
   getLatestMyOrder,
   getOrderById,

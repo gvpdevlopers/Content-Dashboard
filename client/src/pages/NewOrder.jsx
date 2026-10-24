@@ -11,11 +11,14 @@ import {
   Loader2,
   Minus,
   Plus,
+  Save,
+  Trash2,
   X,
 } from "lucide-react";
 
 import OrderSuccess from "../components/OrderSuccess";
 import orderService from "../services/orderService";
+import draftService from "../services/draftService";
 import serviceService from "../services/serviceService";
 import paymentService from "../services/paymentService";
 import CustomSelect from "../components/CustomSelect";
@@ -33,6 +36,14 @@ const formatCurrency = (amount) => {
     maximumFractionDigits: 2,
   })}`;
 };
+
+const isGridPostsService = (service) =>
+  String(service?.slug || "").toLowerCase() === "social-media-grid-posts";
+
+const getGridPricingMode = (service, key) =>
+  (Array.isArray(service?.pricingModes) ? service.pricingModes : []).find(
+    (mode) => mode.key === (key || "line"),
+  ) || null;
 
 const getSortedItems = (items = []) => {
   return [...items].sort(
@@ -559,11 +570,17 @@ const getItemEstimate = (item) => {
   }
 
   const quantity = getItemQuantity(item);
+  const gridPricingMode = getGridPricingMode(
+    item.service,
+    item.formData?.pricingMode,
+  );
 
   let basePrice;
 
   if (item.selectedPricingOption) {
     basePrice = Number(item.selectedPricingOption.price || 0) * quantity;
+  } else if (gridPricingMode) {
+    basePrice = Number(gridPricingMode.unitPrice || 0) * quantity;
   } else {
     switch (item.service.pricingType) {
       case "fixed":
@@ -631,6 +648,7 @@ const createOrderItem = (service) => {
     pricingQuantities: {},
     formData: {
       ...(shouldHaveQuantity ? { quantity: quantityRules.minQuantity } : {}),
+      ...(isGridPostsService(service) ? { pricingMode: "line" } : {}),
       ...createInitialRepeatableData(service),
     },
   };
@@ -950,6 +968,9 @@ const restoreOrderItems = (order, activeServices) => {
     }
 
     const activeFields = getActiveFieldsForItem(nextItem);
+    if (isGridPostsService(service)) {
+      nextItem.formData.pricingMode = savedFormData.pricingMode || "line";
+    }
 
     for (const field of activeFields) {
       if (
@@ -2006,6 +2027,17 @@ const NewOrder = () => {
   const [loadingPreviousOrders, setLoadingPreviousOrders] = useState(true);
   const [previousOrdersError, setPreviousOrdersError] = useState("");
   const [repeatOrderIssues, setRepeatOrderIssues] = useState([]);
+  const [savedDrafts, setSavedDrafts] = useState([]);
+  const [loadingDrafts, setLoadingDrafts] = useState(true);
+  const [draftsError, setDraftsError] = useState("");
+  const [draftBusy, setDraftBusy] = useState(false);
+  const [draftNotice, setDraftNotice] = useState("");
+  const [editingDraftId, setEditingDraftId] = useState("");
+  const [draftQuote, setDraftQuote] = useState(null);
+  const [draftQuoteLoading, setDraftQuoteLoading] = useState(false);
+  const [draftQuoteError, setDraftQuoteError] = useState("");
+  const [draftQuoteErrorRequestKey, setDraftQuoteErrorRequestKey] =
+    useState("");
 
   const [loadingServiceId, setLoadingServiceId] = useState("");
 
@@ -2018,6 +2050,7 @@ const NewOrder = () => {
   const [openOptionalFields, setOpenOptionalFields] = useState({});
 
   const [openServiceIds, setOpenServiceIds] = useState({});
+  const draftOperationRef = useRef(false);
 
   /*
   |--------------------------------------------------------------------------
@@ -2054,6 +2087,37 @@ const NewOrder = () => {
     };
 
     loadServices();
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadDrafts = async () => {
+      try {
+        const response = await draftService.listDrafts();
+        if (mounted) {
+          setSavedDrafts(Array.isArray(response?.drafts) ? response.drafts : []);
+          setDraftsError("");
+        }
+      } catch (loadError) {
+        console.error("Failed to load saved drafts:", loadError);
+        if (mounted) {
+          setDraftsError(
+            loadError.response?.data?.message ||
+              "Saved drafts could not be loaded.",
+          );
+        }
+      } finally {
+        if (mounted) {
+          setLoadingDrafts(false);
+        }
+      }
+    };
+
+    loadDrafts();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -2323,7 +2387,160 @@ const NewOrder = () => {
     );
     setAdditionalRequirements(previousOrder.additionalRequirements || "");
     setRepeatOrderIssues(restored.issues);
+    setEditingDraftId("");
+    setDraftQuote(null);
     setError("");
+  };
+
+  const restoreDraft = (draft) => {
+    const draftItems = (draft.services || []).map((savedItem) => {
+      const service = services.find(
+        (candidate) =>
+          String(candidate._id) === String(savedItem.serviceId),
+      );
+      const option = service
+        ? getPricingOptions(service).find(
+            (candidate) =>
+              String(candidate._id) ===
+              String(savedItem.pricingOptionId || ""),
+          )
+        : null;
+      const selectedOptionSnapshot = option
+        ? {
+            id: option._id,
+            name: option.name,
+            price: option.price,
+            unit: option.unit,
+            group: option.group || "",
+            quantity: savedItem.quantity || 1,
+          }
+        : null;
+
+      return {
+        service: savedItem.serviceId,
+        serviceSnapshot: {
+          serviceId: savedItem.serviceId,
+          slug: service?.slug || "",
+          name: service?.name || "",
+          selectedOption: selectedOptionSnapshot,
+          selectedOptions: selectedOptionSnapshot
+            ? [selectedOptionSnapshot]
+            : [],
+        },
+        quantity: savedItem.quantity || 1,
+        formData: asPlainObject(savedItem.formData),
+      };
+    });
+
+    const restored = restoreOrderItems({ items: draftItems }, services);
+    if (restored.items.length === 0) {
+      setRepeatOrderIssues(
+        restored.issues.length > 0
+          ? restored.issues
+          : ["No active services from this draft could be restored."],
+      );
+      return false;
+    }
+
+    setOrderItems(restored.items);
+    setActiveServiceIndex(0);
+    setOpenServiceIds(
+      Object.fromEntries(
+        restored.items.map((item) => [String(item.service._id), true]),
+      ),
+    );
+    setAdditionalRequirements(draft.additionalRequirements || "");
+    setCouponInput(draft.couponCode || "");
+    setAppliedCouponCode(draft.couponCode || "");
+    setPaymentMethod("cod");
+    setChequeType("");
+    setEditingDraftId(String(draft._id));
+    setDraftQuote(null);
+    setDraftQuoteError("");
+    setRepeatOrderIssues(restored.issues);
+    setDraftNotice("");
+    setError("");
+    return true;
+  };
+
+  const handleOpenDraft = async (draftId) => {
+    if (draftBusy || loadingServices) {
+      return;
+    }
+
+    setDraftBusy(true);
+    setDraftsError("");
+    try {
+      const response = await draftService.getDraft(draftId);
+      restoreDraft(response.draft);
+    } catch (openError) {
+      setDraftsError(
+        openError.response?.data?.message || "Unable to open this draft.",
+      );
+    } finally {
+      setDraftBusy(false);
+    }
+  };
+
+  const handleDeleteDraft = async (draftId) => {
+    if (draftBusy || !window.confirm("Delete this saved draft?")) {
+      return;
+    }
+
+    setDraftBusy(true);
+    setDraftsError("");
+    try {
+      await draftService.deleteDraft(draftId);
+      setSavedDrafts((current) =>
+        current.filter((draft) => String(draft._id) !== String(draftId)),
+      );
+      if (String(editingDraftId) === String(draftId)) {
+        setEditingDraftId("");
+        setDraftQuote(null);
+      }
+      setDraftNotice("Draft deleted.");
+    } catch (deleteError) {
+      setDraftsError(
+        deleteError.response?.data?.message || "Unable to delete this draft.",
+      );
+    } finally {
+      setDraftBusy(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (draftOperationRef.current || submitting || !orderItems.length) {
+      return;
+    }
+
+    draftOperationRef.current = true;
+    setDraftBusy(true);
+    setDraftNotice("");
+    setDraftsError("");
+    try {
+      const payload = {
+        title: `Draft ${new Date().toLocaleDateString("en-IN")}`,
+        services: buildServicesPayload(),
+        additionalRequirements: additionalRequirements.trim(),
+        couponCode: appliedCouponCode,
+      };
+      const response = editingDraftId
+        ? await draftService.updateDraft(editingDraftId, payload)
+        : await draftService.createDraft(payload);
+      const updated = await draftService.listDrafts();
+      setSavedDrafts(Array.isArray(updated?.drafts) ? updated.drafts : []);
+      setEditingDraftId(String(response.draft._id));
+      setDraftQuote(null);
+      setDraftQuoteError("");
+      setDraftNotice(response.message || "Draft saved.");
+    } catch (saveError) {
+      setDraftsError(
+        saveError.response?.data?.message || "Unable to save this draft.",
+      );
+    } finally {
+      draftOperationRef.current = false;
+      setDraftBusy(false);
+    }
   };
 
   /*
@@ -2755,7 +2972,10 @@ const NewOrder = () => {
       hasQuantity,
       quantity: getItemQuantity(item),
       rules,
-      unit: selectedPricingOption?.unit || item.service?.unit,
+      unit:
+        selectedPricingOption?.unit ||
+        getGridPricingMode(item.service, item.formData?.pricingMode)?.unit ||
+        item.service?.unit,
     };
   };
 
@@ -3373,6 +3593,10 @@ const NewOrder = () => {
     const cleanFormData = {};
     const fields = getActiveFieldsForItem(item);
 
+    if (isGridPostsService(item.service)) {
+      cleanFormData.pricingMode = item.formData?.pricingMode || "line";
+    }
+
     for (const field of fields) {
       const value = item.formData?.[field.name];
 
@@ -3527,6 +3751,27 @@ const NewOrder = () => {
   |--------------------------------------------------------------------------
   */
 
+  const getDraftQuoteRequestKey = () =>
+    JSON.stringify({
+      services: buildServicesPayload(),
+      additionalRequirements: additionalRequirements.trim(),
+      paymentMethod,
+      chequeType: paymentMethod === "cheque" ? chequeType : "",
+      couponCode: appliedCouponCode,
+    });
+
+  const currentDraftQuoteRequestKey = editingDraftId
+    ? getDraftQuoteRequestKey()
+    : "";
+  const currentDraftQuote =
+    draftQuote?.requestKey === currentDraftQuoteRequestKey
+      ? draftQuote
+      : null;
+  const currentDraftQuoteError =
+    draftQuoteErrorRequestKey === currentDraftQuoteRequestKey
+      ? draftQuoteError
+      : "";
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
@@ -3586,6 +3831,48 @@ const NewOrder = () => {
       return;
     }
 
+    const draftQuoteRequestKey = currentDraftQuoteRequestKey;
+    const confirmedDraftQuote =
+      draftQuote?.requestKey === draftQuoteRequestKey ? draftQuote : null;
+    const hasConfirmedDraftQuote =
+      Boolean(confirmedDraftQuote?.confirmed);
+
+    if (editingDraftId && !hasConfirmedDraftQuote) {
+      if (confirmedDraftQuote) {
+        setError("Confirm the current draft price before placing the order.");
+        return;
+      }
+      if (draftQuote) {
+        setDraftQuote(null);
+      }
+
+      try {
+        setDraftQuoteLoading(true);
+        setDraftQuoteError("");
+        const quoteResponse = await orderService.getOrderQuote({
+          services: buildServicesPayload(),
+          paymentMethod,
+          ...(paymentMethod === "cheque" ? { chequeType } : {}),
+          ...(appliedCouponCode ? { couponCode: appliedCouponCode } : {}),
+        });
+        setDraftQuote({
+          ...quoteResponse.quote,
+          confirmed: false,
+          requestKey: draftQuoteRequestKey,
+        });
+      } catch (quoteError) {
+        const message =
+          quoteError.response?.data?.message ||
+          "Unable to verify current draft pricing.";
+        setDraftQuoteError(message);
+        setDraftQuoteErrorRequestKey(draftQuoteRequestKey);
+        setError(message);
+      } finally {
+        setDraftQuoteLoading(false);
+      }
+      return;
+    }
+
     try {
       setSubmitting(true);
 
@@ -3597,6 +3884,12 @@ const NewOrder = () => {
         paymentMethod,
         ...(paymentMethod === "cheque" ? { chequeType } : {}),
         ...(appliedCouponCode ? { couponCode: appliedCouponCode } : {}),
+        ...(editingDraftId
+          ? {
+              draftId: editingDraftId,
+              confirmedAmount: confirmedDraftQuote.amount,
+            }
+          : {}),
       });
 
       const createdOrder = orderResponse?.order;
@@ -3736,6 +4029,15 @@ const NewOrder = () => {
       console.error("Create order/payment error:", submitError);
 
       const responseData = submitError.response?.data;
+      if (
+        editingDraftId &&
+        submitError.response?.status === 409 &&
+        String(responseData?.message || "").includes("Pricing changed")
+      ) {
+        setDraftQuote(null);
+        setDraftQuoteError(responseData.message);
+        setDraftQuoteErrorRequestKey(draftQuoteRequestKey);
+      }
 
       if (responseData?.errors) {
         const firstError = Object.values(responseData.errors)[0];
@@ -3872,6 +4174,102 @@ const NewOrder = () => {
                 )}
             </section>
 
+            <section className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 shadow-[0_8px_24px_rgba(0,0,0,0.035)] sm:px-5">
+              <div className="flex items-start gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-500">
+                  <Save size={16} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-sm font-semibold text-zinc-900">
+                    Saved Drafts
+                  </h2>
+                  <p className="mt-0.5 text-xs leading-5 text-zinc-500">
+                    Save a configuration now and return to finish it later.
+                  </p>
+                </div>
+                {editingDraftId && (
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-medium text-emerald-700">
+                    Editing draft
+                  </span>
+                )}
+              </div>
+
+              {draftNotice && (
+                <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                  {draftNotice}
+                </p>
+              )}
+              {draftsError && (
+                <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  {draftsError}
+                </p>
+              )}
+
+              {loadingDrafts ? (
+                <p className="mt-3 flex items-center gap-2 text-xs text-zinc-500">
+                  <Loader2 size={14} className="animate-spin" />
+                  Loading saved drafts...
+                </p>
+              ) : savedDrafts.length === 0 ? (
+                !draftsError && (
+                  <p className="mt-3 text-xs text-zinc-500">
+                    You don’t have any saved drafts yet.
+                  </p>
+                )
+              ) : (
+                <ul className="mt-3 divide-y divide-zinc-100">
+                  {savedDrafts.map((draft) => (
+                    <li
+                      key={draft._id}
+                      className="flex flex-col gap-3 py-3 first:pt-1 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-zinc-800">
+                          {draft.title || "Saved order draft"}
+                        </p>
+                        <p className="mt-0.5 text-xs text-zinc-400">
+                          {(draft.services || []).length}{" "}
+                          {(draft.services || []).length === 1
+                            ? "service"
+                            : "services"}{" "}
+                          · Updated{" "}
+                          {draft.updatedAt
+                            ? new Date(draft.updatedAt).toLocaleDateString(
+                                "en-IN",
+                                {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                },
+                              )
+                            : "recently"}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          type="button"
+                          disabled={draftBusy || loadingServices}
+                          onClick={() => handleOpenDraft(draft._id)}
+                          className="rounded-lg bg-zinc-900 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-zinc-700 disabled:opacity-50"
+                        >
+                          Resume
+                        </button>
+                        <button
+                          type="button"
+                          disabled={draftBusy}
+                          onClick={() => handleDeleteDraft(draft._id)}
+                          aria-label="Delete saved draft"
+                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 text-zinc-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
             {/* ==============================================================
                 SERVICE CHECKLIST
             ============================================================== */}
@@ -3942,6 +4340,17 @@ const NewOrder = () => {
                   const pricingGroups = item
                     ? getPricingGroups(item.service)
                     : [];
+
+                  const gridPricingModes =
+                    item && isGridPostsService(item.service)
+                      ? item.service.pricingModes || []
+                      : [];
+                  const selectedGridPricingMode = item
+                    ? getGridPricingMode(
+                        item.service,
+                        item.formData?.pricingMode,
+                      )
+                    : null;
 
                   const isGroupedPricing = Boolean(item?.isGroupedPricing);
                   const hasServiceLevelPricing = Boolean(
@@ -4135,6 +4544,88 @@ const NewOrder = () => {
                               <p className="text-sm leading-6 text-zinc-500">
                                 {service.description}
                               </p>
+                            </div>
+                          )}
+
+                          {gridPricingModes.length > 0 && (
+                            <div className="mb-7">
+                              <div>
+                                <p className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-400">
+                                  Pricing mode
+                                </p>
+                                <p className="mt-1 text-xs leading-5 text-zinc-500">
+                                  One line includes 3 coordinated posts. Choose
+                                  single-post pricing when you need an
+                                  individual post.
+                                </p>
+                              </div>
+                              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                {gridPricingModes.map((mode) => {
+                                  const isSelected =
+                                    selectedGridPricingMode?.key === mode.key;
+                                  const isLine = mode.key === "line";
+                                  return (
+                                    <button
+                                      key={mode.key}
+                                      type="button"
+                                      disabled={submitting}
+                                      onClick={() =>
+                                        updateItem(selectedIndex, (current) => ({
+                                          ...current,
+                                          formData: {
+                                            ...(current.formData || {}),
+                                            pricingMode: mode.key,
+                                            quantity:
+                                              current.formData?.pricingMode ===
+                                              mode.key
+                                                ? getItemQuantity(current)
+                                                : getQuantityRules(
+                                                    current.service,
+                                                    null,
+                                                  ).minQuantity,
+                                          },
+                                        }))
+                                      }
+                                      aria-pressed={isSelected}
+                                      className={`rounded-2xl border p-4 text-left transition ${
+                                        isSelected
+                                          ? "border-zinc-900 bg-zinc-900 text-white"
+                                          : "border-zinc-200 bg-white text-zinc-900 hover:border-zinc-400"
+                                      }`}
+                                    >
+                                      <span className="block text-sm font-semibold">
+                                        {mode.label}
+                                      </span>
+                                      <span
+                                        className={`mt-1 block text-xs ${
+                                          isSelected
+                                            ? "text-white/65"
+                                            : "text-zinc-500"
+                                        }`}
+                                      >
+                                        {isLine
+                                          ? "3 coordinated posts per line"
+                                          : "Price each post separately"}
+                                      </span>
+                                      <span className="mt-3 block text-sm font-semibold">
+                                        {formatCurrency(mode.unitPrice)} /{" "}
+                                        {mode.unit}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              {selectedGridPricingMode && (
+                                <p className="mt-3 text-xs text-zinc-500">
+                                  {getItemQuantity(item)}{" "}
+                                  {selectedGridPricingMode.unit}
+                                  {getItemQuantity(item) === 1 ? "" : "s"} ·{" "}
+                                  {getItemQuantity(item) *
+                                    selectedGridPricingMode.itemsPerUnit}{" "}
+                                  total posts · Line total{" "}
+                                  {formatCurrency(itemAmount)}
+                                </p>
+                              )}
                             </div>
                           )}
 
@@ -4819,6 +5310,91 @@ const NewOrder = () => {
                     </div>
                   )}
 
+                  {editingDraftId && (
+                    <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                      <p className="text-xs font-semibold text-amber-900">
+                        Review current pricing
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-amber-800">
+                        Prices, coupon eligibility, and tax are recalculated
+                        from current server settings. Confirm the total before
+                        submitting this saved draft.
+                      </p>
+                      {draftQuoteLoading && (
+                        <p className="mt-3 flex items-center gap-2 text-xs text-amber-800">
+                          <Loader2 size={14} className="animate-spin" />
+                          Verifying current prices...
+                        </p>
+                      )}
+                      {currentDraftQuoteError && (
+                        <p className="mt-3 text-xs text-red-700">
+                          {currentDraftQuoteError}
+                        </p>
+                      )}
+                      {currentDraftQuote && (
+                        <div className="mt-3 space-y-2 border-t border-amber-200 pt-3">
+                          {currentDraftQuote.serviceBreakdown.map((line) => (
+                            <div
+                              key={line.serviceId}
+                              className="flex justify-between gap-3 text-xs text-amber-900"
+                            >
+                              <span className="min-w-0 truncate">
+                                {line.serviceName}
+                                {line.discountAmount > 0 &&
+                                  ` · −${formatCurrency(line.discountAmount)}`}
+                              </span>
+                              <span className="shrink-0">
+                                {formatCurrency(line.amount)}
+                              </span>
+                            </div>
+                          ))}
+                          <div className="flex justify-between border-t border-amber-200 pt-2 text-xs text-amber-900">
+                            <span>
+                              Taxable subtotal · GST ({currentDraftQuote.gstRate}%)
+                            </span>
+                            <span>
+                              {formatCurrency(currentDraftQuote.taxableSubtotal)} ·{" "}
+                              {formatCurrency(currentDraftQuote.gstAmount)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3 pt-1">
+                            <span className="text-sm font-semibold text-amber-950">
+                              Current payable total
+                            </span>
+                            <span className="text-base font-bold text-amber-950">
+                              {formatCurrency(currentDraftQuote.amount)}
+                            </span>
+                          </div>
+                          {currentDraftQuote.confirmed ? (
+                            <p className="pt-1 text-xs font-medium text-emerald-800">
+                              Current total confirmed.
+                            </p>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setDraftQuote((current) =>
+                                  current
+                                    ? {
+                                        ...current,
+                                        confirmed:
+                                          current.requestKey ===
+                                          currentDraftQuoteRequestKey,
+                                      }
+                                    : current,
+                                )
+                              }
+                              className="mt-2 w-full rounded-xl bg-amber-900 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-amber-800"
+                            >
+                              Confirm total of{" "}
+                              {formatCurrency(currentDraftQuote.amount)}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {(error ||
                     (paymentMethod === "online" && paymentPricingError)) && (
                     <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
@@ -4829,43 +5405,72 @@ const NewOrder = () => {
                     </div>
                   )}
 
-                  <button
-                    type="submit"
-                    disabled={
-                      submitting ||
-                      currentCouponLoading ||
-                      Boolean(
-                        appliedCouponCode &&
-                          (!hasCurrentCouponQuote || currentCouponError),
-                      ) ||
-                      (paymentMethod === "online" &&
-                        (paymentPricingLoading || !paymentPricing)) ||
-                      Boolean(loadingServiceId) ||
-                      !orderItems.length ||
-                      (paymentMethod === "online" && estimatedTotal <= 0)
-                    }
-                    className="group mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-900 px-5 py-3.5 text-sm font-semibold text-white shadow-[0_8px_25px_rgba(24,24,27,0.12)] transition-all duration-300 ease-out hover:bg-zinc-800 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader2 size={17} className="animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <span>
-                          {paymentMethod === "online"
-                            ? "Continue to payment"
-                            : "Place order"}
-                        </span>
+                  <div className="mt-5 grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)]">
+                    <button
+                      type="button"
+                      onClick={handleSaveDraft}
+                      disabled={
+                        draftBusy ||
+                        submitting ||
+                        !orderItems.length ||
+                        Boolean(loadingServiceId)
+                      }
+                      className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-5 py-3 text-sm font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {draftBusy ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Save size={16} />
+                      )}
+                      {editingDraftId ? "Update Draft" : "Save as Draft"}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={
+                        submitting ||
+                        draftQuoteLoading ||
+                        draftBusy ||
+                        Boolean(
+                          editingDraftId &&
+                            currentDraftQuote &&
+                            !currentDraftQuote.confirmed,
+                        ) ||
+                        currentCouponLoading ||
+                        Boolean(
+                          appliedCouponCode &&
+                            (!hasCurrentCouponQuote || currentCouponError),
+                        ) ||
+                        (paymentMethod === "online" &&
+                          (paymentPricingLoading || !paymentPricing)) ||
+                        Boolean(loadingServiceId) ||
+                        !orderItems.length ||
+                        (paymentMethod === "online" && estimatedTotal <= 0)
+                      }
+                      className="group flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-zinc-900 px-5 py-3.5 text-sm font-semibold text-white shadow-[0_8px_25px_rgba(24,24,27,0.12)] transition-all duration-300 ease-out hover:bg-zinc-800 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {submitting || draftQuoteLoading ? (
+                        <>
+                          <Loader2 size={17} className="animate-spin" />
+                          {submitting ? "Processing..." : "Checking price..."}
+                        </>
+                      ) : (
+                        <>
+                          <span>
+                            {editingDraftId && !currentDraftQuote
+                              ? "Review current total"
+                              : paymentMethod === "online"
+                                ? "Continue to payment"
+                                : "Place order"}
+                          </span>
 
-                        <ArrowRight
-                          size={17}
-                          className="transition-transform duration-200 group-hover:translate-x-0.5"
-                        />
-                      </>
-                    )}
-                  </button>
+                          <ArrowRight
+                            size={17}
+                            className="transition-transform duration-200 group-hover:translate-x-0.5"
+                          />
+                        </>
+                      )}
+                    </button>
+                  </div>
 
                   {(paymentMethod === "online" ||
                     (paymentMethod === "cheque" && chequeType)) && (
@@ -4953,6 +5558,10 @@ const NewOrder = () => {
                             : [];
 
                         const quantityInfo = getQuantityInfo(item);
+                        const gridPricingMode = getGridPricingMode(
+                          item.service,
+                          item.formData?.pricingMode,
+                        );
                         const repeatableGroups = getRepeatableGroups(item.service);
                         const hasBasePriceLine =
                           selectedOptions.length === 0 &&
@@ -4988,7 +5597,10 @@ const NewOrder = () => {
 
                                 {quantityInfo.hasQuantity && (
                                   <p className="mt-1 text-[10px] text-white/30">
-                                    Qty {quantityInfo.quantity}
+                                    Qty {quantityInfo.quantity}{" "}
+                                    {quantityInfo.unit || ""}
+                                    {gridPricingMode &&
+                                      ` · ${quantityInfo.quantity * gridPricingMode.itemsPerUnit} posts`}
                                   </p>
                                 )}
                               </button>
@@ -5080,13 +5692,25 @@ const NewOrder = () => {
                                       </p>
                                       <p className="mt-0.5 text-[10px] text-white/35">
                                         {quantityInfo.quantity} ×{" "}
-                                        {formatCurrency(item.service.basePrice)}{" "}
-                                        / {item.service.unit || "unit"}
+                                        {formatCurrency(
+                                          gridPricingMode?.unitPrice ??
+                                            item.service.basePrice,
+                                        )}{" "}
+                                        /{" "}
+                                        {gridPricingMode?.unit ||
+                                          item.service.unit ||
+                                          "unit"}
+                                        {gridPricingMode &&
+                                          ` · ${gridPricingMode.label} · ${gridPricingMode.itemsPerUnit} posts per unit`}
                                       </p>
                                     </div>
                                     <p className="shrink-0 text-xs text-white/70">
                                       {formatCurrency(
-                                        Number(item.service.basePrice || 0) *
+                                        Number(
+                                          gridPricingMode?.unitPrice ??
+                                            item.service.basePrice ??
+                                            0,
+                                        ) *
                                           (item.service.pricingType === "fixed"
                                             ? 1
                                             : quantityInfo.quantity),
@@ -5517,9 +6141,34 @@ const NewOrder = () => {
                       )}
 
                       <button
+                        type="button"
+                        onClick={handleSaveDraft}
+                        disabled={
+                          draftBusy ||
+                          submitting ||
+                          !orderItems.length ||
+                          Boolean(loadingServiceId)
+                        }
+                        className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {draftBusy ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <Save size={14} />
+                        )}
+                        {editingDraftId ? "Update Draft" : "Save as Draft"}
+                      </button>
+                      <button
                         type="submit"
                         disabled={
                           submitting ||
+                          draftQuoteLoading ||
+                          draftBusy ||
+                          Boolean(
+                            editingDraftId &&
+                            currentDraftQuote &&
+                            !currentDraftQuote.confirmed,
+                          ) ||
                           currentCouponLoading ||
                           Boolean(
                             appliedCouponCode &&
@@ -5533,18 +6182,20 @@ const NewOrder = () => {
                             estimatedTotal !== null &&
                             estimatedTotal <= 0)
                         }
-                        className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-zinc-950 transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-zinc-950 transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {submitting ? (
+                        {submitting || draftQuoteLoading ? (
                           <>
                             <Loader2 size={14} className="animate-spin" />
-                            Processing...
+                            {submitting ? "Processing..." : "Checking price..."}
                           </>
                         ) : (
                           <>
-                            {paymentMethod === "online"
-                              ? "Continue to payment"
-                              : "Place Order"}
+                            {editingDraftId && !currentDraftQuote
+                              ? "Review current total"
+                              : paymentMethod === "online"
+                                ? "Continue to payment"
+                                : "Place Order"}
                             <ArrowRight size={14} aria-hidden="true" />
                           </>
                         )}

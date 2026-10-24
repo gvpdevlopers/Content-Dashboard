@@ -3,6 +3,7 @@ const express = require("express");
 const {
   getPaymentPricing,
   getCouponQuote,
+  getOrderQuote,
   createOrder,
   getMyOrders,
   getLatestMyOrder,
@@ -36,6 +37,12 @@ router.post(
   "/coupon-quote",
   protect,
   getCouponQuote,
+);
+
+router.post(
+  "/quote",
+  protect,
+  getOrderQuote,
 );
 
 /*

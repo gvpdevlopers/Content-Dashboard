@@ -1,6 +1,21 @@
 const mongoose = require("mongoose");
 const Service = require("../models/Service");
 const normalizeAdsService = require("../utils/normalizeAdsService");
+const { getGridPostPricingModes } = require("../utils/gridPostPricing");
+
+const normalizeServiceForClient = (service) => {
+  const normalizedService = normalizeAdsService(service);
+  if (!normalizedService) {
+    return normalizedService;
+  }
+
+  return {
+    ...normalizedService,
+    ...(getGridPostPricingModes(normalizedService).length > 0
+      ? { pricingModes: getGridPostPricingModes(normalizedService) }
+      : {}),
+  };
+};
 
 /* =========================================================
    Validation Constants
@@ -1247,7 +1262,7 @@ const getActiveServices = async (
 
     return res.status(200).json({
       success: true,
-      services: services.map(normalizeAdsService),
+      services: services.map(normalizeServiceForClient),
     });
   } catch (error) {
     console.error(
@@ -1288,7 +1303,7 @@ const getServiceById = async (
 
     return res.status(200).json({
       success: true,
-      service: normalizeAdsService(service),
+      service: normalizeServiceForClient(service),
     });
   } catch (error) {
     console.error(
@@ -1321,7 +1336,7 @@ const getAdminServices = async (
 
     return res.status(200).json({
       success: true,
-      services: services.map(normalizeAdsService),
+      services: services.map(normalizeServiceForClient),
     });
   } catch (error) {
     console.error(
@@ -1361,7 +1376,7 @@ const getAdminServiceById = async (
 
     return res.status(200).json({
       success: true,
-      service: normalizeAdsService(service),
+      service: normalizeServiceForClient(service),
     });
   } catch (error) {
     console.error(

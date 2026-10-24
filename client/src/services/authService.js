@@ -15,9 +15,15 @@ const getMe = async () => {
   return response.data;
 };
 
+const logout = async () => {
+  const response = await api.post("/auth/logout");
+  return response.data;
+};
+
 const authService = {
   login,
   getMe,
+  logout,
 };
 
 export default authService;

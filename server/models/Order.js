@@ -352,6 +352,37 @@ const repeatableGroupSnapshotSchema = new mongoose.Schema(
   }
 );
 
+const selectedPricingModeSnapshotSchema = new mongoose.Schema(
+  {
+    key: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    label: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    unitPrice: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    unit: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    itemsPerUnit: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+  },
+  { _id: false },
+);
+
 /*
 |--------------------------------------------------------------------------
 | Service Snapshot Schema
@@ -456,6 +487,11 @@ const serviceSnapshotSchema = new mongoose.Schema(
     selectedOptions: {
       type: [selectedOptionSnapshotSchema],
       default: [],
+    },
+
+    selectedPricingMode: {
+      type: selectedPricingModeSnapshotSchema,
+      default: undefined,
     },
 
     /*

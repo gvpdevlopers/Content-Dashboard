@@ -11,6 +11,8 @@ const codRoutes = require("./routes/codRoutes");
 const adminUserRoutes = require("./routes/adminUserRoutes");
 const contactSubmissionRoutes = require("./routes/contactSubmissionRoutes");
 const couponRoutes = require("./routes/couponRoutes");
+const draftRoutes = require("./routes/draftRoutes");
+const { getClientOrigins } = require("./utils/authSession");
 
 const connectDB = require("./config/db");
 
@@ -20,7 +22,13 @@ const app = express();
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL,
+    origin: (origin, callback) => {
+      if (!origin || getClientOrigins().includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Origin is not allowed by CORS."));
+    },
     credentials: true,
   })
 );
@@ -42,6 +50,7 @@ app.use("/api/cod", codRoutes);
 app.use("/api/users", adminUserRoutes);
 app.use("/api/contact-submissions", contactSubmissionRoutes);
 app.use("/api/coupons", couponRoutes);
+app.use("/api/drafts", draftRoutes);
 
 const PORT = process.env.PORT || 5000;
 

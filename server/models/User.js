@@ -36,6 +36,12 @@ const userSchema = new mongoose.Schema(
       default: "client",
     },
 
+    tokenVersion: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     isActive: {
       type: Boolean,
       default: true,

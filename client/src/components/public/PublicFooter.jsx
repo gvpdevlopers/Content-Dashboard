@@ -59,19 +59,19 @@ const PublicFooter = () => {
       <div className="absolute -right-48 -top-56 h-[36rem] w-[36rem] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.48),transparent_68%)]" />
     </div>
 
-    <motion.p
+    <motion.img
+      src="/small_logo.png"
+      alt=""
       aria-hidden="true"
-      className="pointer-events-none absolute inset-x-0 bottom-16 z-0 overflow-hidden whitespace-nowrap text-center text-[clamp(3.25rem,14vw,12rem)] font-semibold leading-[0.8] tracking-[-0.09em] text-zinc-950/[0.035]"
+      className="pointer-events-none absolute left-1/2 top-1/2 z-0 h-auto max-h-[100%] w-[clamp(18rem,90vw,1100px)] -translate-x-1/2 -translate-y-1/2 object-contain opacity-5"
       initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      whileInView={{ opacity: 0.1, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
       transition={{
         duration: reduceMotion ? 0 : 0.7,
         ease: [0.22, 1, 0.36, 1],
       }}
-    >
-      GLOW VENTURES
-    </motion.p>
+    />
 
     <div className="relative z-10 mx-auto w-full max-w-[1400px] px-5 sm:px-8 lg:px-10">
       {/* Main Footer */}

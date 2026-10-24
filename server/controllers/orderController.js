@@ -3,9 +3,13 @@ const Service = require("../models/Service");
 const Coupon = require("../models/Coupon");
 const CouponUsage = require("../models/CouponUsage");
 const CouponClientUsage = require("../models/CouponClientUsage");
+const OrderDraft = require("../models/OrderDraft");
 const mongoose = require("mongoose");
 const generateOrderNumber = require("../utils/generateOrderNumber");
 const normalizeAdsService = require("../utils/normalizeAdsService");
+const {
+  resolveGridPostPricingMode,
+} = require("../utils/gridPostPricing");
 const {
   getGstRate,
   getPaymentPricingConfig,
@@ -1830,6 +1834,7 @@ const createServiceSnapshot = ({
   groupedQuantities = {},
   quantity = 1,
   repeatableGroups = [],
+  selectedPricingMode = null,
 }) => {
   const selectedOptionSnapshots =
     selectedOptions.map(
@@ -1882,6 +1887,9 @@ const createServiceSnapshot = ({
     unit: service.unit || "",
     selectedOption: selectedOptionSnapshots[0] || null,
     selectedOptions: selectedOptionSnapshots,
+    ...(selectedPricingMode
+      ? { selectedPricingMode }
+      : {}),
 
     repeatableGroups,
   };
@@ -1899,6 +1907,7 @@ const calculateOrderAmount = ({
   groupedQuantities = {},
   isGroupedPricing = false,
   repeatableAmount = 0,
+  selectedPricingMode = null,
 }) => {
   let amount = 0;
 
@@ -1923,7 +1932,9 @@ const calculateOrderAmount = ({
       Number(option.price || 0) *
       Number(quantity);
   } else {
-    switch (service.pricingType) {
+    if (selectedPricingMode) {
+      amount = Number(selectedPricingMode.unitPrice || 0) * Number(quantity);
+    } else switch (service.pricingType) {
       case "per_unit":
         amount =
           Number(service.basePrice || 0) *
@@ -2288,6 +2299,20 @@ const processOrderServiceItem = async ({
     };
   }
 
+  const selectedPricingMode = resolveGridPostPricingMode(
+    service,
+    formData.pricingMode,
+  );
+  if (
+    String(service.slug || "").toLowerCase() === "social-media-grid-posts" &&
+    !selectedPricingMode
+  ) {
+    return {
+      success: false,
+      message: "Select a valid Grid Posts pricing mode.",
+    };
+  }
+
   let pricingSelection;
 
   try {
@@ -2409,6 +2434,10 @@ const processOrderServiceItem = async ({
     };
   }
 
+  if (selectedPricingMode) {
+    cleanedFormData.pricingMode = selectedPricingMode.key;
+  }
+
   const normalFieldAmount =
     calculateFieldOptionsAmount(
       applicableFields,
@@ -2459,6 +2488,7 @@ const processOrderServiceItem = async ({
       groupedQuantities,
       isGroupedPricing,
       repeatableAmount,
+      selectedPricingMode,
     });
 
   const couponEligibleAmount = calculateCouponEligibleAmount({
@@ -2478,6 +2508,7 @@ const processOrderServiceItem = async ({
       quantity: parsedQuantity,
       repeatableGroups:
         repeatableSnapshot,
+      selectedPricingMode,
     });
 
   /*
@@ -2739,6 +2770,102 @@ const getCouponQuote = async (req, res) => {
   }
 };
 
+const getOrderQuote = async (req, res) => {
+  try {
+    if (!req.user?._id || req.user.role !== "client") {
+      return res.status(403).json({
+        success: false,
+        message: "Only clients can request an order quote.",
+      });
+    }
+
+    const { services, couponCode, paymentMethod, chequeType } = req.body || {};
+    if (!["cod", "online", "cheque"].includes(paymentMethod)) {
+      return res.status(400).json({
+        success: false,
+        message: "Select a valid payment method.",
+      });
+    }
+    if (
+      paymentMethod === "cheque" &&
+      !["with_gst", "direct_collection"].includes(chequeType)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Select a valid cheque payment type.",
+      });
+    }
+
+    const serviceResults = await buildProcessedServiceResults(services);
+    const originalSubtotal = roundCurrency(
+      serviceResults.reduce((sum, result) => sum + result.amount, 0),
+    );
+    let couponSnapshot;
+    let totals = calculateOrderTotals(
+      originalSubtotal,
+      getGstRate(paymentMethod, chequeType),
+    );
+
+    if (String(couponCode || "").trim()) {
+      const coupon = await Coupon.findOne({
+        code: normalizeCouponCode(couponCode),
+      });
+      await validateCouponAvailability(coupon, req.user._id);
+      couponSnapshot = calculateCouponQuote({
+        coupon,
+        serviceResults,
+        paymentMethod,
+        chequeType,
+      });
+      totals = {
+        subtotal: couponSnapshot.taxableSubtotal,
+        gstRate: couponSnapshot.gstRate,
+        gstAmount: couponSnapshot.gstAmount,
+        amount: couponSnapshot.finalTotal,
+      };
+    }
+
+    const serviceBreakdown = serviceResults.map((result) => {
+      const couponLine = couponSnapshot?.serviceBreakdown.find(
+        (line) => String(line.serviceId) === String(result.item.service),
+      );
+      return {
+        serviceId: result.item.service,
+        serviceName: result.service.name,
+        originalAmount: result.amount,
+        discountAmount: couponLine?.discountAmount || 0,
+        amount: couponLine?.discountedAmount ?? result.amount,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      quote: {
+        originalSubtotal,
+        discountTotal: couponSnapshot?.discountTotal || 0,
+        taxableSubtotal: totals.subtotal,
+        gstRate: totals.gstRate,
+        gstAmount: totals.gstAmount,
+        amount: totals.amount,
+        couponCode: couponSnapshot?.code || "",
+        serviceBreakdown,
+      },
+    });
+  } catch (error) {
+    if (error instanceof mongoose.Error || error.name?.startsWith("Mongo")) {
+      console.error("Create order quote error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Unable to calculate the current order price.",
+      });
+    }
+    return res.status(error.statusCode || 400).json({
+      success: false,
+      message: error.message || "Unable to calculate the current order price.",
+    });
+  }
+};
+
 const reserveCouponUsage = async ({
   coupon,
   clientId,
@@ -2850,6 +2977,8 @@ const createOrder = async (
       paymentMethod,
       chequeType,
       couponCode,
+      draftId,
+      confirmedAmount,
     } = req.body;
 
     if (!paymentMethod) {
@@ -2886,6 +3015,13 @@ const createOrder = async (
       return res.status(400).json({
         success: false,
         message: "Cheque type can only be selected for cheque payments.",
+      });
+    }
+
+    if (draftId && !mongoose.Types.ObjectId.isValid(draftId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Saved draft reference is invalid.",
       });
     }
 
@@ -3082,6 +3218,24 @@ const createOrder = async (
       amount,
     } = orderTotals;
 
+    if (draftId) {
+      const confirmedPrice = Number(confirmedAmount);
+      if (!Number.isFinite(confirmedPrice)) {
+        return res.status(400).json({
+          success: false,
+          message: "Review and confirm the current draft price before ordering.",
+        });
+      }
+
+      if (Math.abs(confirmedPrice - amount) > 0.01) {
+        return res.status(409).json({
+          success: false,
+          message:
+            "Pricing changed since confirmation. Review the updated total and try again.",
+        });
+      }
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Legacy main service fields
@@ -3157,38 +3311,81 @@ const createOrder = async (
     */
 
     let order;
-    if (coupon && couponSnapshot) {
+    if ((coupon && couponSnapshot) || draftId) {
       const session = await mongoose.startSession();
 
       try {
         await session.withTransaction(async () => {
-          await reserveCouponUsage({
-            coupon,
-            clientId: req.user._id,
-            session,
-          });
+          if (draftId) {
+            const draft = await OrderDraft.findOne({
+              _id: draftId,
+              client: req.user._id,
+              status: "active",
+            }).session(session);
 
-          const [createdOrder] = await Order.create([orderData], { session });
+            if (!draft) {
+              throw couponRequestError(
+                "This saved draft has already been submitted or is unavailable.",
+                409,
+              );
+            }
+          }
+
+          if (coupon && couponSnapshot) {
+            await reserveCouponUsage({
+              coupon,
+              clientId: req.user._id,
+              session,
+            });
+          }
+
+          const createdOrder = new Order(orderData);
+          await createdOrder.save({ session });
           order = createdOrder;
 
-          await CouponUsage.create(
-            [
+          if (coupon && couponSnapshot) {
+            await CouponUsage.create(
+              [
+                {
+                  coupon: coupon._id,
+                  couponCode: coupon.code,
+                  client: req.user._id,
+                  order: createdOrder._id,
+                  serviceBreakdown: couponSnapshot.serviceBreakdown,
+                  originalSubtotal: couponSnapshot.originalSubtotal,
+                  discountTotal: couponSnapshot.discountTotal,
+                  taxableSubtotal: couponSnapshot.taxableSubtotal,
+                  gstRate: couponSnapshot.gstRate,
+                  gstAmount: couponSnapshot.gstAmount,
+                  finalTotal: couponSnapshot.finalTotal,
+                },
+              ],
+              { session },
+            );
+          }
+
+          if (draftId) {
+            const draftUpdate = await OrderDraft.updateOne(
               {
-                coupon: coupon._id,
-                couponCode: coupon.code,
+                _id: draftId,
                 client: req.user._id,
-                order: createdOrder._id,
-                serviceBreakdown: couponSnapshot.serviceBreakdown,
-                originalSubtotal: couponSnapshot.originalSubtotal,
-                discountTotal: couponSnapshot.discountTotal,
-                taxableSubtotal: couponSnapshot.taxableSubtotal,
-                gstRate: couponSnapshot.gstRate,
-                gstAmount: couponSnapshot.gstAmount,
-                finalTotal: couponSnapshot.finalTotal,
+                status: "active",
               },
-            ],
-            { session },
-          );
+              {
+                $set: {
+                  status: "submitted",
+                  submittedOrder: createdOrder._id,
+                },
+              },
+              { session },
+            );
+            if (draftUpdate.modifiedCount !== 1) {
+              throw couponRequestError(
+                "This saved draft has already been submitted.",
+                409,
+              );
+            }
+          }
         });
       } finally {
         await session.endSession();
@@ -4105,6 +4302,7 @@ const getAdminCodOrders =
 module.exports = {
   getPaymentPricing,
   getCouponQuote,
+  getOrderQuote,
   calculateCouponQuote,
   calculateCouponEligibleAmount,
   createOrder,

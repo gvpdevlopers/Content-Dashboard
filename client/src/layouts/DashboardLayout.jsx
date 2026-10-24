@@ -11,15 +11,24 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
+import { toast } from "sonner";
 
 const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const { user, logout } = useAuth();
 
-  const handleLogout = () => {
-    logout();
-    window.location.replace("/");
+  const handleLogout = async () => {
+    try {
+      await logout();
+      window.location.replace("/");
+    } catch (error) {
+      console.error("Logout failed:", error);
+      toast.error(
+        error.response?.data?.message ||
+          "Unable to log out securely. Please try again.",
+      );
+    }
   };
 
   const closeSidebar = () => {

@@ -11,45 +11,56 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadUser = async () => {
-      if (!token) {
-        setLoading(false);
-        return;
-      }
+    const clearSession = () => {
+      localStorage.removeItem("content_dashboard_token");
+      setToken(null);
+      setUser(null);
+    };
 
+    window.addEventListener("content-dashboard:unauthorized", clearSession);
+
+    const loadUser = async () => {
       try {
         const data = await authService.getMe();
 
         setUser(data.user);
       } catch (error) {
-        localStorage.removeItem("content_dashboard_token");
-        setToken(null);
-        setUser(null);
+        console.error("Unable to restore the authenticated session:", error);
+        clearSession();
       } finally {
         setLoading(false);
       }
     };
 
     loadUser();
-  }, [token]);
+    return () =>
+      window.removeEventListener(
+        "content-dashboard:unauthorized",
+        clearSession,
+      );
+  }, []);
 
   const login = async (identifier, password) => {
     const data = await authService.login(identifier, password);
 
-    localStorage.setItem(
-      "content_dashboard_token",
-      data.token
-    );
+    localStorage.removeItem("content_dashboard_token");
 
-    setToken(data.token);
+    setToken(null);
     setUser(data.user);
 
     return data;
   };
 
-  const logout = () => {
-    localStorage.removeItem("content_dashboard_token");
+  const logout = async () => {
+    try {
+      await authService.logout();
+    } catch (error) {
+      if (error.response?.status !== 401) {
+        throw error;
+      }
+    }
 
+    localStorage.removeItem("content_dashboard_token");
     setToken(null);
     setUser(null);
   };
