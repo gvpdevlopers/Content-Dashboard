@@ -26,6 +26,12 @@ const adminOnly = require("../middleware/admin");
 const orderStaff = require("../middleware/orderStaff");
 
 const router = express.Router();
+const adCredit = require("../controllers/adCreditController");
+router.get("/ad-credit", protect, adCredit.getMyAdCredit);
+router.get("/admin/:id/ad-credit", protect, adminOnly, adCredit.getOrderAdCredit);
+router.post("/admin/:id/ad-credit", protect, adminOnly, adCredit.issueAdCredit);
+router.get("/staff/:id/ad-credit", protect, orderStaff, adCredit.getOrderAdCredit);
+router.post("/staff/:id/ad-credit", protect, orderStaff, adCredit.issueAdCredit);
 
 router.get(
   "/payment-pricing",

@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 
 import { Link } from "react-router-dom";
+import AdCreditBreakdown from "./AdCreditBreakdown";
 
 const OrderSuccess = ({ order }) => {
   return (
@@ -67,6 +68,7 @@ const OrderSuccess = ({ order }) => {
         </p>
 
         {/* ORDER SUMMARY */}
+        <AdCreditBreakdown order={order} />
         <div
           className="
             mt-8

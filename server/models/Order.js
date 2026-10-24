@@ -1032,6 +1032,14 @@ const orderSchema = new mongoose.Schema(
       default: null,
     },
 
+    submissionKey: { type: String },
+    submissionHash: { type: String },
+    adCreditApplied: { type: Map, of: Number, default: undefined },
+    adCreditIssued: { type: Map, of: Number, default: undefined },
+    adCreditTotal: { type: Number, min: 0, default: undefined },
+    subtotalBeforeAdCredit: { type: Number, min: 0, default: undefined },
+    adCreditReleased: { type: Boolean, default: undefined },
+
     razorpayPaymentId: {
       type: String,
       default: null,
@@ -1075,6 +1083,8 @@ const orderSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    codPinAttempts: { type: Number, default: 0, min: 0 },
 
     /*
     |--------------------------------------------------------------------------
@@ -1169,4 +1179,5 @@ const orderSchema = new mongoose.Schema(
   }
 );
 
+orderSchema.index({ submissionKey: 1 }, { unique: true, sparse: true });
 module.exports = mongoose.model("Order", orderSchema);

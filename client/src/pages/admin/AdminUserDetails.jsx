@@ -1,3 +1,4 @@
+import RoleBadge from "../../components/RoleBadge";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -1793,52 +1794,7 @@ const AdminOrderMobileCard = ({
    ROLE BADGE
 ========================================================= */
 
-const RoleBadge = ({
-  role,
-}) => {
-  const isAdmin =
-    role === "admin";
 
-  return (
-    <span
-      className={`
-        inline-flex
-        items-center
-        gap-1.5
-        rounded-full
-        border
-        px-2.5
-        py-1
-        text-[11px]
-        font-medium
-        ${
-          isAdmin
-            ? `
-              border-purple-200
-              bg-purple-50
-              text-purple-700
-            `
-            : `
-              border-zinc-200
-              bg-zinc-50
-              text-zinc-500
-            `
-        }
-      `}
-    >
-      {isAdmin && (
-        <ShieldCheck
-          size={12}
-          strokeWidth={1.7}
-        />
-      )}
-
-      {isAdmin
-        ? "Admin"
-        : "Client"}
-    </span>
-  );
-};
 
 /* =========================================================
    USER STATUS BADGE

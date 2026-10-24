@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const Order = require("../models/Order");
+const { PIN_TTL_MS, PIN_MAX_ATTEMPTS } = require("../utils/pinPolicy");
 
 const generateCodPin = async (req, res) => {
   try {
@@ -28,6 +29,9 @@ const generateCodPin = async (req, res) => {
       });
     }
 
+    if (order.adCreditReleased) return res.status(409).json({ success: false,
+      message: "This order's ad credit was returned after cancellation." });
+
     if (
       order.paymentStatus === "collected" ||
       (order.paymentMethod === "cheque" && order.paymentStatus === "paid")
@@ -39,7 +43,10 @@ const generateCodPin = async (req, res) => {
     }
 
     if (
-      order.codPinStatus === "active" ||
+      (order.codPinStatus === "active" &&
+        order.codPinGeneratedAt &&
+        Date.now() - new Date(order.codPinGeneratedAt).getTime() < PIN_TTL_MS &&
+        Number(order.codPinAttempts || 0) < PIN_MAX_ATTEMPTS) ||
       order.codPinStatus === "verified" ||
       order.codPinStatus === "used"
     ) {
@@ -55,13 +62,17 @@ const generateCodPin = async (req, res) => {
 
     const generatedAt = new Date();
 
-    order.codPin = codPin;
-    order.codPinStatus = "active";
-    order.codPinGeneratedAt = generatedAt;
-    order.codPinVerifiedAt = null;
-    order.codCollectedAt = null;
-
-    await order.save();
+    const generated = await Order.findOneAndUpdate(
+      { _id: order._id, codPinStatus: order.codPinStatus,
+        codPinGeneratedAt: order.codPinGeneratedAt,
+        paymentStatus: order.paymentStatus },
+      { $set: { codPin, codPinStatus: "active", codPinGeneratedAt: generatedAt,
+        codPinAttempts: 0, codPinVerifiedAt: null, codCollectedAt: null } },
+      { new: true },
+    );
+    if (!generated) return res.status(409).json({ success: false,
+      message: "Payment PIN changed. Please refresh and try again." });
+    order.codPinStatus = generated.codPinStatus;
 
     return res.status(200).json({
       success: true,
@@ -120,6 +131,9 @@ const verifyCodPin = async (req, res) => {
       });
     }
 
+    if (order.adCreditReleased) return res.status(409).json({ success: false,
+      message: "This order's ad credit was returned after cancellation." });
+
     if (!["cod", "cheque"].includes(order.paymentMethod)) {
       return res.status(400).json({
         success: false,
@@ -160,26 +174,39 @@ const verifyCodPin = async (req, res) => {
       });
     }
 
-    // Verify PIN.
-    if (order.codPin !== String(pin)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid PIN.",
-      });
+    const cutoff = new Date(Date.now() - PIN_TTL_MS);
+    if (!order.codPinGeneratedAt || order.codPinGeneratedAt <= cutoff ||
+        Number(order.codPinAttempts || 0) >= PIN_MAX_ATTEMPTS) {
+      return res.status(400).json({ success: false,
+        message: "This PIN has expired or is locked. Ask an admin to generate a new PIN." });
     }
-
+    const filter = {
+      _id: order._id, client: req.user.userId, codPinStatus: "active",
+      adCreditReleased: { $ne: true },
+      codPinGeneratedAt: { $gt: cutoff },
+      paymentStatus: order.paymentStatus,
+      $or: [{ codPinAttempts: { $lt: PIN_MAX_ATTEMPTS } },
+            { codPinAttempts: { $exists: false } }],
+    };
+    if (order.codPin !== String(pin)) {
+      await Order.updateOne({ ...filter, codPin: { $ne: String(pin) } },
+        { $inc: { codPinAttempts: 1 } });
+      return res.status(400).json({ success: false, message: "Invalid or locked PIN." });
+    }
     const verifiedAt = new Date();
     const isChequeOrder = order.paymentMethod === "cheque";
-
-    if (!isChequeOrder) {
-      order.paymentStatus = "collected";
-      order.codCollectedAt = verifiedAt;
-    }
-
-    order.codPinStatus = isChequeOrder ? "verified" : "used";
-    order.codPinVerifiedAt = verifiedAt;
-
-    await order.save();
+    const verified = await Order.findOneAndUpdate(
+      { ...filter, codPin: String(pin) },
+      { $set: { codPinStatus: isChequeOrder ? "verified" : "used",
+        codPinVerifiedAt: verifiedAt,
+        ...(!isChequeOrder ? { paymentStatus: "collected", codCollectedAt: verifiedAt } : {}) } },
+      { new: true },
+    );
+    if (!verified) return res.status(409).json({ success: false,
+      message: "PIN expired, locked or already used. Please refresh." });
+    order.paymentStatus = verified.paymentStatus;
+    order.codPinStatus = verified.codPinStatus;
+    order.codCollectedAt = verified.codCollectedAt;
 
     return res.status(200).json({
       success: true,

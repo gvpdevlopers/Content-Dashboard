@@ -23,6 +23,7 @@ import codService from "../../services/codService";
 import CustomSelect from "../../components/CustomSelect";
 import { useAuth } from "../../context/AuthContext";
 import OrderItemsOverview from "../../components/OrderItemsOverview";
+import OrderAdCredit from "../../components/OrderAdCredit";
 import { toast } from "sonner";
 
 const AdminOrderDetails = () => {
@@ -486,6 +487,7 @@ const AdminOrderDetails = () => {
         />
         <span className="truncate">Back to Orders</span>
       </Link>
+
 
       {/* =====================================================
           ERROR
@@ -1028,40 +1030,6 @@ const AdminOrderDetails = () => {
               />
             </div>
 
-            {serviceSnapshot.description && (
-              <div
-                className="
-                  mt-6
-                  border-t
-                  border-zinc-100
-                  pt-5
-                "
-              >
-                <p
-                  className="
-                    text-[10px]
-                    font-medium
-                    uppercase
-                    tracking-[0.15em]
-                    text-zinc-400
-                  "
-                >
-                  Service Description
-                </p>
-
-                <p
-                  className="
-                    mt-2
-                    break-words
-                    text-sm
-                    leading-6
-                    text-zinc-600
-                  "
-                >
-                  {serviceSnapshot.description}
-                </p>
-              </div>
-            )}
 
             {serviceSnapshot.selectedOption && (
               <div
@@ -1139,6 +1107,7 @@ const AdminOrderDetails = () => {
                 )}
               </div>
             )}
+            <OrderAdCredit order={order} staffMode={staffMode} />
           </InfoCard>
         )}
 
@@ -1152,6 +1121,8 @@ const AdminOrderDetails = () => {
             canManageProgress
             updatingProgressKey={progressUpdatingKey}
             onProgressUpdate={handleServiceProgressUpdate}
+            renderServiceExtras={(item) => order.items?.length > 0 && item.serviceSnapshot?.slug === "ads"
+              ? <OrderAdCredit order={order} staffMode={staffMode} /> : null}
           />
         )}
 

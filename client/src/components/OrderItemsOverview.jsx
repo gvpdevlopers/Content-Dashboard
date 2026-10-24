@@ -202,6 +202,7 @@ const OrderItemsOverview = ({
   canManageProgress = false,
   updatingProgressKey = "",
   onProgressUpdate,
+  renderServiceExtras,
 }) => {
   const items =
     Array.isArray(order?.items) && order.items.length
@@ -401,6 +402,8 @@ const OrderItemsOverview = ({
                 </div>
               );
             })}
+
+            {renderServiceExtras?.(item)}
 
             <ServiceProgress
               item={item}

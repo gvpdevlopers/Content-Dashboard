@@ -79,9 +79,11 @@ const updateUserStatus = async (req, res) => {
       });
     }
 
+    await User.updateOne({ _id: user._id }, {
+      $set: { isActive },
+      ...(!isActive ? { $inc: { tokenVersion: 1 } } : {}),
+    });
     user.isActive = isActive;
-
-    await user.save();
 
     return res.status(200).json({
       success: true,
@@ -172,8 +174,11 @@ const resetAdminUserPassword = async (req, res) => {
       });
     }
 
-    user.password = await bcrypt.hash(password, 10);
-    await user.save();
+    const passwordHash = await bcrypt.hash(password, 10);
+    await User.updateOne({ _id: user._id }, {
+      $set: { password: passwordHash },
+      $inc: { tokenVersion: 1 },
+    });
 
     return res.status(200).json({
       success: true,

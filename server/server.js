@@ -33,6 +33,9 @@ app.use(
   })
 );
 
+// Signature verification must receive the exact bytes sent by Razorpay.
+app.post("/api/payments/razorpay/webhook", express.raw({ type: "application/json" }),
+  require("./controllers/paymentController").razorpayWebhook);
 app.use(express.json());
 
 app.get("/api/health", (req, res) => {

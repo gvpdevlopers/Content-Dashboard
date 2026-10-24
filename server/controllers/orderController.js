@@ -1,3 +1,8 @@
+const { changeOrderStatus } = require("../utils/adCreditCancellation");
+const { quoteCredit, spendCredit } = require("../utils/adCredit");
+const crypto = require("crypto");
+const { pinHasExpired } = require("../utils/pinPolicy");
+const { acquireLock } = require("../utils/requestLock");
 const Order = require("../models/Order");
 const Service = require("../models/Service");
 const Coupon = require("../models/Coupon");
@@ -2232,6 +2237,8 @@ const toOrderWithServiceProgress = (order) => {
       ? order.toObject({ flattenMaps: true })
       : { ...order };
 
+  if (pinHasExpired(visibleOrder)) visibleOrder.codPinStatus = "expired";
+
   if (Array.isArray(visibleOrder.items)) {
     visibleOrder.items = visibleOrder.items.map((item) => {
       const progress = getOrderItemServiceProgress(item);
@@ -2825,6 +2832,12 @@ const getOrderQuote = async (req, res) => {
       };
     }
 
+    const creditQuote = await quoteCredit({ client: req.user._id,
+      items: serviceResults.map((result) => result.item), input: req.body.adCredit,
+      subtotal: totals.subtotal, gstRate: totals.gstRate });
+    const subtotalBeforeAdCredit = totals.subtotal;
+    totals = creditQuote.totals;
+
     const serviceBreakdown = serviceResults.map((result) => {
       const couponLine = couponSnapshot?.serviceBreakdown.find(
         (line) => String(line.serviceId) === String(result.item.service),
@@ -2842,6 +2855,9 @@ const getOrderQuote = async (req, res) => {
       success: true,
       quote: {
         originalSubtotal,
+        subtotalBeforeAdCredit,
+        adCreditTotal: creditQuote.total,
+        adCreditApplied: Object.fromEntries(Object.entries(creditQuote.requested).map(([key, value]) => [key, value / 100])),
         discountTotal: couponSnapshot?.discountTotal || 0,
         taxableSubtotal: totals.subtotal,
         gstRate: totals.gstRate,
@@ -2959,12 +2975,35 @@ const createOrder = async (
   req,
   res,
 ) => {
+  let releaseSubmission;
   try {
     if (!req.user?._id) {
       return res.status(401).json({
         success: false,
         message: "Not authorized. User identity is unavailable.",
       });
+    }
+
+    let submissionKey;
+    let submissionHash;
+    const requestKey = req.get("Idempotency-Key");
+    if (requestKey) {
+      if (!/^[a-zA-Z0-9_-]{16,100}$/.test(requestKey)) {
+        return res.status(400).json({ success: false, message: "Invalid checkout request key." });
+      }
+      submissionKey = `${req.user._id}:${requestKey}`;
+      submissionHash = crypto.createHash("sha256")
+        .update(JSON.stringify(req.body)).digest("hex");
+      releaseSubmission = await acquireLock(`checkout:${submissionKey}`);
+      const existing = await Order.findOne({ submissionKey, client: req.user._id });
+      if (existing) {
+        if (existing.submissionHash !== submissionHash) {
+          return res.status(409).json({ success: false,
+            message: "This checkout key was already used for another order." });
+        }
+        return res.status(200).json({ success: true,
+          message: "Order already created.", order: toClientVisibleOrder(existing) });
+      }
     }
 
     const {
@@ -3211,6 +3250,11 @@ const createOrder = async (
       }
     }
 
+    const subtotalBeforeAdCredit = orderTotals.subtotal;
+    const creditQuote = await quoteCredit({ client: req.user._id, items,
+      input: req.body.adCredit, subtotal: orderTotals.subtotal, gstRate: orderTotals.gstRate });
+    orderTotals = creditQuote.totals;
+
     const {
       subtotal: roundedSubtotal,
       gstRate,
@@ -3253,6 +3297,11 @@ const createOrder = async (
       await generateOrderNumber();
 
     const orderData = {
+      ...(creditQuote.total > 0 ? {
+        adCreditApplied: Object.fromEntries(Object.entries(creditQuote.requested).map(([key, value]) => [key, value / 100])),
+        adCreditTotal: creditQuote.total, subtotalBeforeAdCredit,
+      } : {}),
+      ...(submissionKey ? { submissionKey, submissionHash } : {}),
       client: req.user._id,
 
       orderNumber,
@@ -3298,7 +3347,7 @@ const createOrder = async (
       ...(paymentMethod === "cheque" ? { chequeType } : {}),
 
       paymentStatus:
-        "pending",
+        amount === 0 && creditQuote.total > 0 ? "paid" : "pending",
 
       orderStatus:
         "pending",
@@ -3311,7 +3360,7 @@ const createOrder = async (
     */
 
     let order;
-    if ((coupon && couponSnapshot) || draftId) {
+    if ((coupon && couponSnapshot) || draftId || creditQuote.total > 0) {
       const session = await mongoose.startSession();
 
       try {
@@ -3342,6 +3391,10 @@ const createOrder = async (
           const createdOrder = new Order(orderData);
           await createdOrder.save({ session });
           order = createdOrder;
+          if (creditQuote.total > 0) {
+            await spendCredit({ client: req.user._id, order: createdOrder._id,
+              requested: creditQuote.requested, session, actor: req.user._id });
+          }
 
           if (coupon && couponSnapshot) {
             await CouponUsage.create(
@@ -3422,7 +3475,7 @@ const createOrder = async (
       message:
         "Order created successfully.",
       order:
-        toOrderWithServiceProgress(populatedOrder),
+        toClientVisibleOrder(populatedOrder),
     });
   } catch (error) {
     console.error(
@@ -3436,6 +3489,10 @@ const createOrder = async (
         error.message ||
         "Unable to create order.",
     });
+  } finally {
+    if (releaseSubmission) {
+      await releaseSubmission().catch((error) => console.error("Checkout lease release failed:", error));
+    }
   }
 };
 
@@ -3566,6 +3623,8 @@ const getOrderById = async (
 
 const toClientVisibleOrder = (order) => {
   const visibleOrder = toOrderWithServiceProgress(order);
+  for (const field of ["notes", "codPin", "codPinAttempts", "razorpaySignature",
+    "submissionKey", "submissionHash"]) delete visibleOrder[field];
 
   if (visibleOrder.orderStatus !== "completed") {
     delete visibleOrder.deliveryLink;
@@ -3887,10 +3946,7 @@ const updateOrderStatus = async (
       });
     }
 
-    order.orderStatus =
-      status;
-
-    await order.save();
+    await changeOrderStatus(order, status, req.user._id);
 
     const updatedOrder =
       await Order.findById(
@@ -3927,10 +3983,10 @@ const updateOrderStatus = async (
       error,
     );
 
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
       message:
-        "Unable to update order status.",
+        error.statusCode ? error.message : "Unable to update order status.",
     });
   }
 };
@@ -4009,10 +4065,24 @@ const updatePaymentStatus =
         });
       }
 
-      order.paymentStatus =
-        paymentStatus;
+      if (order.adCreditReleased) {
+        return res.status(409).json({ success: false,
+          message: "This order's ad credit was returned. Create a new order instead." });
+      }
 
-      await order.save();
+      if (order.adCreditTotal > 0) {
+        const paymentUpdate = await Order.updateOne({ _id: order._id,
+          adCreditReleased: { $ne: true }, paymentStatus: order.paymentStatus },
+        { $set: { paymentStatus } });
+        if (paymentUpdate.matchedCount !== 1) {
+          return res.status(409).json({ success: false,
+            message: "Order payment or ad credit changed. Refresh and try again." });
+        }
+        order.paymentStatus = paymentStatus;
+      } else {
+        order.paymentStatus = paymentStatus;
+        await order.save();
+      }
 
       return res.status(200).json({
         success: true,
@@ -4279,7 +4349,7 @@ const getAdminCodOrders =
 
       return res.status(200).json({
         success: true,
-        orders,
+        orders: orders.map(toOrderWithServiceProgress),
       });
     } catch (error) {
       console.error(

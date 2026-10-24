@@ -121,11 +121,6 @@ const ServicesSection = () => {
                       <span className="block text-xl font-medium leading-tight tracking-[-0.05em] text-zinc-900 transition-transform duration-300 group-hover:translate-x-1 sm:text-2xl lg:text-3xl">
                         {service.name}
                       </span>
-                      {service.description && (
-                        <span className="mt-2 block max-w-xl text-xs leading-5 text-zinc-500 sm:text-sm sm:leading-6">
-                          {service.description}
-                        </span>
-                      )}
                     </span>
                     <span className="col-start-2 row-start-2 mt-3 text-xs font-medium text-zinc-500 sm:col-start-auto sm:row-start-auto sm:mt-0 sm:text-sm">
                       {service.category || "Glow Ventures"}

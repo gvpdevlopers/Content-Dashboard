@@ -787,12 +787,6 @@ const AdminServices = () => {
                   <StatusBadge isActive={service.isActive} />
                 </div>
 
-                {/* Description */}
-                {service.description && (
-                  <p className="mt-4 line-clamp-2 text-sm leading-6 text-zinc-500">
-                    {service.description}
-                  </p>
-                )}
 
                 {/* Service Details */}
                 <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">

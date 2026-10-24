@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 
 import OrderSuccess from "../components/OrderSuccess";
+import AdCreditCheckout from "../components/AdCreditCheckout";
+import adCreditService from "../services/adCreditService";
 import orderService from "../services/orderService";
 import draftService from "../services/draftService";
 import serviceService from "../services/serviceService";
@@ -2001,6 +2003,19 @@ const RepeatableGroup = ({
 
 const NewOrder = () => {
   const [services, setServices] = useState([]);
+  const [adCreditData, setAdCreditData] = useState(null);
+  const [adCreditError, setAdCreditError] = useState("");
+  const [selectedAdCredit, setSelectedAdCredit] = useState({ metaAds: false, googleAds: false });
+  const [adCreditRefresh, setAdCreditRefresh] = useState(0);
+  useEffect(() => {
+    let active = true;
+    adCreditService.getMine().then((data) => {
+      if (active) { setAdCreditData(data); setAdCreditError(""); }
+    }).catch((loadError) => {
+      if (active) setAdCreditError(loadError.response?.data?.message || "Unable to load ad credit.");
+    });
+    return () => { active = false; };
+  }, [adCreditRefresh]);
   const [orderItems, setOrderItems] = useState([]);
 
   const [activeServiceIndex, setActiveServiceIndex] = useState(0);
@@ -2044,6 +2059,7 @@ const NewOrder = () => {
   const [error, setError] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
+  const submitInFlight = useRef(false);
 
   const [orderSuccess, setOrderSuccess] = useState(null);
 
@@ -3093,6 +3109,37 @@ const NewOrder = () => {
     return null;
   }, [paymentPricing, paymentMethod, chequeType]);
 
+  const adSpendBudgets = useMemo(() => {
+    const budgets = { metaAds: 0, googleAds: 0 };
+    for (const item of orderItems) {
+      if (item.service?.slug !== "ads") continue;
+      const fields = getActiveFieldsForItem(item);
+      for (const platform of ["metaAds", "googleAds"]) {
+        const name = `${platform}AdSpendAmount`;
+        if (!fields.some((field) => field.name === name)) continue;
+        const value = Number(item.formData?.[name] || 0);
+        if (Number.isFinite(value) && value > 0) budgets[platform] += Math.round(value * 100) / 100;
+      }
+    }
+    return budgets;
+  }, [orderItems]);
+  const appliedAdCredit = Object.fromEntries(["metaAds", "googleAds"].map((platform) => [platform,
+    selectedAdCredit[platform] && !adCreditError
+      ? Math.min(adSpendBudgets[platform], Number(adCreditData?.available?.[platform] || 0)) : 0,
+  ]));
+  const adCreditTotal = Number((appliedAdCredit.metaAds + appliedAdCredit.googleAds).toFixed(2));
+
+  const renderAdCreditForField = (field, service) => {
+    if (service?.slug !== "ads") return null;
+    const platform = field.name === "metaAdsAdSpendAmount" ? "metaAds"
+      : field.name === "googleAdsAdSpendAmount" ? "googleAds" : null;
+    if (!platform) return null;
+    return <AdCreditCheckout platform={platform} data={adCreditData} error={adCreditError}
+      budgets={adSpendBudgets} selected={selectedAdCredit} onSelect={setSelectedAdCredit}
+      disabled={submitting} onRefresh={() => setAdCreditRefresh((current) => current + 1)} />;
+  };
+
+
   const currentCouponRequestKey = appliedCouponCode
     ? JSON.stringify({
         code: appliedCouponCode,
@@ -3109,25 +3156,26 @@ const NewOrder = () => {
     couponErrorRequestKey === currentCouponRequestKey ? couponError : "";
   const hasCurrentCouponQuote = Boolean(currentCouponQuote);
   const couponDiscountTotal = Number(currentCouponQuote?.discountTotal || 0);
-  const taxableSubtotal = currentCouponQuote
+  const subtotalBeforeAdCredit = currentCouponQuote
     ? Number(currentCouponQuote.taxableSubtotal || 0)
     : Math.max(0, subtotal - couponDiscountTotal);
+  const taxableSubtotal = Math.max(0, Number((subtotalBeforeAdCredit - adCreditTotal).toFixed(2)));
   const currentCouponLoading =
     couponLoading ||
     Boolean(appliedCouponCode && !currentCouponQuote && !currentCouponError);
 
   const gstAmount = useMemo(
     () =>
-      hasCurrentCouponQuote
+      hasCurrentCouponQuote && adCreditTotal === 0
         ? Number(currentCouponQuote.gstAmount || 0)
         : gstRate === null
         ? 0
         : Number(((taxableSubtotal * gstRate) / 100).toFixed(2)),
-    [currentCouponQuote, gstRate, hasCurrentCouponQuote, taxableSubtotal],
+    [currentCouponQuote, gstRate, hasCurrentCouponQuote, taxableSubtotal, adCreditTotal],
   );
 
   const estimatedTotal =
-    hasCurrentCouponQuote
+    hasCurrentCouponQuote && adCreditTotal === 0
       ? Number(currentCouponQuote.finalTotal)
       : gstRate === null
         ? null
@@ -3758,6 +3806,7 @@ const NewOrder = () => {
       paymentMethod,
       chequeType: paymentMethod === "cheque" ? chequeType : "",
       couponCode: appliedCouponCode,
+      adCredit: appliedAdCredit,
     });
 
   const currentDraftQuoteRequestKey = editingDraftId
@@ -3774,6 +3823,7 @@ const NewOrder = () => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (submitInFlight.current) return;
     setError("");
 
     if (paymentMethod === "cheque" && !chequeType) {
@@ -3824,7 +3874,7 @@ const NewOrder = () => {
       }
     }
 
-    if (paymentMethod === "online" && estimatedTotal <= 0) {
+    if (paymentMethod === "online" && estimatedTotal <= 0 && adCreditTotal === 0) {
       setError(
         "Online payment requires a payable order amount. Please select a priced service option or use Cash on Delivery.",
       );
@@ -3851,6 +3901,7 @@ const NewOrder = () => {
         setDraftQuoteError("");
         const quoteResponse = await orderService.getOrderQuote({
           services: buildServicesPayload(),
+          adCredit: appliedAdCredit,
           paymentMethod,
           ...(paymentMethod === "cheque" ? { chequeType } : {}),
           ...(appliedCouponCode ? { couponCode: appliedCouponCode } : {}),
@@ -3874,12 +3925,14 @@ const NewOrder = () => {
     }
 
     try {
+      submitInFlight.current = true;
       setSubmitting(true);
 
       const servicesPayload = buildServicesPayload();
 
       const orderResponse = await orderService.createOrder({
         services: servicesPayload,
+        ...(adCreditTotal > 0 ? { adCredit: appliedAdCredit } : {}),
         additionalRequirements: additionalRequirements.trim(),
         paymentMethod,
         ...(paymentMethod === "cheque" ? { chequeType } : {}),
@@ -3907,6 +3960,7 @@ const NewOrder = () => {
       */
 
       if (paymentMethod === "cod" || paymentMethod === "cheque") {
+        orderService.clearPendingCheckout();
         setOrderSuccess(createdOrder);
         return;
       }
@@ -3918,9 +3972,20 @@ const NewOrder = () => {
       */
 
       if (paymentMethod === "online") {
+        if (createdOrder.paymentStatus === "paid") {
+          orderService.clearPendingCheckout();
+          setOrderSuccess(createdOrder);
+          return;
+        }
         const razorpayResponse = await paymentService.createRazorpayOrder(
           createdOrder._id || createdOrder.id,
         );
+
+        if (razorpayResponse.alreadyPaid) {
+          orderService.clearPendingCheckout();
+          setOrderSuccess(razorpayResponse.order);
+          return;
+        }
 
         const razorpayOrder = razorpayResponse?.razorpayOrder;
 
@@ -3980,6 +4045,7 @@ const NewOrder = () => {
               });
 
               if (verification?.success) {
+                orderService.clearPendingCheckout();
                 setOrderSuccess(verification.order);
                 toast.success("Payment completed successfully.");
               } else {
@@ -4029,6 +4095,9 @@ const NewOrder = () => {
       console.error("Create order/payment error:", submitError);
 
       const responseData = submitError.response?.data;
+      if (String(responseData?.message || "").toLowerCase().includes("ad credit")) {
+        setAdCreditRefresh((current) => current + 1);
+      }
       if (
         editingDraftId &&
         submitError.response?.status === 409 &&
@@ -4057,6 +4126,7 @@ const NewOrder = () => {
         toast.error(message);
       }
     } finally {
+      submitInFlight.current = false;
       setSubmitting(false);
     }
   };
@@ -4456,14 +4526,6 @@ const NewOrder = () => {
                               <span className="block truncate text-sm font-semibold text-zinc-900 sm:text-[15px]">
                                 {service.name}
                               </span>
-                              {/* 
-                              {service.description && (
-                                <span className="mt-0.5 line-clamp-1 block text-xs text-zinc-400">
-                                  {
-                                    service.description
-                                  }
-                                </span>
-                              )} */}
                             </span>
 
                           </button>
@@ -4537,15 +4599,7 @@ const NewOrder = () => {
 
                       {selected && item && openServiceIds[serviceId] && (
                         <div className="border-t border-zinc-200 p-4 sm:px-4 py-6">
-                          {/* Service description */}
 
-                          {service.description && (
-                            <div className="mb-6 rounded-2xl border border-zinc-100 bg-zinc-50 px-4 py-3.5">
-                              <p className="text-sm leading-6 text-zinc-500">
-                                {service.description}
-                              </p>
-                            </div>
-                          )}
 
                           {gridPricingModes.length > 0 && (
                             <div className="mb-7">
@@ -4853,6 +4907,7 @@ const NewOrder = () => {
                                                 )
                                               }
                                             />
+                                            {renderAdCreditForField(field, service)}
                                           </div>
                                         ))}
                                       </div>
@@ -4990,6 +5045,7 @@ const NewOrder = () => {
                                         )
                                       }
                                     />
+                                    {renderAdCreditForField(field, service)}
                                   </div>
                                 ))}
                               </div>
@@ -5061,6 +5117,7 @@ const NewOrder = () => {
                                           )
                                         }
                                       />
+                                      {renderAdCreditForField(field, service)}
                                     </div>
                                   ))}
                                 </div>
@@ -5216,6 +5273,7 @@ const NewOrder = () => {
 
             {orderItems.length > 0 && (
               <>
+
                 <section className="rounded-[24px] border border-zinc-200 bg-white p-5 shadow-[0_10px_35px_rgba(0,0,0,0.04)] sm:p-7">
                   <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
                     Step 2
@@ -5313,12 +5371,10 @@ const NewOrder = () => {
                   {editingDraftId && (
                     <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
                       <p className="text-xs font-semibold text-amber-900">
-                        Review current pricing
+                        Confirm order total
                       </p>
                       <p className="mt-1 text-xs leading-5 text-amber-800">
-                        Prices, coupon eligibility, and tax are recalculated
-                        from current server settings. Confirm the total before
-                        submitting this saved draft.
+                        Review the updated total before placing your order.
                       </p>
                       {draftQuoteLoading && (
                         <p className="mt-3 flex items-center gap-2 text-xs text-amber-800">
@@ -5444,7 +5500,7 @@ const NewOrder = () => {
                           (paymentPricingLoading || !paymentPricing)) ||
                         Boolean(loadingServiceId) ||
                         !orderItems.length ||
-                        (paymentMethod === "online" && estimatedTotal <= 0)
+                        (paymentMethod === "online" && estimatedTotal <= 0 && adCreditTotal === 0)
                       }
                       className="group flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-zinc-900 px-5 py-3.5 text-sm font-semibold text-white shadow-[0_8px_25px_rgba(24,24,27,0.12)] transition-all duration-300 ease-out hover:bg-zinc-800 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
                     >
@@ -6018,10 +6074,10 @@ const NewOrder = () => {
                           </div>
                           <div className="flex items-center justify-between gap-4">
                             <p className="text-xs text-white/40">
-                              Taxable subtotal
+                              {adCreditTotal > 0 ? "Subtotal after coupon" : "Taxable subtotal"}
                             </p>
                             <p className="text-sm font-medium text-white">
-                              {formatCurrency(taxableSubtotal)}
+                              {formatCurrency(subtotalBeforeAdCredit)}
                             </p>
                           </div>
                           <div className="space-y-1 border-l border-white/10 pl-3">
@@ -6042,6 +6098,12 @@ const NewOrder = () => {
                               ))}
                           </div>
                         </>
+                      )}
+
+                      {adCreditTotal > 0 && (
+                        <div className="flex items-center justify-between text-sm text-emerald-300">
+                          <span>Ad credit applied</span><span>-{formatCurrency(adCreditTotal)}</span>
+                        </div>
                       )}
 
                       <div className="flex items-center justify-between gap-4">
@@ -6180,7 +6242,7 @@ const NewOrder = () => {
                           !orderItems.length ||
                           (paymentMethod === "online" &&
                             estimatedTotal !== null &&
-                            estimatedTotal <= 0)
+                            estimatedTotal <= 0 && adCreditTotal === 0)
                         }
                         className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-zinc-950 transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
                       >

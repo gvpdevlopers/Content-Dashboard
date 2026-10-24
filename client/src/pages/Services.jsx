@@ -210,11 +210,6 @@ const Services = () => {
                               {service.category}
                             </p>
                           )}
-                          {service.description && (
-                            <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-600 sm:text-base sm:leading-7">
-                              {service.description}
-                            </p>
-                          )}
                         </div>
                         <div className="sm:pt-1">
                           <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-zinc-400">

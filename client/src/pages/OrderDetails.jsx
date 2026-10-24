@@ -17,6 +17,8 @@ import { Link, useParams } from "react-router-dom";
 import orderService from "../services/orderService";
 import codService from "../services/codService";
 import OrderItemsOverview from "../components/OrderItemsOverview";
+import RetryOnlinePayment from "../components/RetryOnlinePayment";
+import AdCreditBreakdown from "../components/AdCreditBreakdown";
 import { toast } from "sonner";
 
 const OrderDetails = () => {
@@ -247,7 +249,6 @@ const OrderDetails = () => {
 
   const serviceName = service.name || "Service";
   const serviceCategory = service.category || "";
-  const serviceDescription = service.description || "";
 
   const formData =
     order.formData instanceof Map
@@ -508,19 +509,6 @@ const OrderDetails = () => {
               </div>
             </div>
 
-            {serviceDescription && (
-              <p
-                className="
-                mt-5
-                max-w-3xl
-                text-sm
-                leading-6
-                text-zinc-500
-              "
-              >
-                {serviceDescription}
-              </p>
-            )}
 
             {/* Order pricing information */}
 
@@ -912,6 +900,8 @@ const OrderDetails = () => {
           title="Payment Information"
           description="Payment details for this order."
         >
+          <RetryOnlinePayment order={order} onPaid={setOrder} />
+          <AdCreditBreakdown order={order} />
           <InfoRow
             label="Method"
             value={

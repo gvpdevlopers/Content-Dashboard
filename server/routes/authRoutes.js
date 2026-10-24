@@ -10,7 +10,7 @@ const protect = require("../middleware/auth");
 
 const router = express.Router();
 
-router.post("/login", login);
+router.post("/login", require("../middleware/loginLimit"), login);
 
 router.post("/logout", protect, logout);
 

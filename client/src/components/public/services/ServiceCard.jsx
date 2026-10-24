@@ -186,20 +186,6 @@ const ServiceCard = ({ service, index = 0 }) => {
           />
         </div>
 
-        {service?.description && (
-          <p
-            className="
-              mt-3
-              line-clamp-4
-              max-w-xl
-              text-sm
-              leading-6
-              text-zinc-500
-            "
-          >
-            {service.description}
-          </p>
-        )}
       </div>
 
       {/* Bottom */}
