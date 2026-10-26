@@ -102,9 +102,21 @@ test("dropdown placement fits mobile, tablet and desktop viewports and opens abo
 
 test("draft labels normalize generated titles while preserving custom names and data", () => {
   const draft = { title: "Draft 24/10/2026", updatedAt: "2026-10-25T10:00:00Z" };
-  assert.equal(getDraftLabel(draft), "Draft ? 24 Oct 2026");
+  assert.equal(getDraftLabel(draft), "Draft \u00b7 24 Oct 2026");
   assert.equal(draft.title, "Draft 24/10/2026");
   assert.equal(getDraftLabel({ title: "Campaign launch" }), "Campaign launch");
   assert.equal(formatDraftDate("invalid"), "recently");
   assert.equal(getDraftLabel({}), "Saved draft");
+});
+
+test("contact form reuses the accessible service select without changing submission validation", async () => {
+  const ContactForm = (await server.ssrLoadModule("/src/components/public/contact/ContactForm.jsx")).default;
+  const html = render(ContactForm, {});
+  assert.equal((html.match(/role="combobox"/g) || []).length, 1);
+  assert.match(html, /id="service"/);
+  assert.match(html, /aria-label="Service"/);
+  assert.match(html, /aria-required="true"/);
+  assert.match(html, /novalidate=""/i);
+  assert.match(html, />Select a service</);
+  assert.doesNotMatch(html, /<select/);
 });

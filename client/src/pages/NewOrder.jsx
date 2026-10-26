@@ -6039,7 +6039,7 @@ const NewOrder = () => {
                               setCouponErrorRequestKey("");
                               setCouponLoading(false);
                             }}
-                            className="dashboard-action dashboard-action--secondary shrink-0 rounded-xl border border-white/15 px-3 py-2.5 text-xs font-medium text-white/70 hover:bg-white/10"
+                            className="dashboard-action dashboard-action--tertiary dashboard-action--inverse shrink-0 rounded-xl border border-white/15 px-3 py-2.5 text-xs font-medium text-white/70 hover:bg-white/10"
                           >
                             Remove
                           </button>
@@ -6058,7 +6058,7 @@ const NewOrder = () => {
                                 couponInput.trim().toUpperCase(),
                               );
                             }}
-                            className="dashboard-action dashboard-action--secondary shrink-0 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="dashboard-action dashboard-action--primary dashboard-action--inverse shrink-0 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Apply
                           </button>
@@ -6260,7 +6260,7 @@ const NewOrder = () => {
                           !orderItems.length ||
                           Boolean(loadingServiceId)
                         }
-                        className="dashboard-action dashboard-action--secondary mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="dashboard-action dashboard-action--secondary dashboard-action--inverse mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {draftBusy ? (
                           <Loader2 size={14} className="animate-spin" />
@@ -6294,7 +6294,7 @@ const NewOrder = () => {
                             estimatedTotal !== null &&
                             estimatedTotal <= 0 && adCreditTotal === 0)
                         }
-                        className="dashboard-action dashboard-action--secondary mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-zinc-950 transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="dashboard-action dashboard-action--primary dashboard-action--inverse mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-zinc-950 transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {submitting || draftQuoteLoading ? (
                           <>

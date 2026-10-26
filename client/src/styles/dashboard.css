@@ -69,7 +69,7 @@
 .custom-select-menu { animation: select-reveal 150ms ease-out; }
 @keyframes select-reveal { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .dashboard-ui *, .dashboard-ui *::before, .dashboard-ui *::after, .custom-select-menu {
+  .dashboard-ui *, .dashboard-ui *::before, .dashboard-ui *::after, .custom-select-menu, .custom-select-menu * {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
@@ -83,3 +83,13 @@
 .dashboard-ui .dashboard-action:disabled :is(span, svg) { color: inherit; }
 
 .dashboard-ui .dashboard-action--icon { width: 2.5rem; height: 2.5rem; min-height: 2.5rem; padding: 0.5rem; flex-shrink: 0; }
+
+/* The existing dark summary uses the same hierarchy with inverted surfaces. */
+.dashboard-ui .dashboard-action--primary.dashboard-action--inverse { background: #f8fafc; border-color: #f8fafc; color: #1e293b; }
+.dashboard-ui .dashboard-action--primary.dashboard-action--inverse:hover:not(:disabled) { background: #e2e8f0; border-color: #e2e8f0; color: #0f172a; }
+.dashboard-ui .dashboard-action--secondary.dashboard-action--inverse { background: rgb(255 255 255 / 0.04); border-color: rgb(255 255 255 / 0.16); color: #e2e8f0; }
+.dashboard-ui .dashboard-action--tertiary.dashboard-action--inverse { background: transparent; border-color: transparent; color: #cbd5e1; }
+.dashboard-ui .dashboard-action--secondary.dashboard-action--inverse:hover:not(:disabled),
+.dashboard-ui .dashboard-action--tertiary.dashboard-action--inverse:hover:not(:disabled) { background: rgb(255 255 255 / 0.1); border-color: rgb(255 255 255 / 0.24); color: #fff; }
+.dashboard-ui .dashboard-action--inverse:focus-visible { outline-color: #94a3b8; }
+.dashboard-ui .dashboard-action--inverse:disabled { background: rgb(255 255 255 / 0.04); border-color: rgb(255 255 255 / 0.08); color: #64748b; box-shadow: none; opacity: 0.75; }

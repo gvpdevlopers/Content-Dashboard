@@ -11,5 +11,5 @@ export const getDraftLabel = (draft) => {
   if (title && !generated) return title;
   const date = draft.createdAt || (generated ? `${generated[3]}-${generated[2].padStart(2, "0")}-${generated[1].padStart(2, "0")}T00:00:00+05:30` : draft.updatedAt);
   const formatted = formatDraftDate(date);
-  return formatted === "recently" ? "Saved draft" : `Draft ? ${formatted}`;
+  return formatted === "recently" ? "Saved draft" : `Draft \u00b7 ${formatted}`;
 };

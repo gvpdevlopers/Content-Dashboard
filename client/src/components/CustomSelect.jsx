@@ -5,7 +5,7 @@ import { getSelectPlacement, findEnabledOption, findTypeaheadOption } from "../u
 
 const CustomSelect = ({
   value, onChange, options = [], placeholder = "Select an option", disabled = false,
-  id, name, required = false, label, compact = false, className = "",
+  id, name, required = false, label, compact = false, className = "", onBlur,
   "aria-label": ariaLabel, "aria-labelledby": labelledBy, "aria-describedby": describedBy,
   "aria-invalid": invalid,
 }) => {
@@ -119,6 +119,7 @@ const CustomSelect = ({
         aria-activedescendant={open && options[activeIndex] ? `${menuId}-${activeIndex}` : undefined}
         aria-label={ariaLabel || (labelledBy || label ? undefined : placeholder)} aria-labelledby={labelledBy}
         aria-describedby={describedBy} aria-invalid={invalid} aria-required={required || undefined}
+        onBlur={(event) => { if (!menuRef.current?.contains(event.relatedTarget)) onBlur?.(event); }}
         onClick={(event) => { event.stopPropagation(); if (open) setOpen(false); else show(); }} onKeyDown={handleKeyDown}
         className={`custom-select-trigger flex w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-left text-sm text-zinc-700 transition-colors duration-150 hover:border-zinc-300 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500 disabled:cursor-not-allowed disabled:opacity-50 ${compact ? "min-h-10 py-2" : "min-h-12 py-3"} ${open ? "border-slate-400 bg-white" : ""}`}>
         <span className={`min-w-0 break-words ${selectedOption ? "text-zinc-900" : "text-zinc-400"}`}>{selectedOption?.label ?? placeholder}</span>

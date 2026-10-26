@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import CustomSelect from "../../CustomSelect";
+import { useRef, useState } from "react";
 
 import {
   AlertCircle,
-  Check,
   CheckCircle2,
-  ChevronDown,
   Loader2,
   Send,
 } from "lucide-react";
@@ -39,14 +38,9 @@ const ContactForm = () => {
   const [touched, setTouched] = useState({});
   const [status, setStatus] = useState("idle");
   const [submissionError, setSubmissionError] = useState("");
-  const [serviceOpen, setServiceOpen] = useState(false);
-  const [activeServiceIndex, setActiveServiceIndex] = useState(-1);
 
   const isOnline = useOnlineStatus();
   const submitLockRef = useRef(false);
-  const serviceDropdownRef = useRef(null);
-  const serviceTriggerRef = useRef(null);
-  const serviceOptionsRef = useRef(null);
 
   /* ==========================================================
       VALIDATION
@@ -196,129 +190,11 @@ const ContactForm = () => {
       service: "",
     }));
 
-    setServiceOpen(false);
-    setActiveServiceIndex(-1);
-
     if (status !== "idle") {
       setStatus("idle");
     }
     setSubmissionError("");
-
-    requestAnimationFrame(() => {
-      serviceTriggerRef.current?.focus();
-    });
   };
-
-  const handleServiceKeyDown = (event) => {
-    if (!serviceOpen) {
-      if (
-        event.key === "ArrowDown" ||
-        event.key === "ArrowUp" ||
-        event.key === "Enter" ||
-        event.key === " "
-      ) {
-        event.preventDefault();
-        setServiceOpen(true);
-        setActiveServiceIndex(
-          formData.service
-            ? serviceOptions.indexOf(formData.service)
-            : 0,
-        );
-      }
-
-      return;
-    }
-
-    switch (event.key) {
-      case "ArrowDown":
-        event.preventDefault();
-
-        setActiveServiceIndex((current) =>
-          current >= serviceOptions.length - 1
-            ? 0
-            : current + 1,
-        );
-        break;
-
-      case "ArrowUp":
-        event.preventDefault();
-
-        setActiveServiceIndex((current) =>
-          current <= 0
-            ? serviceOptions.length - 1
-            : current - 1,
-        );
-        break;
-
-      case "Enter":
-      case " ":
-        event.preventDefault();
-
-        if (activeServiceIndex >= 0) {
-          handleServiceSelect(
-            serviceOptions[activeServiceIndex],
-          );
-        }
-        break;
-
-      case "Escape":
-        event.preventDefault();
-        setServiceOpen(false);
-        setActiveServiceIndex(-1);
-        break;
-
-      case "Tab":
-        setServiceOpen(false);
-        setActiveServiceIndex(-1);
-        break;
-
-      default:
-        break;
-    }
-  };
-
-  /* Close dropdown when clicking outside */
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        serviceDropdownRef.current &&
-        !serviceDropdownRef.current.contains(event.target)
-      ) {
-        setServiceOpen(false);
-        setActiveServiceIndex(-1);
-      }
-    };
-
-    document.addEventListener(
-      "mousedown",
-      handleClickOutside,
-    );
-
-    return () => {
-      document.removeEventListener(
-        "mousedown",
-        handleClickOutside,
-      );
-    };
-  }, []);
-
-  /* Scroll active option into view */
-  useEffect(() => {
-    if (
-      !serviceOpen ||
-      activeServiceIndex < 0 ||
-      !serviceOptionsRef.current
-    ) {
-      return;
-    }
-
-    const activeOption =
-      serviceOptionsRef.current.children[activeServiceIndex];
-
-    activeOption?.scrollIntoView({
-      block: "nearest",
-    });
-  }, [activeServiceIndex, serviceOpen]);
 
   /* ==========================================================
       SUBMIT
@@ -373,8 +249,6 @@ const ContactForm = () => {
     setFormData(initialForm);
     setErrors({});
     setTouched({});
-    setServiceOpen(false);
-    setActiveServiceIndex(-1);
   };
 
   /* ==========================================================
@@ -852,270 +726,21 @@ const ContactForm = () => {
                   <span className="text-red-500">*</span>
                 </label>
 
-                <div
-                  ref={serviceDropdownRef}
-                  className="relative mt-2"
-                >
-                  {/* Trigger */}
-                  <button
-                    ref={serviceTriggerRef}
-                    id="service"
-                    type="button"
-                    onClick={() => {
-                      setServiceOpen((current) => {
-                        const next = !current;
-
-                        if (next) {
-                          setActiveServiceIndex(
-                            formData.service
-                              ? serviceOptions.indexOf(
-                                  formData.service,
-                                )
-                              : 0,
-                          );
-                        } else {
-                          setActiveServiceIndex(-1);
-                        }
-
-                        return next;
-                      });
-                    }}
-                    onBlur={() => {
-                      setTimeout(() => {
-                        if (
-                          !serviceDropdownRef.current?.contains(
-                            document.activeElement,
-                          )
-                        ) {
-                          setTouched((current) => ({
-                            ...current,
-                            service: true,
-                          }));
-
-                          setErrors((current) => ({
-                            ...current,
-                            service: validateField(
-                              "service",
-                              formData.service,
-                            ),
-                          }));
-
-                          setServiceOpen(false);
-                          setActiveServiceIndex(-1);
-                        }
-                      }, 0);
-                    }}
-                    onKeyDown={handleServiceKeyDown}
-                    aria-haspopup="listbox"
-                    aria-expanded={serviceOpen}
-                    aria-invalid={
-                      touched.service &&
-                      Boolean(errors.service)
-                    }
-                    aria-describedby={
-                      touched.service && errors.service
-                        ? "service-error"
-                        : undefined
-                    }
-                    className={`
-                      flex
-                      h-12
-                      w-full
-                      items-center
-                      justify-between
-                      rounded-2xl
-                      border
-                      bg-white
-                      px-4
-                      text-left
-                      text-sm
-                      outline-none
-                      transition-all
-                      duration-300
-                      ${
-                        touched.service && errors.service
-                          ? `
-                            border-red-300
-                            bg-red-50/30
-                            hover:border-red-400
-                            focus:border-red-400
-                            focus:ring-4
-                            focus:ring-red-500/10
-                          `
-                          : `
-                            border-zinc-200
-                            hover:border-zinc-300
-                            focus:border-zinc-900
-                            focus:ring-4
-                            focus:ring-zinc-900/[0.07]
-                          `
-                      }
-                      ${
-                        serviceOpen
-                          ? `
-                            border-zinc-900
-                            ring-4
-                            ring-zinc-900/[0.07]
-                          `
-                          : ""
-                      }
-                    `}
-                  >
-                    <span
-                      className={
-                        formData.service
-                          ? "text-zinc-900"
-                          : "text-zinc-400"
-                      }
-                    >
-                      {formData.service ||
-                        "Select a service"}
-                    </span>
-
-                    <ChevronDown
-                      size={16}
-                      strokeWidth={1.8}
-                      className={`
-                        shrink-0
-                        text-zinc-400
-                        transition-transform
-                        duration-300
-                        ${
-                          serviceOpen
-                            ? "rotate-180 text-zinc-700"
-                            : ""
-                        }
-                      `}
-                      aria-hidden="true"
-                    />
-                  </button>
-
-                  {/* Dropdown */}
-                  {serviceOpen && (
-                    <div
-                      className="
-                        absolute
-                        left-0
-                        right-0
-                        top-[calc(100%+8px)]
-                        z-50
-                        overflow-hidden
-                        rounded-2xl
-                        border
-                        border-zinc-200
-                        bg-white
-                        p-1.5
-                        shadow-[0_18px_45px_rgba(24,24,27,0.12)]
-                      "
-                    >
-                      <div
-                        ref={serviceOptionsRef}
-                        className="
-                          max-h-60
-                          overflow-y-auto
-                          scrollbar-none
-                        "
-                        role="listbox"
-                        aria-label="Select a service"
-                      >
-                        {serviceOptions.map(
-                          (option, index) => {
-                            const isSelected =
-                              formData.service === option;
-
-                            const isActive =
-                              activeServiceIndex ===
-                              index;
-
-                            return (
-                              <button
-                                key={option}
-                                type="button"
-                                role="option"
-                                aria-selected={isSelected}
-                                onMouseEnter={() =>
-                                  setActiveServiceIndex(
-                                    index,
-                                  )
-                                }
-                                onMouseDown={(event) => {
-                                  event.preventDefault();
-                                }}
-                                onClick={() =>
-                                  handleServiceSelect(
-                                    option,
-                                  )
-                                }
-                                className={`
-                                  group/option
-                                  flex
-                                  w-full
-                                  items-center
-                                  justify-between
-                                  rounded-xl
-                                  px-3.5
-                                  py-3
-                                  text-left
-                                  text-sm
-                                  transition-all
-                                  duration-200
-                                  ${
-                                    isSelected
-                                      ? `
-                                        bg-zinc-950
-                                        text-white
-                                      `
-                                      : isActive
-                                        ? `
-                                          bg-zinc-100
-                                          text-zinc-950
-                                        `
-                                        : `
-                                          text-zinc-700
-                                          hover:bg-zinc-50
-                                          hover:text-zinc-950
-                                        `
-                                  }
-                                `}
-                              >
-                                <span>{option}</span>
-
-                                <span
-                                  className={`
-                                    flex
-                                    h-6
-                                    w-6
-                                    items-center
-                                    justify-center
-                                    rounded-full
-                                    transition-all
-                                    duration-200
-                                    ${
-                                      isSelected
-                                        ? `
-                                          bg-white/10
-                                          text-white
-                                        `
-                                        : `
-                                          text-transparent
-                                          group-hover/option:text-zinc-300
-                                        `
-                                    }
-                                  `}
-                                >
-                                  <Check
-                                    size={13}
-                                    strokeWidth={2}
-                                  />
-                                </span>
-                              </button>
-                            );
-                          },
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <CustomSelect
+                  id="service"
+                  required
+                  aria-label="Service"
+                  value={formData.service}
+                  onChange={handleServiceSelect}
+                  onBlur={() => handleBlur({ target: { name: "service", value: formData.service } })}
+                  options={serviceOptions.map((service) => ({ value: service, label: service }))}
+                  placeholder="Select a service"
+                  aria-invalid={touched.service && Boolean(errors.service)}
+                  aria-describedby={touched.service && errors.service ? "service-error" : undefined}
+                  className={`mt-2 [&_.custom-select-trigger]:rounded-2xl [&_.custom-select-trigger]:bg-white ${
+                    touched.service && errors.service ? "[&_.custom-select-trigger]:border-red-300" : ""
+                  }`}
+                />
 
                 {errors.service && touched.service && (
                   <div id="service-error">
