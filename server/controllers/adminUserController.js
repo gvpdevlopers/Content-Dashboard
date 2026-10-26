@@ -97,6 +97,7 @@ const updateUserStatus = async (req, res) => {
         username: user.username,
         role: user.role,
         isActive: user.isActive,
+        allowMonthEndPayment: user.allowMonthEndPayment === true,
       },
     });
   } catch (error) {
@@ -237,7 +238,14 @@ const createAdminUser = async (req, res) => {
       username,
       password,
       role = "client",
+      allowMonthEndPayment = false,
     } = req.body;
+
+    if (typeof allowMonthEndPayment !== "boolean" ||
+        (allowMonthEndPayment && role !== "client")) {
+      return res.status(400).json({ success: false,
+        message: "Pay on Month-End must be a boolean and can only be enabled for clients." });
+    }
 
     // Validate required fields
     if (!name || !email || !username || !password) {
@@ -301,6 +309,7 @@ const createAdminUser = async (req, res) => {
       username: normalizedUsername,
       password: hashedPassword,
       role,
+      allowMonthEndPayment,
       isActive: true,
     });
 
@@ -314,6 +323,7 @@ const createAdminUser = async (req, res) => {
         username: user.username,
         role: user.role,
         isActive: user.isActive,
+        allowMonthEndPayment: user.allowMonthEndPayment === true,
         createdAt: user.createdAt,
       },
     });
@@ -327,7 +337,32 @@ const createAdminUser = async (req, res) => {
   }
 };
 
+const updateMonthEndPermission = async (req, res) => {
+  try {
+    if (req.user?.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Admin access required." });
+    }
+    const { allowMonthEndPayment } = req.body || {};
+    if (typeof allowMonthEndPayment !== "boolean") {
+      return res.status(400).json({ success: false, message: "allowMonthEndPayment must be a boolean." });
+    }
+    const user = await User.findOneAndUpdate(
+      { _id: req.params.id, role: "client" },
+      { $set: { allowMonthEndPayment } },
+      { new: true, runValidators: true },
+    ).select("-password");
+    if (!user) {
+      return res.status(404).json({ success: false, message: "Client not found." });
+    }
+    return res.json({ success: true, message: "Payment permission updated.", user });
+  } catch (error) {
+    console.error("Update month-end permission error:", error);
+    return res.status(500).json({ success: false, message: "Unable to update payment permission." });
+  }
+};
+
 module.exports = {
+  updateMonthEndPermission,
   getAdminUsers,
   getAdminUserById,
   updateUserStatus,

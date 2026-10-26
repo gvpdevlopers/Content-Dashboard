@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import CustomSelect from "../../components/CustomSelect";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
@@ -202,237 +203,6 @@ const getValidationSummary = (errors) => {
 // CUSTOM SELECT
 // ============================================================
 
-const CustomSelect = ({
-  value,
-  onChange,
-  options = [],
-  placeholder = "Select an option",
-  disabled = false,
-}) => {
-  const [open, setOpen] = useState(false);
-  const selectRef = useRef(null);
-
-  const selectedOption = options.find((option) => option.value === value);
-
-  useEffect(() => {
-    const handleOutsideClick = (event) => {
-      if (selectRef.current && !selectRef.current.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleOutsideClick);
-
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleEscape = (event) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, []);
-
-  const handleSelect = (option) => {
-    if (disabled) {
-      return;
-    }
-
-    onChange(option.value);
-    setOpen(false);
-  };
-
-  const handleToggle = () => {
-    if (disabled) {
-      return;
-    }
-
-    setOpen((current) => !current);
-  };
-
-  return (
-    <div ref={selectRef} className="relative w-full">
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={handleToggle}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        className={`
-          group
-          flex
-          min-h-11
-          w-full
-          items-center
-          justify-between
-          rounded-xl
-          border
-          px-3
-          py-0
-          text-left
-          text-sm
-          outline-none
-          transition-all
-          duration-200
-          hover:cursor-pointer
-          ${
-            open
-              ? `
-                border-zinc-300
-                bg-white
-                ring-4
-                ring-zinc-900/[0.04]
-              `
-              : `
-                border-zinc-200
-                bg-zinc-50
-                hover:border-zinc-300
-                hover:bg-white
-              `
-          }
-          disabled:cursor-not-allowed
-          disabled:opacity-50
-        `}
-      >
-        <span className={selectedOption ? "text-zinc-900" : "text-zinc-400"}>
-          {selectedOption?.label || placeholder}
-        </span>
-
-        <ChevronDown
-          size={17}
-          strokeWidth={1.8}
-          className={`
-            shrink-0
-            text-zinc-400
-            transition-transform
-            duration-200
-            ${open ? "rotate-180 text-zinc-700" : ""}
-          `}
-        />
-      </button>
-
-      {open && (
-        <div
-          className="
-            absolute
-            left-0
-            right-0
-            top-[calc(100%+8px)]
-            z-[9999]
-            overflow-hidden
-            rounded-2xl
-            border
-            border-zinc-200
-            bg-white
-            p-1.5
-            shadow-[0_20px_50px_rgba(0,0,0,0.12)]
-          "
-          role="listbox"
-          onMouseDown={(event) => {
-            event.stopPropagation();
-          }}
-        >
-          <div className="max-h-64 overflow-y-auto">
-            {options.length > 0 ? (
-              options.map((option) => {
-                const isSelected = option.value === value;
-
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    role="option"
-                    aria-selected={isSelected}
-                    onMouseDown={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                    }}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleSelect(option);
-                    }}
-                    className={`
-                      flex
-                      min-h-11
-                      w-full
-                      items-center
-                      justify-between
-                      rounded-xl
-                      px-3
-                      py-3
-                      text-left
-                      text-sm
-                      transition-all
-                      duration-150
-                      hover:cursor-pointer
-                      ${
-                        isSelected
-                          ? `
-                            bg-zinc-100
-                            text-zinc-900
-                          `
-                          : `
-                            text-zinc-600
-                            hover:bg-zinc-50
-                            hover:text-zinc-900
-                          `
-                      }
-                    `}
-                  >
-                    <span>{option.label}</span>
-
-                    {isSelected && (
-                      <span
-                        className="
-                          flex
-                          h-5
-                          w-5
-                          shrink-0
-                          items-center
-                          justify-center
-                          rounded-full
-                          bg-zinc-900
-                          text-white
-                        "
-                      >
-                        <Check size={12} strokeWidth={2} />
-                      </span>
-                    )}
-                  </button>
-                );
-              })
-            ) : (
-              <div
-                className="
-                  px-3
-                  py-4
-                  text-center
-                  text-xs
-                  text-zinc-400
-                "
-              >
-                No options available.
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ============================================================
-// SMALL UI COMPONENTS
-// ============================================================
 
 const SectionHeader = ({ icon: Icon, title, description, action }) => {
   return (
@@ -555,7 +325,7 @@ const Select = ({
     <div>
       {label && <FieldLabel required={required}>{label}</FieldLabel>}
 
-      <CustomSelect
+      <CustomSelect aria-label={label}
         value={value}
         onChange={onChange}
         options={options}
@@ -575,8 +345,7 @@ const Toggle = ({ checked, onChange, label, description }) => {
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="
-        flex
+      className="flex
         w-full
         items-center
         justify-between
@@ -699,7 +468,7 @@ const FieldOptionsEditor = ({
         <button
           type="button"
           onClick={addOption}
-          className="
+          className="dashboard-action dashboard-action--secondary
             inline-flex
             h-9
             items-center
@@ -790,7 +559,7 @@ const FieldOptionsEditor = ({
                     />
                   </div>
 
-                  <div className="flex shrink-0 items-center gap-1">
+                  <div className="flex max-w-full shrink-0 flex-wrap items-center gap-1">
                     <button
                       type="button"
                       disabled={index === 0}
@@ -934,7 +703,7 @@ const FieldEditor = ({
     >
       {/* FIELD HEADER */}
 
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm">
             <FieldIcon size={18} />
@@ -949,7 +718,7 @@ const FieldEditor = ({
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex max-w-full shrink-0 flex-wrap items-center gap-1">
           <button
             type="button"
             disabled={index === 0}
@@ -1181,7 +950,7 @@ const FieldsCollection = ({
           <button
             type="button"
             onClick={addField}
-            className="
+            className="dashboard-action dashboard-action--primary
               inline-flex
               h-10
               shrink-0
@@ -1222,7 +991,7 @@ const FieldsCollection = ({
           <button
             type="button"
             onClick={addField}
-            className="
+            className="dashboard-action dashboard-action--secondary
               mt-4
               inline-flex
               h-9
@@ -1347,7 +1116,7 @@ const PricingOptionEditor = ({
     >
       {/* OPTION HEADER */}
 
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <button
           type="button"
           onClick={() => setExpanded((current) => !current)}
@@ -1370,7 +1139,7 @@ const PricingOptionEditor = ({
           </div>
         </button>
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex max-w-full shrink-0 flex-wrap items-center gap-1">
           <button
             type="button"
             disabled={index === 0}
@@ -1572,7 +1341,7 @@ const PricingOptionEditor = ({
               <button
                 type="button"
                 onClick={addField}
-                className="
+                className="dashboard-action dashboard-action--secondary
                   inline-flex
                   h-9
                   items-center
@@ -1671,7 +1440,7 @@ const PricingOptionsEditor = ({ options, onChange, errors = {} }) => {
           <button
             type="button"
             onClick={addOption}
-            className="
+            className="dashboard-action dashboard-action--primary
               inline-flex
               h-10
               shrink-0
@@ -1697,7 +1466,7 @@ const PricingOptionsEditor = ({ options, onChange, errors = {} }) => {
       {options.length === 0 ? (
         <div className="mt-5 rounded-2xl border border-dashed border-zinc-300 bg-zinc-50/70 px-5 py-8 text-center">
           <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-white text-zinc-400 shadow-sm">
-            <Layers3 size={19} />
+            <Layers3 className="icon-accent-blue" size={19} />
           </div>
 
           <p className="mt-3 text-sm font-semibold text-zinc-700">
@@ -1712,7 +1481,7 @@ const PricingOptionsEditor = ({ options, onChange, errors = {} }) => {
           <button
             type="button"
             onClick={addOption}
-            className="
+            className="dashboard-action dashboard-action--secondary
               mt-4
               inline-flex
               h-9
@@ -2330,7 +2099,7 @@ const AdminCreateService = () => {
               </button>
 
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                <Layers3 size={21} />
+                <Layers3 className="icon-accent-blue" size={21} />
               </div>
 
               <div className="min-w-0">
@@ -2354,7 +2123,7 @@ const AdminCreateService = () => {
                 type="button"
                 onClick={() => navigate("/admin/services")}
                 disabled={submitting}
-                className="
+                className="dashboard-action dashboard-action--secondary
                   inline-flex
                   h-10
                   items-center
@@ -2380,7 +2149,7 @@ const AdminCreateService = () => {
               <button
                 type="submit"
                 disabled={submitting}
-                className="
+                className="dashboard-action dashboard-action--primary
                   inline-flex
                   h-10
                   items-center
@@ -2419,7 +2188,7 @@ const AdminCreateService = () => {
             <AlertCircle size={19} className="mt-0.5 shrink-0" />
 
             <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="font-semibold">Unable to create service</p>
 
@@ -2529,7 +2298,7 @@ const AdminCreateService = () => {
                 <button
                   type="button"
                   onClick={generateSlug}
-                  className="
+                  className="dashboard-action dashboard-action--secondary
                     mb-0
                     flex
                     h-11
@@ -2778,7 +2547,7 @@ const AdminCreateService = () => {
             type="button"
             onClick={() => navigate("/admin/services")}
             disabled={submitting}
-            className="
+            className="dashboard-action dashboard-action--secondary
               inline-flex
               h-11
               items-center
@@ -2803,7 +2572,7 @@ const AdminCreateService = () => {
           <button
             type="submit"
             disabled={submitting}
-            className="
+            className="dashboard-action dashboard-action--primary
               inline-flex
               h-11
               items-center

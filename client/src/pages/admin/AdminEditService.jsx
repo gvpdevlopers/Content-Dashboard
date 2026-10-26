@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import CustomSelect from "../../components/CustomSelect";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowDown,
   ArrowUp,
   Check,
-  ChevronDown,
   Copy,
   Layers3,
   Loader2,
@@ -248,237 +248,6 @@ const hydrateService = (service) => ({
    Custom Select
 ========================================================= */
 
-const CustomSelect = ({
-  value,
-  onChange,
-  options = [],
-  placeholder = "Select an option",
-  disabled = false,
-}) => {
-  const [open, setOpen] = useState(false);
-  const selectRef = useRef(null);
-
-  const selectedOption = options.find((option) => option.value === value);
-
-  useEffect(() => {
-    const handleOutsideClick = (event) => {
-      if (selectRef.current && !selectRef.current.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleOutsideClick);
-
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleEscape = (event) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, []);
-
-  const handleToggle = () => {
-    if (disabled) {
-      return;
-    }
-
-    setOpen((current) => !current);
-  };
-
-  const handleSelect = (option) => {
-    if (disabled) {
-      return;
-    }
-
-    onChange(option.value);
-    setOpen(false);
-  };
-
-  return (
-    <div ref={selectRef} className="relative w-full">
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={handleToggle}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        className={`
-          group
-          flex
-          min-h-12
-          w-full
-          items-center
-          justify-between
-          rounded-xl
-          border
-          px-4
-          py-3.5
-          text-left
-          text-sm
-          outline-none
-          transition-all
-          duration-200
-          hover:cursor-pointer
-          ${
-            open
-              ? `
-                border-zinc-300
-                bg-white
-                ring-4
-                ring-zinc-900/[0.04]
-              `
-              : `
-                border-zinc-200
-                bg-zinc-50
-                hover:border-zinc-300
-                hover:bg-white
-              `
-          }
-          disabled:cursor-not-allowed
-          disabled:opacity-50
-        `}
-      >
-        <span className={selectedOption ? "text-zinc-900" : "text-zinc-400"}>
-          {selectedOption?.label || placeholder}
-        </span>
-
-        <ChevronDown
-          size={17}
-          strokeWidth={1.8}
-          className={`
-            shrink-0
-            text-zinc-400
-            transition-transform
-            duration-200
-            ${open ? "rotate-180 text-zinc-700" : ""}
-          `}
-        />
-      </button>
-
-      {open && (
-        <div
-          className="
-            absolute
-            left-0
-            right-0
-            top-[calc(100%+8px)]
-            z-[9999]
-            overflow-hidden
-            rounded-2xl
-            border
-            border-zinc-200
-            bg-white
-            p-1.5
-            shadow-[0_20px_50px_rgba(0,0,0,0.12)]
-          "
-          role="listbox"
-          onMouseDown={(event) => {
-            event.stopPropagation();
-          }}
-        >
-          <div className="max-h-64 overflow-y-auto">
-            {options.length > 0 ? (
-              options.map((option) => {
-                const isSelected = option.value === value;
-
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    role="option"
-                    aria-selected={isSelected}
-                    onMouseDown={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                    }}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleSelect(option);
-                    }}
-                    className={`
-                      flex
-                      min-h-11
-                      w-full
-                      items-center
-                      justify-between
-                      rounded-xl
-                      px-3
-                      py-3
-                      text-left
-                      text-sm
-                      transition-all
-                      duration-150
-                      hover:cursor-pointer
-                      ${
-                        isSelected
-                          ? `
-                            bg-zinc-100
-                            text-zinc-900
-                          `
-                          : `
-                            text-zinc-600
-                            hover:bg-zinc-50
-                            hover:text-zinc-900
-                          `
-                      }
-                    `}
-                  >
-                    <span>{option.label}</span>
-
-                    {isSelected && (
-                      <span
-                        className="
-                          flex
-                          h-5
-                          w-5
-                          shrink-0
-                          items-center
-                          justify-center
-                          rounded-full
-                          bg-zinc-900
-                          text-white
-                        "
-                      >
-                        <Check size={12} strokeWidth={2} />
-                      </span>
-                    )}
-                  </button>
-                );
-              })
-            ) : (
-              <div
-                className="
-                  px-3
-                  py-4
-                  text-center
-                  text-xs
-                  text-zinc-400
-                "
-              >
-                No options available.
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-/* =========================================================
-   Payload Helpers
-========================================================= */
 
 const cleanFieldForPayload = (field, index = 0) => {
   const cleaned = {
@@ -1029,7 +798,7 @@ const Select = ({
       </span>
     )}
 
-    <CustomSelect
+    <CustomSelect aria-label={label}
       value={value}
       onChange={onChange}
       options={options}
@@ -1083,7 +852,7 @@ const FieldOptionEditor = ({
   isLast,
 }) => (
   <div className="rounded-2xl border border-zinc-200 bg-zinc-50/70 p-4">
-    <div className="flex items-start justify-between gap-3">
+    <div className="flex flex-wrap items-start justify-between gap-3">
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-400">
         Option {index + 1}
       </p>
@@ -1093,7 +862,8 @@ const FieldOptionEditor = ({
           type="button"
           onClick={() => onMove(index, -1)}
           disabled={isFirst}
-          className="rounded-xl p-2 text-zinc-500 transition hover:bg-white hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-30"
+          aria-label="Move up"
+            className="dashboard-action--icon dashboard-action dashboard-action--secondary rounded-xl p-2 text-zinc-500 transition hover:bg-white hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-30"
         >
           <ArrowUp size={15} />
         </button>
@@ -1102,7 +872,8 @@ const FieldOptionEditor = ({
           type="button"
           onClick={() => onMove(index, 1)}
           disabled={isLast}
-          className="rounded-xl p-2 text-zinc-500 transition hover:bg-white hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-30"
+          aria-label="Move down"
+            className="dashboard-action--icon dashboard-action dashboard-action--secondary rounded-xl p-2 text-zinc-500 transition hover:bg-white hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-30"
         >
           <ArrowDown size={15} />
         </button>
@@ -1110,7 +881,8 @@ const FieldOptionEditor = ({
         <button
           type="button"
           onClick={onRemove}
-          className="rounded-xl p-2 text-red-500 transition hover:bg-red-50"
+          aria-label="Delete"
+            className="dashboard-action--icon dashboard-action dashboard-action--destructive rounded-xl p-2 text-red-500 transition hover:bg-red-50"
         >
           <Trash2 size={15} />
         </button>
@@ -1245,12 +1017,13 @@ const FieldEditor = ({
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex max-w-full shrink-0 flex-wrap items-center gap-1">
           <button
             type="button"
             onClick={() => onMove(index, -1)}
             disabled={index === 0}
-            className="rounded-xl p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-30"
+            aria-label="Move up"
+            className="dashboard-action--icon dashboard-action dashboard-action--tertiary rounded-xl p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-30"
           >
             <ArrowUp size={15} />
           </button>
@@ -1259,7 +1032,8 @@ const FieldEditor = ({
             type="button"
             onClick={() => onMove(index, 1)}
             disabled={index === total - 1}
-            className="rounded-xl p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-30"
+            aria-label="Move down"
+            className="dashboard-action--icon dashboard-action dashboard-action--tertiary rounded-xl p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-30"
           >
             <ArrowDown size={15} />
           </button>
@@ -1267,7 +1041,8 @@ const FieldEditor = ({
           <button
             type="button"
             onClick={onDuplicate}
-            className="rounded-xl p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900"
+            aria-label="Duplicate"
+            className="dashboard-action--icon dashboard-action dashboard-action--tertiary rounded-xl p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900"
           >
             <Copy size={15} />
           </button>
@@ -1275,7 +1050,8 @@ const FieldEditor = ({
           <button
             type="button"
             onClick={onRemove}
-            className="rounded-xl p-2 text-red-500 transition hover:bg-red-50"
+            aria-label="Delete"
+            className="dashboard-action--icon dashboard-action dashboard-action--destructive rounded-xl p-2 text-red-500 transition hover:bg-red-50"
           >
             <Trash2 size={15} />
           </button>
@@ -1449,7 +1225,7 @@ const FieldEditor = ({
             <button
               type="button"
               onClick={addOption}
-              className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-900"
+              className="dashboard-action dashboard-action--secondary inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-900"
             >
               <Plus size={14} />
               Add option
@@ -1608,12 +1384,13 @@ const PricingOptionEditor = ({
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex max-w-full shrink-0 flex-wrap items-center gap-1">
             <button
               type="button"
               onClick={() => onMove(index, -1)}
               disabled={index === 0}
-              className="rounded-xl p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-30"
+              aria-label="Move up"
+            className="dashboard-action--icon dashboard-action dashboard-action--tertiary rounded-xl p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-30"
             >
               <ArrowUp size={15} />
             </button>
@@ -1622,7 +1399,8 @@ const PricingOptionEditor = ({
               type="button"
               onClick={() => onMove(index, 1)}
               disabled={index === total - 1}
-              className="rounded-xl p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-30"
+              aria-label="Move down"
+            className="dashboard-action--icon dashboard-action dashboard-action--tertiary rounded-xl p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-30"
             >
               <ArrowDown size={15} />
             </button>
@@ -1630,7 +1408,8 @@ const PricingOptionEditor = ({
             <button
               type="button"
               onClick={onDuplicate}
-              className="rounded-xl p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900"
+              aria-label="Duplicate"
+            className="dashboard-action--icon dashboard-action dashboard-action--tertiary rounded-xl p-2 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900"
             >
               <Copy size={15} />
             </button>
@@ -1638,7 +1417,8 @@ const PricingOptionEditor = ({
             <button
               type="button"
               onClick={onRemove}
-              className="rounded-xl p-2 text-red-500 transition hover:bg-red-50"
+              aria-label="Delete"
+            className="dashboard-action--icon dashboard-action dashboard-action--destructive rounded-xl p-2 text-red-500 transition hover:bg-red-50"
             >
               <Trash2 size={15} />
             </button>
@@ -1780,7 +1560,7 @@ const PricingOptionEditor = ({
           <button
             type="button"
             onClick={addField}
-            className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-900"
+            className="dashboard-action dashboard-action--secondary inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-900"
           >
             <Plus size={14} />
             Add field
@@ -2278,7 +2058,7 @@ const AdminEditService = () => {
 
           <Link
             to="/admin/services"
-            className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800"
+            className="dashboard-action dashboard-action--primary mt-6 inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800"
           >
             <ArrowLeft size={16} />
             Back to Services
@@ -2315,7 +2095,7 @@ const AdminEditService = () => {
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
-                    <Layers3 size={12} />
+                    <Layers3 className="icon-accent-blue" size={12} />
                     Service Management
                   </span>
 
@@ -2345,7 +2125,7 @@ const AdminEditService = () => {
             <div className="flex shrink-0 items-center gap-3">
               <Link
                 to="/admin/services"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-900"
+                className="dashboard-action dashboard-action--secondary inline-flex items-center justify-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-900"
               >
                 <X size={16} />
                 Cancel
@@ -2355,7 +2135,7 @@ const AdminEditService = () => {
                 type="submit"
                 form="edit-service-form"
                 disabled={saving}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="dashboard-action dashboard-action--primary inline-flex items-center justify-center gap-2 rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {saving ? (
                   <Loader2 size={16} className="animate-spin" />
@@ -2596,7 +2376,7 @@ const AdminEditService = () => {
             <button
               type="button"
               onClick={addServiceField}
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800"
+              className="dashboard-action dashboard-action--primary inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800"
             >
               <Plus size={16} />
               Add Field
@@ -2645,7 +2425,7 @@ const AdminEditService = () => {
               <button
                 type="button"
                 onClick={addServiceField}
-                className="mt-5 inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-900"
+                className="dashboard-action dashboard-action--secondary mt-5 inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-900"
               >
                 <Plus size={14} />
                 Add First Field
@@ -2670,7 +2450,7 @@ const AdminEditService = () => {
             <button
               type="button"
               onClick={addPricingOption}
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800"
+              className="dashboard-action dashboard-action--primary inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800"
             >
               <Plus size={16} />
               Add Pricing Option
@@ -2714,7 +2494,7 @@ const AdminEditService = () => {
 
           {form.pricingOptions.length === 0 && (
             <div className="mt-6 rounded-[22px] border border-dashed border-zinc-300 bg-zinc-50/60 p-10 text-center">
-              <Layers3 size={25} className="mx-auto text-zinc-300" />
+              <Layers3 size={25} className="icon-accent-blue mx-auto text-zinc-300" />
 
               <p className="mt-3 text-sm font-semibold text-zinc-700">
                 No pricing options
@@ -2728,7 +2508,7 @@ const AdminEditService = () => {
               <button
                 type="button"
                 onClick={addPricingOption}
-                className="mt-5 inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-900"
+                className="dashboard-action dashboard-action--secondary mt-5 inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-xs font-semibold text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-900"
               >
                 <Plus size={14} />
                 Add First Pricing Option
@@ -2744,7 +2524,7 @@ const AdminEditService = () => {
         <div className="flex flex-col-reverse gap-3 pb-8 sm:flex-row sm:items-center sm:justify-between">
           <Link
             to="/admin/services"
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-zinc-200 bg-white px-5 py-3 text-sm font-semibold text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-900"
+            className="dashboard-action dashboard-action--secondary inline-flex items-center justify-center gap-2 rounded-2xl border border-zinc-200 bg-white px-5 py-3 text-sm font-semibold text-zinc-700 transition hover:border-zinc-300 hover:text-zinc-900"
           >
             <ArrowLeft size={16} />
             Back to Services
@@ -2753,7 +2533,7 @@ const AdminEditService = () => {
           <button
             type="submit"
             disabled={saving}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-zinc-900 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+            className="dashboard-action dashboard-action--primary inline-flex items-center justify-center gap-2 rounded-2xl bg-zinc-900 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving ? (
               <Loader2 size={16} className="animate-spin" />

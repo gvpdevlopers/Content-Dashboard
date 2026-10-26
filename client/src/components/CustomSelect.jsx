@@ -1,259 +1,147 @@
-import { useEffect, useRef, useState } from "react";
-
+import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
+import { getSelectPlacement, findEnabledOption, findTypeaheadOption } from "../utils/selectNavigation";
 
 const CustomSelect = ({
-  value,
-  onChange,
-  options = [],
-  placeholder = "Select an option",
-  disabled = false,
+  value, onChange, options = [], placeholder = "Select an option", disabled = false,
+  id, name, required = false, label, compact = false, className = "",
+  "aria-label": ariaLabel, "aria-labelledby": labelledBy, "aria-describedby": describedBy,
+  "aria-invalid": invalid,
 }) => {
+  const generatedId = useId();
+  const triggerId = id || generatedId;
+  const menuId = `${triggerId}-options`;
+  const triggerRef = useRef(null);
+  const menuRef = useRef(null);
+  const searchRef = useRef({ text: "", time: 0 });
   const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const [placement, setPlacement] = useState(null);
+  const selectedIndex = options.findIndex((option) => option.value === value);
+  const selectedOption = options[selectedIndex];
 
-  const selectRef = useRef(null);
-
-  const selectedOption = options.find((option) => option.value === value);
-
-  /* =====================================================
-     CLOSE WHEN CLICKING OUTSIDE
-  ====================================================== */
-
-  useEffect(() => {
-    const handleOutsideClick = (event) => {
-      if (selectRef.current && !selectRef.current.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleOutsideClick);
-
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-    };
-  }, []);
-
-  /* =====================================================
-     CLOSE WITH ESCAPE
-  ====================================================== */
-
-  useEffect(() => {
-    const handleEscape = (event) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, []);
-
-  /* =====================================================
-     SELECT OPTION
-  ====================================================== */
-
-  const handleSelect = (option) => {
-    if (disabled) {
-      return;
-    }
-
+  const measure = () => getSelectPlacement(triggerRef.current.getBoundingClientRect(), window.innerWidth, window.innerHeight);
+  const show = (direction = 1) => {
+    if (disabled) return;
+    setPlacement(measure());
+    setActiveIndex(selectedIndex >= 0 && !selectedOption.disabled
+      ? selectedIndex : findEnabledOption(options, direction > 0 ? -1 : options.length, direction));
+    setOpen(true);
+  };
+  const choose = (index) => {
+    const option = options[index];
+    if (disabled || !option || option.disabled) return;
     onChange(option.value);
     setOpen(false);
+    triggerRef.current?.focus();
   };
 
-  /* =====================================================
-     TOGGLE DROPDOWN
-  ====================================================== */
+  useEffect(() => {
+    if (!open) return;
+    const outside = (event) => {
+      if (!triggerRef.current?.contains(event.target) && !menuRef.current?.contains(event.target)) setOpen(false);
+    };
+    const reposition = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > window.innerHeight) setOpen(false);
+      else setPlacement(getSelectPlacement(rect, window.innerWidth, window.innerHeight));
+    };
+    const escape = (event) => { if (event.key === "Escape") { event.stopPropagation(); setOpen(false); triggerRef.current?.focus(); } };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("focusin", outside);
+    document.addEventListener("keydown", escape);
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("focusin", outside);
+      document.removeEventListener("keydown", escape);
+      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", reposition, true);
+    };
+  }, [open]);
 
-  const handleToggle = () => {
-    if (disabled) {
-      return;
+  useEffect(() => {
+    if (open) menuRef.current?.querySelector(`[data-option-index="${activeIndex}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, open]);
+
+  useEffect(() => {
+    // A permission/loading change must dismiss a popup whose trigger becomes disabled.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (disabled) setOpen(false);
+  }, [disabled]);
+
+  const handleKeyDown = (event) => {
+    const { key } = event;
+    if (["ArrowDown", "ArrowUp"].includes(key)) {
+      event.preventDefault();
+      const direction = key === "ArrowDown" ? 1 : -1;
+      if (!open) show(direction);
+      else setActiveIndex(findEnabledOption(options, activeIndex, direction));
+    } else if (key === "Home" || key === "End") {
+      event.preventDefault();
+      if (!open) { setPlacement(measure()); setOpen(true); }
+      setActiveIndex(findEnabledOption(options, key === "Home" ? -1 : options.length, key === "Home" ? 1 : -1));
+    } else if (key === "Enter" || key === " ") {
+      event.preventDefault();
+      if (open) choose(activeIndex); else show();
+    } else if (key === "Escape" || key === "Tab") {
+      if (key === "Escape" && open) { event.preventDefault(); event.stopPropagation(); }
+      setOpen(false);
+    } else if (key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      const now = Date.now();
+      const search = searchRef.current;
+      search.text = now - search.time < 600 ? search.text + key.toLowerCase() : key.toLowerCase();
+      search.time = now;
+      const repeated = [...search.text].every((letter) => letter === search.text[0]);
+      const query = repeated ? key.toLowerCase() : search.text;
+      const start = open ? activeIndex : selectedIndex;
+      const next = findTypeaheadOption(options, start, query);
+      if (next >= 0) {
+        event.preventDefault();
+        if (!open) { setPlacement(measure()); setOpen(true); }
+        setActiveIndex(next);
+      }
     }
-
-    setOpen((current) => !current);
   };
 
   return (
-    <div ref={selectRef} className="relative w-full">
-      {/* =================================================
-          SELECT BUTTON
-      ================================================== */}
-
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={handleToggle}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        className={`
-          group
-          flex
-          min-h-12
-          w-full
-          items-center
-          justify-between
-          rounded-xl
-          border
-          px-4
-          py-3.5
-          text-left
-          text-sm
-          outline-none
-          transition-all
-          duration-200
-          hover: cursor-pointer
-          ${
-            open
-              ? `
-                border-zinc-300
-                bg-white
-                ring-4
-                ring-zinc-900/[0.04]
-              `
-              : `
-                border-zinc-200
-                bg-zinc-50
-                hover:border-zinc-300
-                hover:bg-white
-              `
-          }
-
-          disabled:cursor-not-allowed
-          disabled:opacity-50
-        `}
-      >
-        <span className={selectedOption ? "text-zinc-900" : "text-zinc-400"}>
-          {selectedOption?.label || placeholder}
-        </span>
-
-        <ChevronDown
-          size={17}
-          strokeWidth={1.8}
-          className={`
-            shrink-0
-            text-zinc-400
-            transition-transform
-            duration-200
-            ${open ? "rotate-180 text-zinc-700" : ""}
-          `}
-        />
+    <div className={`relative min-w-0 w-full ${className}`}>
+      {label && <label htmlFor={triggerId} className="mb-2 block text-sm font-medium text-zinc-600">{label}</label>}
+      {(name || required) && <input className="sr-only" tabIndex={-1} aria-hidden="true" name={name}
+        value={value ?? ""} onChange={() => {}} required={required} disabled={disabled}
+        onInvalid={(event) => { event.preventDefault(); triggerRef.current?.focus(); }} />}
+      <button ref={triggerRef} id={triggerId} type="button" role="combobox" disabled={disabled}
+        aria-haspopup="listbox" aria-expanded={open && !disabled} aria-controls={open ? menuId : undefined}
+        aria-activedescendant={open && options[activeIndex] ? `${menuId}-${activeIndex}` : undefined}
+        aria-label={ariaLabel || (labelledBy || label ? undefined : placeholder)} aria-labelledby={labelledBy}
+        aria-describedby={describedBy} aria-invalid={invalid} aria-required={required || undefined}
+        onClick={(event) => { event.stopPropagation(); if (open) setOpen(false); else show(); }} onKeyDown={handleKeyDown}
+        className={`custom-select-trigger flex w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-left text-sm text-zinc-700 transition-colors duration-150 hover:border-zinc-300 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500 disabled:cursor-not-allowed disabled:opacity-50 ${compact ? "min-h-10 py-2" : "min-h-12 py-3"} ${open ? "border-slate-400 bg-white" : ""}`}>
+        <span className={`min-w-0 break-words ${selectedOption ? "text-zinc-900" : "text-zinc-400"}`}>{selectedOption?.label ?? placeholder}</span>
+        <ChevronDown size={16} aria-hidden="true" className={`shrink-0 text-slate-400 motion-safe:transition-transform motion-safe:duration-150 ${open ? "rotate-180" : ""}`} />
       </button>
-
-      {/* =================================================
-          DROPDOWN
-      ================================================== */}
-
-      {open && (
-        <div
-          className="
-            absolute
-            left-0
-            right-0
-            top-[calc(100%+8px)]
-            z-[9999]
-            overflow-hidden
-            rounded-2xl
-            border
-            border-zinc-200
-            bg-white
-            p-1.5
-            shadow-[0_20px_50px_rgba(0,0,0,0.12)]
-          "
-          role="listbox"
-          onMouseDown={(event) => {
-            event.stopPropagation();
-          }}
-        >
-          <div className="max-h-64 overflow-y-auto">
-            {options.length > 0 ? (
-              options.map((option) => {
-                const isSelected = option.value === value;
-
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    role="option"
-                    aria-selected={isSelected}
-                    onMouseDown={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                    }}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleSelect(option);
-                    }}
-                    className={`
-                      flex
-                      min-h-11
-                      w-full
-                      items-center
-                      justify-between
-                      rounded-xl
-                      px-3
-                      py-3
-                      text-left
-                      text-sm
-                      transition-all
-                      duration-150
-                      cursor-pointer
-                      ${
-                        isSelected
-                          ? `
-                            bg-zinc-100
-                            text-zinc-900
-                          `
-                          : `
-                            text-zinc-600
-                            hover:bg-zinc-50
-                            hover:text-zinc-900
-                          `
-                      }
-                    `}
-                  >
-                    <span>{option.label}</span>
-
-                    {isSelected && (
-                      <span
-                        className="
-                          flex
-                          h-5
-                          w-5
-                          shrink-0
-                          items-center
-                          justify-center
-                          rounded-full
-                          bg-zinc-900
-                          text-white
-                        "
-                      >
-                        <Check size={12} strokeWidth={2} />
-                      </span>
-                    )}
-                  </button>
-                );
-              })
-            ) : (
-              <div
-                className="
-                  px-3
-                  py-4
-                  text-center
-                  text-xs
-                  text-zinc-400
-                "
-              >
-                No options available.
-              </div>
-            )}
-          </div>
-        </div>
+      {open && !disabled && placement && createPortal(
+        <div ref={menuRef} id={menuId} role="listbox" aria-label={ariaLabel || label || placeholder} aria-labelledby={labelledBy}
+          className="custom-select-menu fixed z-[10000] overflow-y-auto overscroll-contain rounded-xl border border-zinc-200 bg-white p-1.5 text-sm shadow-[0_12px_32px_rgba(15,23,42,0.12)]"
+          onClick={(event) => event.stopPropagation()}
+          style={{ left: placement.left, top: placement.top, bottom: placement.bottom, width: placement.width, maxHeight: placement.maxHeight }}>
+          {options.length ? options.map((option, index) => (
+            <div key={option.value} id={`${menuId}-${index}`} role="option" aria-selected={option.value === value}
+              aria-disabled={option.disabled || undefined} data-option-index={index}
+              onPointerMove={() => { if (!option.disabled) setActiveIndex(index); }}
+              onMouseDown={(event) => event.preventDefault()} onClick={() => choose(index)}
+              className={`flex min-h-11 items-center justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors duration-150 ${option.disabled ? "cursor-not-allowed text-zinc-400" : "cursor-pointer text-zinc-700"} ${activeIndex === index ? "bg-slate-100" : ""} ${option.value === value ? "font-medium text-slate-900" : ""}`}>
+              <span className="min-w-0 break-words">{option.label}</span>
+              {option.value === value && <Check size={14} className="shrink-0 text-slate-600" aria-hidden="true" />}
+            </div>
+          )) : <p className="px-3 py-4 text-center text-xs text-zinc-400">No options available.</p>}
+        </div>, document.body,
       )}
     </div>
   );
 };
-
 export default CustomSelect;

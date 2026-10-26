@@ -176,6 +176,12 @@ const AdminOrderDetails = () => {
     }
   };
 
+  const handleServiceDeliverySave = async (itemId, url) => {
+    const data = await adminOrderService.updateServiceDelivery(order._id, itemId, url, staffMode);
+    setOrder((current) => ({ ...current, items: current.items.map((item) =>
+      String(item._id) === String(data.itemId) ? { ...item, delivery: data.delivery } : item) }));
+  };
+
   const handleServiceProgressUpdate = async (itemId, progressUpdate) => {
     if (!order || !itemId) {
       return;
@@ -618,7 +624,7 @@ const AdminOrderDetails = () => {
                     text-zinc-500
                   "
                 >
-                  <Package size={18} strokeWidth={1.6} />
+                  <Package className="icon-accent-blue" size={18} strokeWidth={1.6} />
                 </div>
 
                 <div className="min-w-0">
@@ -710,7 +716,7 @@ const AdminOrderDetails = () => {
                 notesLoading ||
                 codLoading
               }
-              className="
+              className="dashboard-action dashboard-action--secondary
                 group/refresh
                 inline-flex
                 shrink-0
@@ -834,7 +840,7 @@ const AdminOrderDetails = () => {
               </p>
 
               <div className="min-w-0">
-                <CustomSelect
+                <CustomSelect aria-label="Order status" disabled={statusLoading}
                   value={order?.orderStatus || "pending"}
                   onChange={handleStatusChange}
                   options={[
@@ -934,13 +940,13 @@ const AdminOrderDetails = () => {
               />
 
               <p className="mb-4 text-xs leading-5 text-zinc-400">
-                Payment status can be confirmed here. COD PIN verification
-                completes collection; cheque PIN verification does not mark
-                payment as paid.
+                {order?.paymentMethod === "month_end"
+                  ? "Payment is due at the end of the month. Select Paid only after payment has been received and verified. Status changes record your account and the time."
+                  : "Payment status can be confirmed here. COD PIN verification completes collection; cheque PIN verification does not mark payment as paid."}
               </p>
 
               <div className="min-w-0">
-                <CustomSelect
+                <CustomSelect aria-label="Payment status" disabled={paymentLoading}
                   value={order?.paymentStatus || "pending"}
                   onChange={handlePaymentStatusChange}
                   options={[
@@ -964,7 +970,7 @@ const AdminOrderDetails = () => {
                       value: "collected",
                       label: "Collected",
                     },
-                  ]}
+                  ].filter((option) => order?.paymentMethod !== "month_end" || option.value !== "collected")}
                 />
               </div>
 
@@ -1119,6 +1125,7 @@ const AdminOrderDetails = () => {
           <OrderItemsOverview
             order={order}
             canManageProgress
+            onDeliverySave={handleServiceDeliverySave}
             updatingProgressKey={progressUpdatingKey}
             onProgressUpdate={handleServiceProgressUpdate}
             renderServiceExtras={(item) => order.items?.length > 0 && item.serviceSnapshot?.slug === "ads"
@@ -1280,7 +1287,7 @@ const AdminOrderDetails = () => {
                   type="button"
                   onClick={handleSaveDelivery}
                   disabled={deliveryLoading}
-                  className="
+                  className="dashboard-action dashboard-action--primary
                     mt-3
                     inline-flex
                     max-w-full
@@ -1412,7 +1419,7 @@ const AdminOrderDetails = () => {
                   type="button"
                   onClick={handleSaveInvoice}
                   disabled={invoiceLoading}
-                  className="
+                  className="dashboard-action dashboard-action--primary
                     mt-3
                     inline-flex
                     max-w-full
@@ -1611,7 +1618,7 @@ const AdminOrderDetails = () => {
                       order?.paymentStatus === "paid" ||
                       ["verified", "used"].includes(order?.codPinStatus)
                     }
-                    className="
+                    className="dashboard-action dashboard-action--primary
                       group
                       inline-flex
                       w-full
@@ -1768,7 +1775,7 @@ const AdminOrderDetails = () => {
                 type="button"
                 onClick={handleSaveNotes}
                 disabled={notesLoading}
-                className="
+                className="dashboard-action dashboard-action--primary
                   inline-flex
                   items-center
                   justify-center
@@ -2408,6 +2415,7 @@ const formatStatus = (status) => {
 };
 
 const formatPaymentMethod = (method) => {
+  if (method === "month_end") return "Pay on Month-End";
   if (method === "cod") {
     return "Cash on Delivery";
   }

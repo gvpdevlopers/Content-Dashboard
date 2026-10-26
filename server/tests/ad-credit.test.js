@@ -309,3 +309,68 @@ test("an order fully funded by eligible ad credit has no new payment due", async
   assert.equal(res.body.order.paymentStatus, "paid");
   assert.equal(f.state.balances.metaAds, 0);
 });
+
+
+test("month-end quotes and orders preserve coupons, credit and pricing snapshots", async () => {
+  for (const coupon of [false, true]) {
+    const f = checkoutFixture({ coupon });
+    f.req.user.allowMonthEndPayment = true;
+    f.req.body.paymentMethod = "month_end";
+    const quote = response(); await f.controller.getOrderQuote(f.req, quote);
+    assert.equal(quote.statusCode, 200, JSON.stringify(quote.body));
+    assert.equal(quote.body.quote.gstRate, 18);
+    const created = response(); await f.controller.createOrder(f.req, created);
+    assert.equal(created.statusCode, 201, JSON.stringify(created.body));
+    assert.equal(created.body.order.amount, coupon ? 4814.4 : 4956);
+    assert.equal(created.body.order.amount, quote.body.quote.amount);
+    assert.equal(created.body.order.paymentMethod, "month_end");
+    assert.equal(created.body.order.paymentStatus, "pending");
+    assert.equal(created.body.order.orderStatus, "pending");
+    assert.equal(created.body.order.chequeType, undefined);
+    assert.equal(created.body.order.razorpayOrderId, undefined);
+    assert.equal(created.body.order.codPin, undefined);
+    assert.equal(created.body.order.items[0].serviceSnapshot.slug, "ads");
+    assert.equal(created.body.order.items[0].serviceSnapshot.selectedOptions[0].price, 1200);
+  }
+});
+
+test("revoked month-end eligibility rejects quotes, coupons and draft submission without writes", async () => {
+  for (const allowed of [false, undefined]) {
+    const f = checkoutFixture({ coupon: true });
+    Object.assign(f.req.user, { allowMonthEndPayment: allowed });
+    Object.assign(f.req.body, { paymentMethod: "month_end", allowMonthEndPayment: true,
+      userId: "another-client", draftId: orderId, confirmedAmount: 4814.4, code: "SAVE" });
+    for (const method of ["getOrderQuote", "getCouponQuote", "createOrder"]) {
+      const res = response(); await f.controller[method](f.req, res);
+      assert.equal(res.statusCode, 403, method);
+      assert.equal(res.body.code, "MONTH_END_NOT_ALLOWED");
+    }
+    assert.equal(f.state.writes, 0);
+    assert.equal(f.saved(), undefined);
+  }
+});
+
+test("eligible month-end draft requires current price confirmation before submission", async () => {
+  const f = checkoutFixture();
+  f.req.user.allowMonthEndPayment = true;
+  Object.assign(f.req.body, { paymentMethod: "month_end", draftId: orderId, confirmedAmount: 4200 });
+  const stale = response(); await f.controller.createOrder(f.req, stale);
+  assert.equal(stale.statusCode, 409);
+  assert.equal(f.saved(), undefined);
+  f.req.body.confirmedAmount = 4956;
+  const created = response(); await f.controller.createOrder(f.req, created);
+  assert.equal(created.statusCode, 201, JSON.stringify(created.body));
+  assert.equal(created.body.order.paymentStatus, "pending");
+});
+
+test("fully credit-covered month-end orders remain pending at creation", async () => {
+  const f = checkoutFixture();
+  f.req.user.allowMonthEndPayment = true;
+  f.req.body.paymentMethod = "month_end";
+  f.req.body.services[0].formData.metaAdsAdSpendAmount = 2000;
+  f.service.pricingOptions[0].price = 0;
+  const created = response(); await f.controller.createOrder(f.req, created);
+  assert.equal(created.statusCode, 201, JSON.stringify(created.body));
+  assert.equal(created.body.order.amount, 0);
+  assert.equal(created.body.order.paymentStatus, "pending");
+});

@@ -79,6 +79,7 @@ const login = async (req, res) => {
         email: user.email,
         username: user.username,
         role: user.role,
+        allowMonthEndPayment: user.role === "client" && user.allowMonthEndPayment === true,
       },
     });
   } catch (error) {

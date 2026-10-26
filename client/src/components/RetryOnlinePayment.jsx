@@ -49,7 +49,7 @@ export default function RetryOnlinePayment({ order, onPaid }) {
   };
   return (
     <button type="button" onClick={pay} disabled={busy}
-      className="mt-4 rounded-xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white disabled:opacity-50">
+      className="dashboard-action dashboard-action--primary mt-4 rounded-xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white disabled:opacity-50">
       {busy ? "Processing payment..." : "Pay online / retry payment"}
     </button>
   );

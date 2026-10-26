@@ -4,9 +4,7 @@ import {
   AlertCircle,
   Boxes,
   CheckCircle2,
-  ChevronRight,
   Edit3,
-  Filter,
   Layers3,
   Plus,
   RefreshCw,
@@ -69,7 +67,7 @@ const StatusBadge = ({ isActive }) => {
   if (isActive) {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
-        <CheckCircle2 size={13} />
+        <CheckCircle2 className="icon-accent-green" size={13} />
         Active
       </span>
     );
@@ -299,7 +297,7 @@ const AdminServices = () => {
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-500">
-              <Layers3 size={23} />
+              <Layers3 className="icon-accent-blue" size={23} />
             </div>
 
             <div className="min-w-0">
@@ -334,7 +332,7 @@ const AdminServices = () => {
           <button
             type="button"
             disabled
-            className="
+            className="dashboard-action dashboard-action--secondary
     inline-flex
     h-11
     shrink-0
@@ -376,7 +374,7 @@ const AdminServices = () => {
           <button
             type="button"
             onClick={() => setError("")}
-            className="rounded-lg p-1 text-red-500 transition hover:bg-red-100"
+            className="dashboard-action--icon dashboard-action dashboard-action--destructive rounded-lg p-1 text-red-500 transition hover:bg-red-100"
             aria-label="Close error"
           >
             <XCircle size={18} />
@@ -447,7 +445,7 @@ const AdminServices = () => {
           <div className="flex flex-col gap-3 sm:flex-row">
             {/* Status Filter */}
             <div className="w-full sm:min-w-[170px] sm:max-w-[190px]">
-              <CustomSelect
+              <CustomSelect aria-label="Filter services by status"
                 value={statusFilter}
                 onChange={setStatusFilter}
                 options={[
@@ -472,7 +470,7 @@ const AdminServices = () => {
               type="button"
               onClick={() => fetchServices(true)}
               disabled={refreshing}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="dashboard-action dashboard-action--secondary inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RefreshCw
                 size={17}
@@ -537,7 +535,7 @@ const AdminServices = () => {
             // <button
             //   type="button"
             //   onClick={() => navigate("/admin/services/new")}
-            //   className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-800"
+            //   className="dashboard-action dashboard-action--primary mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-800"
             // >
             //   <Plus size={17} />
             //   Create Service
@@ -545,7 +543,7 @@ const AdminServices = () => {
             <button
               type="button"
               disabled
-              className="
+              className="dashboard-action dashboard-action--secondary
     inline-flex
     h-11
     shrink-0
@@ -574,7 +572,7 @@ const AdminServices = () => {
                 setSearchTerm("");
                 setStatusFilter("all");
               }}
-              className="mt-5 inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
+              className="dashboard-action dashboard-action--secondary mt-5 inline-flex h-10 items-center justify-center rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
             >
               Clear Filters
             </button>
@@ -643,7 +641,7 @@ const AdminServices = () => {
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3.5">
                           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-500">
-                            <Layers3 size={20} />
+                            <Layers3 className="icon-accent-blue" size={20} />
                           </div>
 
                           <div className="min-w-0">
@@ -707,7 +705,7 @@ const AdminServices = () => {
                             onClick={() =>
                               navigate(`/admin/services/${service._id}/edit`)
                             }
-                            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                            className="dashboard-action dashboard-action--secondary inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
                           >
                             <Edit3 size={15} />
                             Edit
@@ -770,7 +768,7 @@ const AdminServices = () => {
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-500">
-                      <Layers3 size={20} />
+                      <Layers3 className="icon-accent-blue" size={20} />
                     </div>
 
                     <div className="min-w-0">

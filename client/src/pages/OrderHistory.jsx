@@ -1,5 +1,9 @@
-import { useEffect, useState } from "react";
-import { ArrowRight, ClipboardList, Loader2, RefreshCw } from "lucide-react";
+import StatusBadge from "../components/OrderStatusBadge";
+import OrderItemsOverview from "../components/OrderItemsOverview";
+import OrderResourceAction from "../components/OrderResourceAction";
+import { hasProjectDetails, validResourceUrl } from "../utils/orderResources";
+import { useEffect, useId, useState } from "react";
+import { ArrowRight, ChevronDown, ChevronUp, ClipboardList, Loader2, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import orderService from "../services/orderService";
 
@@ -49,7 +53,7 @@ const OrderHistory = () => {
               shadow-sm
             "
           >
-            <ClipboardList size={17} strokeWidth={1.7} />
+            <ClipboardList className="icon-accent-blue" size={17} strokeWidth={1.7} />
           </div>
 
           <div>
@@ -86,7 +90,7 @@ const OrderHistory = () => {
           type="button"
           onClick={loadOrders}
           disabled={loading}
-          className="
+          className="dashboard-action dashboard-action--secondary
             group
             inline-flex
             items-center
@@ -314,11 +318,14 @@ const LoadingOrders = () => {
 ============================================================ */
 
 const OrderTableRow = ({ order }) => {
+  const [expanded, setExpanded] = useState(false);
+  const detailsId = useId();
   const serviceName = getServiceName(order);
 
   const paymentDone = isPaymentCompleted(order);
 
   return (
+    <>
     <div
       className="
         group
@@ -342,6 +349,7 @@ const OrderTableRow = ({ order }) => {
         <p className="truncate text-sm font-medium text-zinc-900">
           {order.orderNumber || "—"}
         </p>
+        {validResourceUrl(order.invoice?.url) && <div className="mt-2"><InvoiceAction order={order} /></div>}
       </div>
 
       {/* Service */}
@@ -377,11 +385,13 @@ const OrderTableRow = ({ order }) => {
         )}
 
         <p className="mt-1 text-[11px] text-zinc-400">
-          {order.paymentMethod === "online"
-            ? "Pay Online"
-            : order.paymentMethod === "cheque"
-              ? "Cheque"
-              : "Cash on Delivery"}
+          {order.paymentMethod === "month_end"
+            ? "Pay on Month-End"
+            : order.paymentMethod === "online"
+              ? "Pay Online"
+              : order.paymentMethod === "cheque"
+                ? "Cheque"
+                : "Cash on Delivery"}
         </p>
         {order.paymentMethod === "cheque" && (
           <p className="mt-1 text-[11px] text-zinc-500">
@@ -408,37 +418,17 @@ const OrderTableRow = ({ order }) => {
 
       {/* View */}
 
-      <Link
-        to={`/dashboard/orders/${order._id || order.id}`}
-        className="
-          group/button
-          flex h-9 w-9
-          items-center justify-center
-          justify-self-end
-          rounded-xl
-          border border-zinc-200
-          bg-white
-          text-zinc-400
-          shadow-sm
-          transition
-          duration-200
-          hover:border-zinc-300
-          hover:bg-zinc-50
-          hover:text-zinc-900
-          hover:shadow-md
-        "
-        aria-label={`View ${order.orderNumber || "order"}`}
-      >
-        <ArrowRight
-          size={16}
-          className="
-            transition-transform
-            duration-200
-            group-hover/button:translate-x-0.5
-          "
-        />
-      </Link>
+      <button type="button" aria-expanded={expanded} aria-controls={detailsId}
+        aria-label={`${expanded ? "Collapse" : "Expand"} ${order.orderNumber || "order"} details`}
+        onClick={() => setExpanded((current) => !current)}
+        className="flex h-9 w-9 items-center justify-center justify-self-end rounded-xl border border-zinc-200 bg-white text-zinc-500 transition-colors hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500">
+        {expanded ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
+      </button>
     </div>
+    <div id={detailsId} hidden={!expanded} className="min-w-0 border-b border-zinc-100 bg-zinc-50/60 p-5 sm:p-6">
+      {expanded && <ExpandedOrder order={order} />}
+    </div>
+    </>
   );
 };
 
@@ -447,6 +437,8 @@ const OrderTableRow = ({ order }) => {
 ============================================================ */
 
 const OrderMobileCard = ({ order }) => {
+  const [expanded, setExpanded] = useState(false);
+  const detailsId = useId();
   const serviceName = getServiceName(order);
   const paymentDone = isPaymentCompleted(order);
 
@@ -572,11 +564,13 @@ const OrderMobileCard = ({ order }) => {
           <MobileDetail
             label="Payment"
             value={
-              order.paymentMethod === "online"
-                ? "Pay Online"
-                : order.paymentMethod === "cheque"
-                  ? `Cheque — ${order.chequeType === "with_gst" ? "With GST" : "Direct Collection"}`
-                  : "Cash on Delivery"
+              order.paymentMethod === "month_end"
+                ? "Pay on Month-End"
+                : order.paymentMethod === "online"
+                  ? "Pay Online"
+                  : order.paymentMethod === "cheque"
+                    ? `Cheque — ${order.chequeType === "with_gst" ? "With GST" : "Direct Collection"}`
+                    : "Cash on Delivery"
             }
           />
 
@@ -589,48 +583,19 @@ const OrderMobileCard = ({ order }) => {
 
         {/* View Order */}
 
-        <Link
-          to={`/dashboard/orders/${order._id || order.id}`}
-          className="
-            group/button
-            mt-6
-            inline-flex
-            w-full
-            items-center
-            justify-center
-            gap-2
-            rounded-xl
-            border
-            border-zinc-900
-            bg-zinc-900
-            px-5
-            py-3
-            text-sm
-            font-medium
-            text-white
-            shadow-sm
-            transition-[transform,background-color,box-shadow]
-            duration-300
-            ease-out
-            hover:scale-[1.01]
-            hover:bg-zinc-800
-            hover:text-white
-            hover:shadow-md
-            active:scale-[0.99]
-          "
-        >
-          View Order
-          <ArrowRight
-            size={16}
-            className="
-              text-white
-              transition-transform
-              duration-300
-              ease-out
-              group-hover/button:translate-x-0.5
-            "
-          />
-        </Link>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+          <InvoiceAction order={order} />
+          <button type="button" aria-expanded={expanded} aria-controls={detailsId}
+            aria-label={`${expanded ? "Collapse" : "Expand"} ${order.orderNumber || "order"} details`}
+            onClick={() => setExpanded((current) => !current)}
+            className="dashboard-action dashboard-action--secondary ml-auto inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500">
+            {expanded ? "Hide details" : "Show details"}
+            {expanded ? <ChevronUp size={15} aria-hidden="true" /> : <ChevronDown size={15} aria-hidden="true" />}
+          </button>
+        </div>
+        <div id={detailsId} hidden={!expanded} className="min-w-0">
+          {expanded && <div className="mt-5 border-t border-zinc-100 pt-5"><ExpandedOrder order={order} /></div>}
+        </div>
       </div>
     </div>
   );
@@ -669,10 +634,33 @@ const MobileDetail = ({ label, value, paymentDone = false }) => {
   );
 };
 
+const InvoiceAction = ({ order }) => (
+  <OrderResourceAction url={order.invoice?.url} download label="Invoice" name={order.invoice?.name}
+    ariaLabel={`Download invoice for ${order.orderNumber || "order"}`} />
+);
+
+const ExpandedOrder = ({ order }) => (
+  <div className="min-w-0 space-y-4">
+    <OrderItemsOverview order={order} compact />
+    {hasProjectDetails(order.additionalRequirements) && (
+      <section className="rounded-xl border border-zinc-200 bg-white p-4">
+        <h3 className="text-xs font-semibold text-zinc-700">Additional Requirements</h3>
+        <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-zinc-600">{order.additionalRequirements}</p>
+      </section>
+    )}
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <OrderResourceAction url={order.deliveryLink} label="Open order delivery" />
+      <Link to={`/dashboard/orders/${order._id || order.id}`} className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-700 underline-offset-4 hover:underline">
+        View full details <ArrowRight size={13} aria-hidden="true" />
+      </Link>
+    </div>
+  </div>
+);
+
 const OrderArtifactIndicator = ({ order }) => {
   const available = [
     order?.deliveryLink ? "Delivery" : null,
-    order?.invoice?.url ? "Invoice" : null,
+    order?.items?.some((item) => item.delivery?.url) ? "Service delivery" : null,
   ].filter(Boolean);
 
   if (!available.length) {
@@ -689,43 +677,6 @@ const OrderArtifactIndicator = ({ order }) => {
 /* ============================================================
    ORDER STATUS BADGE
 ============================================================ */
-
-const StatusBadge = ({ status }) => {
-  const normalizedStatus = status || "unknown";
-
-  const statusStyles = {
-    pending: "border-amber-200 bg-amber-50 text-amber-700",
-
-    processing: "border-blue-200 bg-blue-50 text-blue-700",
-
-    in_progress: "border-blue-200 bg-blue-50 text-blue-700",
-
-    completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
-
-    cancelled: "border-red-200 bg-red-50 text-red-700",
-  };
-
-  return (
-    <span
-      className={`
-        inline-flex
-        shrink-0
-        rounded-full
-        border
-        px-3
-        py-1.5
-        text-[11px]
-        font-medium
-        ${
-          statusStyles[normalizedStatus] ||
-          "border-zinc-200 bg-zinc-50 text-zinc-600"
-        }
-      `}
-    >
-      {formatStatus(normalizedStatus)}
-    </span>
-  );
-};
 
 /* ============================================================
    PAYMENT STATUS BADGE
@@ -824,7 +775,7 @@ const EmptyOrders = () => {
           <ClipboardList
             size={22}
             strokeWidth={1.5}
-            className="text-zinc-400"
+            className="icon-accent-blue text-zinc-400"
           />
         </div>
 
@@ -860,7 +811,7 @@ const EmptyOrders = () => {
 
         <Link
           to="/dashboard/new-order"
-          className="
+          className="dashboard-action dashboard-action--primary
             group
             mt-7
             inline-flex

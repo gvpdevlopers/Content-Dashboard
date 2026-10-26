@@ -114,6 +114,7 @@ const AdminOrders = () => {
         serviceName.includes(searchValue) ||
         serviceSlug.includes(searchValue) ||
         paymentMethod.includes(searchValue) ||
+        (paymentMethod === "month_end" && "pay on month-end".includes(searchValue)) ||
         String(order?.chequeType || "").toLowerCase().includes(searchValue) ||
         paymentStatus.includes(searchValue);
 
@@ -229,7 +230,7 @@ const AdminOrders = () => {
                 group-hover:text-zinc-800
               "
             >
-              <ClipboardList size={18} strokeWidth={1.6} />
+              <ClipboardList className="icon-accent-blue" size={18} strokeWidth={1.6} />
             </div>
 
             <p
@@ -288,7 +289,7 @@ const AdminOrders = () => {
               type="button"
               onClick={() => loadOrders(true)}
               disabled={loading || refreshing}
-              className="
+              className="dashboard-action dashboard-action--secondary
                 group/refresh
                 inline-flex
                 items-center
@@ -452,7 +453,7 @@ const AdminOrders = () => {
               lg:shrink-0
             "
           >
-            <CustomSelect
+            <CustomSelect aria-label="Filter orders by status"
               value={statusFilter}
               onChange={setStatusFilter}
               options={[
@@ -501,7 +502,7 @@ const AdminOrders = () => {
               lg:shrink-0
             "
           >
-            <CustomSelect
+            <CustomSelect aria-label="Filter orders by payment status"
               value={paymentFilter}
               onChange={setPaymentFilter}
               options={[
@@ -539,7 +540,7 @@ const AdminOrders = () => {
             <button
               type="button"
               onClick={clearFilters}
-              className="
+              className="dashboard-action dashboard-action--secondary
                 inline-flex
                 h-[50px]
                 shrink-0
@@ -898,7 +899,7 @@ const AdminOrderMobileCard = ({ order, orderPath }) => {
   return (
     <Link
       to={`${orderPath}/${order._id}`}
-      className="
+      className="dashboard-action dashboard-action--secondary
         group
         block
         rounded-2xl
@@ -1168,15 +1169,17 @@ const StatusBadge = ({ status }) => {
 
 const PaymentBadge = ({ method, status }) => {
   const methodLabel =
-    method === "cod"
-      ? "COD"
-      : method === "online"
-        ? "Online"
-        : method === "cheque"
-          ? "Cheque"
-        : method
-          ? formatStatus(method)
-          : "—";
+    method === "month_end"
+      ? "Pay on Month-End"
+      : method === "cod"
+        ? "COD"
+        : method === "online"
+          ? "Online"
+          : method === "cheque"
+            ? "Cheque"
+            : method
+              ? formatStatus(method)
+              : "—";
 
   const statusConfig = {
     paid: {
@@ -1277,7 +1280,7 @@ const EmptyOrders = ({ hasFilters, onClear }) => {
             text-zinc-400
           "
         >
-          <ClipboardList size={22} strokeWidth={1.6} />
+          <ClipboardList className="icon-accent-blue" size={22} strokeWidth={1.6} />
         </div>
 
         <h2
@@ -1309,7 +1312,7 @@ const EmptyOrders = ({ hasFilters, onClear }) => {
           <button
             type="button"
             onClick={onClear}
-            className="
+            className="dashboard-action dashboard-action--primary
               mt-5
               inline-flex
               items-center

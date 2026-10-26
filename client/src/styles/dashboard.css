@@ -1,0 +1,85 @@
+/* Explicit action variants keep configuration choices and public-site buttons intact. */
+.dashboard-ui .dashboard-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  max-width: 100%;
+  padding: 0.625rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  text-align: center;
+  transition: background-color 175ms ease, border-color 175ms ease, box-shadow 175ms ease, color 175ms ease;
+  box-shadow: none;
+  transform: none;
+}
+.dashboard-ui .dashboard-action--primary {
+  background: #334155;
+  border-color: #334155;
+  color: #fff;
+  box-shadow: 0 2px 4px rgb(15 23 42 / 0.05);
+}
+.dashboard-ui .dashboard-action--primary:hover:not(:disabled) {
+  background: #1e293b;
+  border-color: #1e293b;
+  color: #fff;
+  box-shadow: 0 3px 8px rgb(15 23 42 / 0.08);
+}
+.dashboard-ui .dashboard-action--secondary {
+  background: #fff;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+.dashboard-ui .dashboard-action--secondary:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #1e293b;
+}
+.dashboard-ui .dashboard-action--tertiary { background: transparent; color: #64748b; }
+.dashboard-ui .dashboard-action--tertiary:hover:not(:disabled) { background: #f1f5f9; color: #334155; }
+.dashboard-ui .dashboard-action--destructive { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+.dashboard-ui .dashboard-action--destructive:hover:not(:disabled) { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+.dashboard-ui .dashboard-action:active:not(:disabled) { box-shadow: inset 0 1px 2px rgb(15 23 42 / 0.08); }
+.dashboard-ui .dashboard-action:disabled, .dashboard-ui .dashboard-action[aria-disabled="true"] {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+  box-shadow: none;
+  opacity: 0.75;
+}
+.dashboard-ui :where(button, a, input, textarea):focus-visible {
+  outline: 2px solid #64748b;
+  outline-offset: 3px;
+}
+.dashboard-ui .dashboard-action > svg { flex-shrink: 0; }
+.dashboard-ui .dashboard-action--primary > svg { color: currentColor; }
+/* Semantic accents are opt-in on informational icons, never inherited by action buttons. */
+.dashboard-ui .icon-accent-blue { color: #2563eb; }
+.dashboard-ui .icon-accent-green { color: #059669; }
+.dashboard-ui .icon-accent-amber { color: #b45309; }
+.dashboard-ui .icon-accent-red { color: #b91c1c; }
+.dashboard-ui .icon-accent-slate { color: #64748b; }
+.dashboard-ui .draft-row { transition: background-color 175ms ease, border-color 175ms ease; }
+.dashboard-ui .draft-row:hover { background-color: #f8fafc; border-color: #cbd5e1; }
+.custom-select-menu { animation: select-reveal 150ms ease-out; }
+@keyframes select-reveal { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-ui *, .dashboard-ui *::before, .dashboard-ui *::after, .custom-select-menu {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+@media (pointer: coarse) {
+  .dashboard-ui button[aria-label]:not(.custom-select-trigger):not([role="option"]) { min-height: 2.75rem; min-width: 2.75rem; }
+}
+
+.dashboard-ui .dashboard-action--compact { min-height: 2.25rem; padding: 0.375rem 0.625rem; font-size: 0.75rem; line-height: 1rem; }
+.dashboard-ui .dashboard-action:disabled :is(span, svg) { color: inherit; }
+
+.dashboard-ui .dashboard-action--icon { width: 2.5rem; height: 2.5rem; min-height: 2.5rem; padding: 0.5rem; flex-shrink: 0; }

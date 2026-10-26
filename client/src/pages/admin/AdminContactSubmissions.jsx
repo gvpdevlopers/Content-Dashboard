@@ -258,7 +258,7 @@ const AdminContactSubmissions = () => {
           type="button"
           onClick={refreshSubmissions}
           disabled={loading}
-          className="inline-flex min-h-11 items-center justify-center gap-2 self-start rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-600 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-50 lg:self-center"
+          className="dashboard-action dashboard-action--secondary inline-flex min-h-11 items-center justify-center gap-2 self-start rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-600 shadow-sm transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-50 lg:self-center"
         >
           <RefreshCw
             size={16}
@@ -315,7 +315,7 @@ const AdminContactSubmissions = () => {
             className="h-12 w-full rounded-xl border border-zinc-200 bg-zinc-50 pl-11 pr-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 hover:border-zinc-300 hover:bg-white focus:border-zinc-400 focus:bg-white focus:ring-2 focus:ring-zinc-900/5"
           />
         </label>
-        <CustomSelect
+        <CustomSelect aria-label="Filter submissions by status"
           value={statusFilter}
           onChange={setStatusFilter}
           options={[
@@ -382,7 +382,7 @@ const AdminContactSubmissions = () => {
                 <button
                   type="button"
                   onClick={() => openDetails(submission._id)}
-                  className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-950"
+                  className="dashboard-action dashboard-action--secondary inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-950"
                 >
                   View details
                 </button>
@@ -524,7 +524,7 @@ const AdminContactSubmissions = () => {
                     <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">
                       Follow-up status
                     </p>
-                    <CustomSelect
+                    <CustomSelect aria-label="Submission status"
                       value={selectedSubmission.status}
                       onChange={updateStatus}
                       options={STATUS_OPTIONS}
@@ -535,7 +535,7 @@ const AdminContactSubmissions = () => {
                     type="button"
                     disabled={deleting}
                     onClick={() => setSubmissionToDelete(selectedSubmission)}
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-medium text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="dashboard-action dashboard-action--destructive inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-medium text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Trash2 size={16} aria-hidden="true" />
                     Delete
@@ -582,7 +582,7 @@ const StatusBadge = ({ status }) => (
     }`}
   >
     {status === "converted" && (
-      <CheckCircle2 size={12} aria-hidden="true" />
+      <CheckCircle2 className="icon-accent-green" size={12} aria-hidden="true" />
     )}
     {formatStatus(status)}
   </span>

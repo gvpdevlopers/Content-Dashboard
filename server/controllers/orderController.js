@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const { pinHasExpired } = require("../utils/pinPolicy");
 const { acquireLock } = require("../utils/requestLock");
 const Order = require("../models/Order");
+const { supportsServiceDelivery } = require("../config/serviceDelivery");
 const Service = require("../models/Service");
 const Coupon = require("../models/Coupon");
 const CouponUsage = require("../models/CouponUsage");
@@ -37,7 +38,16 @@ const getPaymentPricing = async (req, res) => {
   return res.status(200).json({
     success: true,
     gstRates: getPaymentPricingConfig(),
+    allowMonthEndPayment: req.user?.role === "client" && req.user.allowMonthEndPayment === true,
   });
+};
+
+const rejectIneligibleMonthEnd = (req, res) => {
+  if (req.body?.paymentMethod !== "month_end") return false;
+  if (req.user?.role === "client" && req.user.allowMonthEndPayment === true) return false;
+  res.status(403).json({ success: false, code: "MONTH_END_NOT_ALLOWED",
+    message: "Pay on Month-End is not enabled for your account. Choose another payment method." });
+  return true;
 };
 
 const normalizeString = (value) => {
@@ -1877,6 +1887,7 @@ const createServiceSnapshot = ({
     serviceId: service._id,
     name: service.name,
     slug: service.slug || "",
+    supportsDelivery: supportsServiceDelivery({ slug: service.slug }),
     description:
       service.description || "",
     category:
@@ -2243,9 +2254,11 @@ const toOrderWithServiceProgress = (order) => {
     visibleOrder.items = visibleOrder.items.map((item) => {
       const progress = getOrderItemServiceProgress(item);
 
-      return progress
-        ? { ...item, serviceProgress: toServiceProgressView(progress) }
-        : item;
+      return {
+        ...item,
+        supportsDelivery: supportsServiceDelivery(item.serviceSnapshot),
+        ...(progress ? { serviceProgress: toServiceProgressView(progress) } : {}),
+      };
     });
   }
 
@@ -2730,8 +2743,9 @@ const getCouponQuote = async (req, res) => {
       });
     }
 
+    if (rejectIneligibleMonthEnd(req, res)) return;
     const { services, code, paymentMethod, chequeType } = req.body || {};
-    if (!["cod", "online", "cheque"].includes(paymentMethod)) {
+    if (!["cod", "online", "cheque", "month_end"].includes(paymentMethod)) {
       return res.status(400).json({
         success: false,
         message: "Select a valid payment method.",
@@ -2786,8 +2800,9 @@ const getOrderQuote = async (req, res) => {
       });
     }
 
+    if (rejectIneligibleMonthEnd(req, res)) return;
     const { services, couponCode, paymentMethod, chequeType } = req.body || {};
-    if (!["cod", "online", "cheque"].includes(paymentMethod)) {
+    if (!["cod", "online", "cheque", "month_end"].includes(paymentMethod)) {
       return res.status(400).json({
         success: false,
         message: "Select a valid payment method.",
@@ -3020,6 +3035,8 @@ const createOrder = async (
       confirmedAmount,
     } = req.body;
 
+    if (rejectIneligibleMonthEnd(req, res)) return;
+
     if (!paymentMethod) {
       return res.status(400).json({
         success: false,
@@ -3029,7 +3046,7 @@ const createOrder = async (
     }
 
     if (
-      !["cod", "online", "cheque"].includes(
+      !["cod", "online", "cheque", "month_end"].includes(
         paymentMethod,
       )
     ) {
@@ -3347,7 +3364,7 @@ const createOrder = async (
       ...(paymentMethod === "cheque" ? { chequeType } : {}),
 
       paymentStatus:
-        amount === 0 && creditQuote.total > 0 ? "paid" : "pending",
+        paymentMethod !== "month_end" && amount === 0 && creditQuote.total > 0 ? "paid" : "pending",
 
       orderStatus:
         "pending",
@@ -3623,7 +3640,7 @@ const getOrderById = async (
 
 const toClientVisibleOrder = (order) => {
   const visibleOrder = toOrderWithServiceProgress(order);
-  for (const field of ["notes", "codPin", "codPinAttempts", "razorpaySignature",
+  for (const field of ["monthEndPaymentHistory", "notes", "codPin", "codPinAttempts", "razorpaySignature",
     "submissionKey", "submissionHash"]) delete visibleOrder[field];
 
   if (visibleOrder.orderStatus !== "completed") {
@@ -4070,7 +4087,26 @@ const updatePaymentStatus =
           message: "This order's ad credit was returned. Create a new order instead." });
       }
 
-      if (order.adCreditTotal > 0) {
+      if (order.paymentMethod === "month_end") {
+        if (!["admin", "employee"].includes(req.user?.role)) {
+          return res.status(403).json({ success: false, message: "Order management access required." });
+        }
+        if (paymentStatus === "collected") {
+          return res.status(400).json({ success: false, message: "Use Paid to confirm receipt of a month-end payment." });
+        }
+        if (paymentStatus !== order.paymentStatus) {
+          const updated = await Order.updateOne({ _id: order._id,
+            paymentStatus: order.paymentStatus, adCreditReleased: { $ne: true } }, {
+            $set: { paymentStatus },
+            $push: { monthEndPaymentHistory: { from: order.paymentStatus, to: paymentStatus,
+              changedBy: req.user._id, changedAt: new Date() } },
+          });
+          if (updated.matchedCount !== 1) {
+            return res.status(409).json({ success: false, message: "Payment changed. Refresh and try again." });
+          }
+          order.paymentStatus = paymentStatus;
+        }
+      } else if (order.adCreditTotal > 0) {
         const paymentUpdate = await Order.updateOne({ _id: order._id,
           adCreditReleased: { $ne: true }, paymentStatus: order.paymentStatus },
         { $set: { paymentStatus } });
@@ -4121,6 +4157,48 @@ const updatePaymentStatus =
       });
     }
   };
+
+const updateServiceDelivery = async (req, res) => {
+  try {
+    if (!["admin", "employee"].includes(req.user?.role)) {
+      return res.status(403).json({ success: false, message: "Order management access required." });
+    }
+    const { id, itemId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(itemId)) {
+      return res.status(400).json({ success: false, message: "Invalid order service reference." });
+    }
+    const input = req.body?.url;
+    if (typeof input !== "string" || input.length > 2048) {
+      return res.status(400).json({ success: false, message: "Delivery URL must be a string of at most 2048 characters." });
+    }
+    const url = input.trim();
+    if (url) {
+      let parsed;
+      try { parsed = new URL(url); } catch { /* Rejected below. */ }
+      if (!parsed || !["http:", "https:"].includes(parsed.protocol) ||
+          !parsed.hostname || parsed.username || parsed.password || /\s/.test(url)) {
+        return res.status(400).json({ success: false, message: "Enter a valid HTTP or HTTPS delivery URL without credentials." });
+      }
+    }
+    const order = await Order.findById(id);
+    if (!order) return res.status(404).json({ success: false, message: "Order not found." });
+    const item = order.items?.id(itemId);
+    if (!item) return res.status(404).json({ success: false, message: "Order service was not found." });
+    if (!supportsServiceDelivery(item.serviceSnapshot)) {
+      return res.status(400).json({ success: false, message: "Delivery links are not supported for this service." });
+    }
+    const delivery = { url, updatedAt: new Date(), updatedBy: req.user._id };
+    const result = await Order.updateOne({ _id: order._id, "items._id": item._id },
+      { $set: { "items.$.delivery": delivery } }, { runValidators: true });
+    if (result.matchedCount !== 1) {
+      return res.status(409).json({ success: false, message: "Order service changed. Refresh and try again." });
+    }
+    return res.json({ success: true, message: "Service delivery link saved.", itemId: String(item._id), delivery });
+  } catch (error) {
+    console.error("Update service delivery error:", error);
+    return res.status(500).json({ success: false, message: "Unable to save service delivery link." });
+  }
+};
 
 const updateDeliveryLink = async (req, res) => {
   try {
@@ -4370,6 +4448,7 @@ const getAdminCodOrders =
 ========================================================= */
 
 module.exports = {
+  updateServiceDelivery,
   getPaymentPricing,
   getCouponQuote,
   getOrderQuote,

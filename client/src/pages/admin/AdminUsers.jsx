@@ -350,7 +350,7 @@ const AdminUsers = () => {
             <button
               type="button"
               onClick={() => navigate("/admin/users/new")}
-              className="
+              className="dashboard-action dashboard-action--primary
                 inline-flex
                 items-center
                 justify-center
@@ -380,7 +380,7 @@ const AdminUsers = () => {
               type="button"
               onClick={loadUsers}
               disabled={loading}
-              className="
+              className="dashboard-action dashboard-action--secondary
                 group/refresh
                 inline-flex
                 items-center
@@ -567,7 +567,7 @@ const AdminUsers = () => {
               lg:shrink-0
             "
           >
-            <CustomSelect
+            <CustomSelect aria-label="Filter users by status"
               value={statusFilter}
               onChange={setStatusFilter}
               options={[
@@ -596,7 +596,7 @@ const AdminUsers = () => {
               lg:shrink-0
             "
           >
-            <CustomSelect
+            <CustomSelect aria-label="Filter users by role"
               value={roleFilter}
               onChange={setRoleFilter}
               options={[
@@ -1214,7 +1214,7 @@ const UserMobileCard = ({ user, onStatusChange, onDelete, deleting }) => {
       <div className="mt-5 flex gap-2">
         <Link
           to={`/admin/users/${user._id}`}
-          className="
+          className="dashboard-action dashboard-action--primary
             group/view
             flex
             flex-1
@@ -1252,7 +1252,7 @@ const UserMobileCard = ({ user, onStatusChange, onDelete, deleting }) => {
             type="button"
             onClick={toggleStatus}
             disabled={updating}
-            className="
+            className="dashboard-action dashboard-action--secondary
               flex
               items-center
               justify-center
@@ -1285,7 +1285,7 @@ const UserMobileCard = ({ user, onStatusChange, onDelete, deleting }) => {
             type="button"
             onClick={() => onDelete(user)}
             disabled={deleting}
-            className="flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-3 text-sm text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+            className="dashboard-action dashboard-action--destructive flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-3 text-sm text-red-600 transition hover:bg-red-50 disabled:opacity-50"
             aria-label={`Delete ${user.name || "user"}`}
           >
             {deleting ? (

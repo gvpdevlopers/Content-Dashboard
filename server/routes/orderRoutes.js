@@ -13,6 +13,7 @@ const {
   getStaffOrders,
   getStaffOrderById,
   updateServiceProgress,
+  updateServiceDelivery,
   updateOrderStatus,
   updatePaymentStatus,
   updateDeliveryLink,
@@ -178,6 +179,9 @@ router.patch(
   orderStaff,
   updateInvoice
 );
+
+router.patch("/admin/:id/items/:itemId/delivery", protect, adminOnly, updateServiceDelivery);
+router.patch("/staff/:id/items/:itemId/delivery", protect, orderStaff, updateServiceDelivery);
 
 /*
 |--------------------------------------------------------------------------

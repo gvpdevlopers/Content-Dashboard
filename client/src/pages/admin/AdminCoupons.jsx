@@ -263,7 +263,7 @@ const AdminCoupons = () => {
           type="button"
           onClick={loadData}
           disabled={loading}
-          className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
+          className="dashboard-action dashboard-action--secondary inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-medium text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
         >
           <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
           Refresh
@@ -288,7 +288,7 @@ const AdminCoupons = () => {
             <button
               type="button"
               onClick={resetForm}
-              className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-800"
+              className="dashboard-action--icon dashboard-action dashboard-action--tertiary rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-800"
               aria-label="Cancel editing"
             >
               <X size={18} />
@@ -445,7 +445,7 @@ const AdminCoupons = () => {
             <button
               type="button"
               onClick={resetForm}
-              className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
+              className="dashboard-action dashboard-action--secondary rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-50"
             >
               Cancel
             </button>
@@ -453,7 +453,7 @@ const AdminCoupons = () => {
           <button
             type="submit"
             disabled={saving || loading || sortedServices.length === 0}
-            className="inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-zinc-700 disabled:cursor-wait disabled:opacity-60"
+            className="dashboard-action dashboard-action--primary inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-zinc-700 disabled:cursor-wait disabled:opacity-60"
           >
             {saving ? (
               <Loader2 size={15} className="animate-spin" />
@@ -535,7 +535,7 @@ const AdminCoupons = () => {
                       <button
                         type="button"
                         onClick={() => toggleUsage(coupon._id)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                        className="dashboard-action dashboard-action--secondary inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
                       >
                         {loadingUsageId === coupon._id ? (
                           <Loader2 size={14} className="animate-spin" />
@@ -549,21 +549,21 @@ const AdminCoupons = () => {
                       <button
                         type="button"
                         onClick={() => startEditing(coupon)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                        className="dashboard-action dashboard-action--secondary inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
                       >
                         <Pencil size={13} /> Edit
                       </button>
                       <button
                         type="button"
                         onClick={() => toggleCoupon(coupon)}
-                        className="rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                        className="dashboard-action dashboard-action--secondary rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
                       >
                         {coupon.isActive ? "Deactivate" : "Activate"}
                       </button>
                       <button
                         type="button"
                         onClick={() => removeCoupon(coupon)}
-                        className="rounded-lg border border-red-100 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+                        className="dashboard-action--icon dashboard-action dashboard-action--destructive rounded-lg border border-red-100 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
                         aria-label={`Delete ${coupon.code}`}
                       >
                         <Trash2 size={14} />

@@ -66,7 +66,7 @@ const ConfirmDialog = ({
             type="button"
             disabled={loading}
             onClick={onCancel}
-            className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="dashboard-action dashboard-action--secondary rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cancelLabel}
           </button>
@@ -74,7 +74,7 @@ const ConfirmDialog = ({
             type="button"
             disabled={loading}
             onClick={onConfirm}
-            className={`rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
+            className={`dashboard-action ${destructive ? "dashboard-action--destructive" : "dashboard-action--primary"} rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
               destructive
                 ? "bg-red-700 hover:bg-red-800"
                 : "bg-zinc-950 hover:bg-zinc-800"

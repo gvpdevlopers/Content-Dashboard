@@ -2,6 +2,7 @@ const express = require("express");
 
 const {
   createAdminUser,
+  updateMonthEndPermission,
   getAdminUsers,
   getAdminUserById,
   updateUserStatus,
@@ -25,6 +26,8 @@ router.get("/", getAdminUsers);
 
 // Get single user
 router.get("/:id", getAdminUserById);
+
+router.patch("/:id/payment-permissions", updateMonthEndPermission);
 
 // Update user status
 router.patch("/:id/status", updateUserStatus);

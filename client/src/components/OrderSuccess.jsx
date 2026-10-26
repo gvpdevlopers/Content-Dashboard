@@ -143,13 +143,21 @@ const OrderSuccess = ({ order }) => {
             </span>
 
             <span className="text-sm font-medium uppercase text-zinc-900">
-              {order.paymentMethod === "online"
-                ? "Pay Online"
-                : order.paymentMethod === "cheque"
-                  ? "Cheque"
-                  : "COD"}
+              {order.paymentMethod === "month_end"
+                ? "Pay on Month-End"
+                : order.paymentMethod === "online"
+                  ? "Pay Online"
+                  : order.paymentMethod === "cheque"
+                    ? "Cheque"
+                    : "COD"}
             </span>
           </div>
+          {order.paymentMethod === "month_end" && (
+            <div className="pt-4 text-left text-xs leading-5 text-zinc-500">
+              <p>Payment status: {order.paymentStatus === "paid" ? "Paid" : "Pending"}</p>
+              {order.paymentStatus !== "paid" && <p>Payment is due at the end of the month.</p>}
+            </div>
+          )}
           {order.paymentMethod === "cheque" && (
             <div className="flex items-center justify-between gap-4 pt-4">
               <span className="text-sm text-zinc-500">Cheque type</span>
@@ -175,7 +183,7 @@ const OrderSuccess = ({ order }) => {
         >
          <Link
   to={`/dashboard/orders/${order.id}`}
-  className="
+  className="dashboard-action dashboard-action--primary
     group
     inline-flex
     items-center
@@ -219,7 +227,7 @@ const OrderSuccess = ({ order }) => {
 
           <Link
             to="/dashboard/orders"
-            className="
+            className="dashboard-action dashboard-action--secondary
               inline-flex
               items-center
               justify-center

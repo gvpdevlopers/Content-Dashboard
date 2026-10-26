@@ -1,6 +1,8 @@
+import { formatDraftDate, getDraftLabel } from "../utils/draftLabels";
 import {
   ArrowRight,
   Banknote,
+  CalendarDays,
   Check,
   ChevronDown,
   ChevronUp,
@@ -1164,7 +1166,7 @@ const DynamicField = ({ field, value, onChange, compact = false }) => {
           </p>
         </div>
 
-        <CustomSelect
+        <CustomSelect aria-label={field.label}
           value={value || ""}
           onChange={(nextValue) => onChange(field.name, nextValue)}
           options={options}
@@ -1660,7 +1662,7 @@ const RepeatableGroup = ({
             type="button"
             disabled={disabled}
             onClick={onAdd}
-            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-all hover:-translate-y-0.5 hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="dashboard-action dashboard-action--secondary inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-all hover:-translate-y-0.5 hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus size={14} />
             Add Another {group.label || "Item"}
@@ -1984,7 +1986,7 @@ const RepeatableGroup = ({
             type="button"
             disabled={disabled}
             onClick={onAdd}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-700 transition-colors hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="dashboard-action dashboard-action--secondary inline-flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-700 transition-colors hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus size={15} />
             Add Another {group.label || "Item"}
@@ -2031,6 +2033,7 @@ const NewOrder = () => {
 
   const [paymentMethod, setPaymentMethod] = useState("cod");
   const [chequeType, setChequeType] = useState("");
+  const [allowMonthEndPayment, setAllowMonthEndPayment] = useState(false);
   const [paymentPricing, setPaymentPricing] = useState(null);
   const [paymentPricingLoading, setPaymentPricingLoading] = useState(true);
   const [paymentPricingError, setPaymentPricingError] = useState("");
@@ -2146,7 +2149,7 @@ const NewOrder = () => {
 
         if (
           !rates ||
-          !["cod", "online", "chequeWithGst", "chequeDirectCollection"].every(
+          !["cod", "online", "chequeWithGst", "chequeDirectCollection", "month_end"].every(
             (key) => Number.isFinite(rates[key]) && rates[key] >= 0,
           )
         ) {
@@ -2155,6 +2158,7 @@ const NewOrder = () => {
 
         if (mounted) {
           setPaymentPricing(rates);
+          setAllowMonthEndPayment(response.allowMonthEndPayment === true);
           setPaymentPricingError("");
         }
       } catch (loadError) {
@@ -2174,8 +2178,10 @@ const NewOrder = () => {
     };
 
     loadPaymentPricing();
+    window.addEventListener("focus", loadPaymentPricing);
     return () => {
       mounted = false;
+      window.removeEventListener("focus", loadPaymentPricing);
     };
   }, []);
 
@@ -3094,6 +3100,8 @@ const NewOrder = () => {
       return null;
     }
 
+    if (paymentMethod === "month_end") return paymentPricing.month_end;
+
     if (paymentMethod === "online") {
       return paymentPricing.online;
     }
@@ -3182,6 +3190,8 @@ const NewOrder = () => {
         : taxableSubtotal + gstAmount;
 
   const selectPaymentMethod = (method) => {
+    if (!["cod", "online", "cheque", "month_end"].includes(method) ||
+        (method === "month_end" && !allowMonthEndPayment)) return;
     setPaymentMethod(method);
     if (method !== "cheque") {
       setChequeType("");
@@ -3826,12 +3836,18 @@ const NewOrder = () => {
     if (submitInFlight.current) return;
     setError("");
 
+    if (!["cod", "online", "cheque", "month_end"].includes(paymentMethod) ||
+        (paymentMethod === "month_end" && !allowMonthEndPayment)) {
+      setError("Choose a permitted payment method. Pay on Month-End is not enabled for your account.");
+      return;
+    }
+
     if (paymentMethod === "cheque" && !chequeType) {
       setError("Choose a cheque payment type before placing your order.");
       return;
     }
 
-    if (paymentMethod === "online" && !paymentPricing) {
+    if (["online", "month_end"].includes(paymentMethod) && !paymentPricing) {
       setError(
         paymentPricingError ||
           "Payment tax information is still loading. Please try again.",
@@ -3876,7 +3892,7 @@ const NewOrder = () => {
 
     if (paymentMethod === "online" && estimatedTotal <= 0 && adCreditTotal === 0) {
       setError(
-        "Online payment requires a payable order amount. Please select a priced service option or use Cash on Delivery.",
+        "Online payment requires a payable order amount. Please select a priced service option or use Cash Payment.",
       );
       return;
     }
@@ -3959,7 +3975,7 @@ const NewOrder = () => {
       |--------------------------------------------------------------------------
       */
 
-      if (paymentMethod === "cod" || paymentMethod === "cheque") {
+      if (["cod", "cheque", "month_end"].includes(paymentMethod)) {
         orderService.clearPendingCheckout();
         setOrderSuccess(createdOrder);
         return;
@@ -4095,6 +4111,9 @@ const NewOrder = () => {
       console.error("Create order/payment error:", submitError);
 
       const responseData = submitError.response?.data;
+      if (responseData?.code === "MONTH_END_NOT_ALLOWED") {
+        setAllowMonthEndPayment(false);
+      }
       if (String(responseData?.message || "").toLowerCase().includes("ad credit")) {
         setAdCreditRefresh((current) => current + 1);
       }
@@ -4208,7 +4227,7 @@ const NewOrder = () => {
                     {loadingPreviousOrders ? (
                       <Loader2 size={16} className="animate-spin" />
                     ) : (
-                      <History size={16} />
+                      <History className="icon-accent-blue" size={16} />
                     )}
                   </span>
                   <div className="min-w-0">
@@ -4232,7 +4251,7 @@ const NewOrder = () => {
                     onClick={() =>
                       handleRepeatPreviousOrder(latestPreviousOrder)
                     }
-                    className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-zinc-900 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                    className="dashboard-action dashboard-action--primary inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-zinc-900 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                   >
                     Repeat Previous Order
                     <ArrowRight size={14} aria-hidden="true" />
@@ -4246,7 +4265,7 @@ const NewOrder = () => {
 
             <section className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 shadow-[0_8px_24px_rgba(0,0,0,0.035)] sm:px-5">
               <div className="flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-500">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600">
                   <Save size={16} />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -4287,40 +4306,31 @@ const NewOrder = () => {
                   </p>
                 )
               ) : (
-                <ul className="mt-3 divide-y divide-zinc-100">
+                <ul className="mt-4 space-y-2">
                   {savedDrafts.map((draft) => (
                     <li
                       key={draft._id}
-                      className="flex flex-col gap-3 py-3 first:pt-1 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+                      className="draft-row flex min-w-0 flex-col gap-3 rounded-xl border border-zinc-100 bg-zinc-50/50 p-3 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-zinc-800">
-                          {draft.title || "Saved order draft"}
+                          {getDraftLabel(draft)}
                         </p>
-                        <p className="mt-0.5 text-xs text-zinc-400">
+                        <p className="mt-1 text-xs leading-5 text-zinc-500">
                           {(draft.services || []).length}{" "}
                           {(draft.services || []).length === 1
                             ? "service"
                             : "services"}{" "}
                           · Updated{" "}
-                          {draft.updatedAt
-                            ? new Date(draft.updatedAt).toLocaleDateString(
-                                "en-IN",
-                                {
-                                  day: "numeric",
-                                  month: "short",
-                                  year: "numeric",
-                                },
-                              )
-                            : "recently"}
+                          {formatDraftDate(draft.updatedAt)}
                         </p>
                       </div>
-                      <div className="flex shrink-0 gap-2">
+                      <div className="flex shrink-0 items-center gap-2 sm:ml-4">
                         <button
                           type="button"
                           disabled={draftBusy || loadingServices}
                           onClick={() => handleOpenDraft(draft._id)}
-                          className="rounded-lg bg-zinc-900 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-zinc-700 disabled:opacity-50"
+                          className="dashboard-action dashboard-action--primary rounded-lg bg-zinc-900 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-zinc-700 disabled:opacity-50"
                         >
                           Resume
                         </button>
@@ -4328,10 +4338,11 @@ const NewOrder = () => {
                           type="button"
                           disabled={draftBusy}
                           onClick={() => handleDeleteDraft(draft._id)}
-                          aria-label="Delete saved draft"
-                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 text-zinc-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                          aria-label={`Delete ${getDraftLabel(draft)}`}
+                          className="dashboard-action dashboard-action--secondary text-red-600"
                         >
-                          <Trash2 size={15} />
+                          <Trash2 size={15} className="icon-accent-red" aria-hidden="true" />
+                          Delete
                         </button>
                       </div>
                     </li>
@@ -5320,12 +5331,12 @@ const NewOrder = () => {
                     Choose how you'd like to complete the payment.
                   </p>
 
-                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  <div className={`mt-5 grid gap-3 ${allowMonthEndPayment ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
                     <PaymentOption
                       selected={paymentMethod === "cod"}
                       onClick={() => selectPaymentMethod("cod")}
                       icon={Banknote}
-                      title="Cash on Delivery"
+                      title="Cash Payment"
                       description="Pay after your order is processed."
                     />
 
@@ -5349,7 +5360,22 @@ const NewOrder = () => {
                       title="Cheque"
                       description="Choose how the cheque will be collected."
                     />
+                    {allowMonthEndPayment && (
+                      <PaymentOption
+                        selected={paymentMethod === "month_end"}
+                        onClick={() => selectPaymentMethod("month_end")}
+                        icon={CalendarDays}
+                        title="Pay on Month-End"
+                        description="Payment is due at the end of the month."
+                      />
+                    )}
                   </div>
+                  {allowMonthEndPayment && (
+                    <p className="mt-3 text-xs leading-5 text-zinc-500">Your account is eligible for Pay on Month-End. Place your order now and pay at the end of the month.</p>
+                  )}
+                  {paymentMethod === "month_end" && !allowMonthEndPayment && (
+                    <p role="alert" className="mt-3 text-xs leading-5 text-red-600">Pay on Month-End is no longer enabled. Choose another payment method.</p>
+                  )}
 
                   {paymentMethod === "cheque" && (
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -5362,8 +5388,8 @@ const NewOrder = () => {
                       <ChequeOption
                         selected={chequeType === "direct_collection"}
                         onClick={() => setChequeType("direct_collection")}
-                        title="Cheque — Direct Collection"
-                        description={`${paymentPricing?.chequeDirectCollection ?? "Loading"}% GST for direct collection.`}
+                        title="Self Cash Cheque"
+                        description={`${paymentPricing?.chequeDirectCollection ?? "Loading"}% GST for self cash cheque.`}
                       />
                     </div>
                   )}
@@ -5452,11 +5478,11 @@ const NewOrder = () => {
                   )}
 
                   {(error ||
-                    (paymentMethod === "online" && paymentPricingError)) && (
+                    (["online", "month_end"].includes(paymentMethod) && paymentPricingError)) && (
                     <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
                       <p className="text-xs leading-5 text-red-700">
                         {error ||
-                          (paymentMethod === "online" && paymentPricingError)}
+                          (["online", "month_end"].includes(paymentMethod) && paymentPricingError)}
                       </p>
                     </div>
                   )}
@@ -5471,7 +5497,7 @@ const NewOrder = () => {
                         !orderItems.length ||
                         Boolean(loadingServiceId)
                       }
-                      className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-5 py-3 text-sm font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="dashboard-action dashboard-action--secondary inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-5 py-3 text-sm font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {draftBusy ? (
                         <Loader2 size={16} className="animate-spin" />
@@ -5496,13 +5522,14 @@ const NewOrder = () => {
                           appliedCouponCode &&
                             (!hasCurrentCouponQuote || currentCouponError),
                         ) ||
-                        (paymentMethod === "online" &&
+                        (["online", "month_end"].includes(paymentMethod) &&
                           (paymentPricingLoading || !paymentPricing)) ||
+                        (paymentMethod === "month_end" && !allowMonthEndPayment) ||
                         Boolean(loadingServiceId) ||
                         !orderItems.length ||
                         (paymentMethod === "online" && estimatedTotal <= 0 && adCreditTotal === 0)
                       }
-                      className="group flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-zinc-900 px-5 py-3.5 text-sm font-semibold text-white shadow-[0_8px_25px_rgba(24,24,27,0.12)] transition-all duration-300 ease-out hover:bg-zinc-800 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="dashboard-action dashboard-action--primary group flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-zinc-900 px-5 py-3.5 text-sm font-semibold text-white shadow-[0_8px_25px_rgba(24,24,27,0.12)] transition-all duration-300 ease-out hover:bg-zinc-800 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {submitting || draftQuoteLoading ? (
                         <>
@@ -5541,7 +5568,7 @@ const NewOrder = () => {
                           ? `Online payments include ${gstRate}% GST on the order subtotal.`
                           : chequeType === "with_gst"
                             ? `This cheque option includes ${gstRate}% GST on the order subtotal.`
-                            : `Direct Collection currently uses ${gstRate}% GST. Confirm this treatment with your accountant.`}
+                            : `Self Cash Cheque currently uses ${gstRate}% GST. Confirm this treatment with your accountant.`}
                       </p>
                     </div>
                   )}
@@ -5673,6 +5700,17 @@ const NewOrder = () => {
                                   : formatCurrency(discountedItemAmount)}
                                 </p>
                               </div>
+
+                              <button
+                                type="button"
+                                disabled={submitting || Boolean(loadingServiceId)}
+                                onClick={() => handleToggleService(serviceId)}
+                                aria-label={`Remove ${item.service.name} from order`}
+                                title={`Remove ${item.service.name} from order`}
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/50 transition hover:bg-red-500/10 hover:text-red-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                <Trash2 size={16} aria-hidden="true" />
+                              </button>
 
                               <button
                                 type="button"
@@ -6001,7 +6039,7 @@ const NewOrder = () => {
                               setCouponErrorRequestKey("");
                               setCouponLoading(false);
                             }}
-                            className="shrink-0 rounded-xl border border-white/15 px-3 py-2.5 text-xs font-medium text-white/70 hover:bg-white/10"
+                            className="dashboard-action dashboard-action--secondary shrink-0 rounded-xl border border-white/15 px-3 py-2.5 text-xs font-medium text-white/70 hover:bg-white/10"
                           >
                             Remove
                           </button>
@@ -6020,7 +6058,7 @@ const NewOrder = () => {
                                 couponInput.trim().toUpperCase(),
                               );
                             }}
-                            className="shrink-0 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="dashboard-action dashboard-action--secondary shrink-0 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Apply
                           </button>
@@ -6120,10 +6158,10 @@ const NewOrder = () => {
                                   ? "Choose a cheque type"
                                   : "Loading tax rate"
                               : paymentMethod === "cod"
-                                ? `${gstRate}% for COD`
+                                ? `${gstRate}% for Cash Payment`
                                 : paymentMethod === "cheque" &&
                                     chequeType === "direct_collection"
-                                  ? `${gstRate}% for Direct Collection`
+                                  ? `${gstRate}% for Self Cash Cheque`
                                   : `${gstRate}% on subtotal`}
                           </p>
                         </div>
@@ -6161,12 +6199,12 @@ const NewOrder = () => {
                         Payment method
                       </p>
 
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className={`grid gap-2 ${allowMonthEndPayment ? "grid-cols-2" : "grid-cols-3"}`}>
                         <PaymentMethodChip
                           selected={paymentMethod === "cod"}
                           onClick={() => selectPaymentMethod("cod")}
                           icon={Banknote}
-                          label="COD"
+                          label="Cash Payment"
                         />
                         <PaymentMethodChip
                           selected={paymentMethod === "online"}
@@ -6183,7 +6221,18 @@ const NewOrder = () => {
                           icon={Landmark}
                           label="Cheque"
                         />
+                        {allowMonthEndPayment && (
+                          <PaymentMethodChip
+                            selected={paymentMethod === "month_end"}
+                            onClick={() => selectPaymentMethod("month_end")}
+                            icon={CalendarDays}
+                            label="Pay on Month-End"
+                          />
+                        )}
                       </div>
+                      {allowMonthEndPayment && (
+                        <p className="mt-2 text-[11px] leading-4 text-white/50">Eligible for month-end payment. Payment is due at the end of the month.</p>
+                      )}
 
                       {paymentMethod === "cheque" && (
                         <div className="mt-2 grid grid-cols-2 gap-2">
@@ -6197,7 +6246,7 @@ const NewOrder = () => {
                             compact
                             selected={chequeType === "direct_collection"}
                             onClick={() => setChequeType("direct_collection")}
-                            title="Direct collection"
+                            title="Self Cash Cheque"
                           />
                         </div>
                       )}
@@ -6211,7 +6260,7 @@ const NewOrder = () => {
                           !orderItems.length ||
                           Boolean(loadingServiceId)
                         }
-                        className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="dashboard-action dashboard-action--secondary mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {draftBusy ? (
                           <Loader2 size={14} className="animate-spin" />
@@ -6236,15 +6285,16 @@ const NewOrder = () => {
                             appliedCouponCode &&
                               (!hasCurrentCouponQuote || currentCouponError),
                           ) ||
-                          (paymentMethod === "online" &&
+                          (["online", "month_end"].includes(paymentMethod) &&
                             (paymentPricingLoading || !paymentPricing)) ||
+                          (paymentMethod === "month_end" && !allowMonthEndPayment) ||
                           Boolean(loadingServiceId) ||
                           !orderItems.length ||
                           (paymentMethod === "online" &&
                             estimatedTotal !== null &&
                             estimatedTotal <= 0 && adCreditTotal === 0)
                         }
-                        className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-zinc-950 transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="dashboard-action dashboard-action--secondary mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-zinc-950 transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {submitting || draftQuoteLoading ? (
                           <>

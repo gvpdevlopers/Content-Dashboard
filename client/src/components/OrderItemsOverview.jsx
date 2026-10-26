@@ -1,3 +1,6 @@
+import ServiceProgress from "./ServiceProgress";
+import ServiceDelivery from "./ServiceDelivery";
+
 const toPlainObject = (value) => {
   if (value instanceof Map) {
     return Object.fromEntries(value);
@@ -25,184 +28,14 @@ const formatValue = (value) => {
   return String(value);
 };
 
-const progressStatusLabels = {
-  pending_start: "Pending Start",
-  in_progress: "In Progress",
-  completed: "Completed",
-  period_ended: "Period Ended",
-  pending: "Pending",
-};
-
-const progressStatusStyles = {
-  pending_start: "border-zinc-200 bg-zinc-100 text-zinc-600",
-  pending: "border-zinc-200 bg-zinc-100 text-zinc-600",
-  in_progress: "border-blue-200 bg-blue-50 text-blue-700",
-  completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  period_ended: "border-amber-200 bg-amber-50 text-amber-800",
-};
-
-const formatKolkataDate = (value) => {
-  if (!value) {
-    return "";
-  }
-
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Kolkata",
-  }).format(new Date(value));
-};
-
-const ServiceProgress = ({
-  item,
-  canManage,
-  updatingKey,
-  onUpdate,
-}) => {
-  const progress = item?.serviceProgress;
-
-  if (!progress) {
-    return null;
-  }
-
-  const status = progress.displayStatus || progress.status;
-  const progressPercent = Math.min(
-    100,
-    Math.max(0, Number(progress.progressPercent) || 0),
-  );
-
-  return (
-    <section className="mt-5 rounded-xl border border-zinc-200 bg-white p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold text-zinc-800">
-          Service progress
-        </h4>
-        <span
-          className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${
-            progressStatusStyles[status] || progressStatusStyles.pending_start
-          }`}
-        >
-          {progressStatusLabels[status] || "Pending"}
-        </span>
-      </div>
-
-      <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-100">
-        <div
-          className="h-full rounded-full bg-zinc-800 transition-[width]"
-          style={{ width: `${progressPercent}%` }}
-          role="progressbar"
-          aria-label="Service progress"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round(progressPercent)}
-        />
-      </div>
-
-      {progress.type === "time_based" ? (
-        <>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-600">
-            <span>
-              {progress.startAt
-                ? `Day ${progress.dayNumber} of ${progress.durationDays}`
-                : "30-day service period starts when staff activates the service."}
-            </span>
-            {progress.startAt && (
-              <span>
-                {progress.remainingDays}{" "}
-                {progress.remainingDays === 1 ? "day" : "days"} remaining
-              </span>
-            )}
-            {progress.startAt && (
-              <span>Started {formatKolkataDate(progress.startAt)} IST</span>
-            )}
-          </div>
-          {canManage && (
-            <div className="mt-4 flex justify-end">
-              {status === "pending_start" ? (
-                <button
-                  type="button"
-                  onClick={() => onUpdate(item._id, { action: "start" })}
-                  disabled={updatingKey === `${item._id}:start`}
-                  className="rounded-lg bg-zinc-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-wait disabled:opacity-60"
-                >
-                  {updatingKey === `${item._id}:start`
-                    ? "Starting..."
-                    : "Start Service"}
-                </button>
-              ) : status !== "completed" ? (
-                <button
-                  type="button"
-                  onClick={() => onUpdate(item._id, { action: "complete" })}
-                  disabled={updatingKey === `${item._id}:complete`}
-                  className="rounded-lg border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-wait disabled:opacity-60"
-                >
-                  {updatingKey === `${item._id}:complete`
-                    ? "Updating..."
-                    : "Mark Completed"}
-                </button>
-              ) : null}
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          <p className="mt-3 text-xs text-zinc-600">
-            {progress.completedCount} of {progress.totalCount} completed
-          </p>
-          <div className="mt-3 divide-y divide-zinc-100">
-            {(progress.deliverables || []).map((deliverable) => (
-              <div
-                key={deliverable.key}
-                className="flex flex-wrap items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
-              >
-                <span className="text-sm text-zinc-700">
-                  {deliverable.name}
-                </span>
-                {canManage ? (
-                  <select
-                    aria-label={`${deliverable.name} status`}
-                    value={deliverable.status}
-                    disabled={
-                      updatingKey === `${item._id}:${deliverable.key}`
-                    }
-                    onChange={(event) =>
-                      onUpdate(item._id, {
-                        action: "set_deliverable_status",
-                        deliverableKey: deliverable.key,
-                        status: event.target.value,
-                      })
-                    }
-                    className="min-w-32 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs text-zinc-700 outline-none focus:border-zinc-500 disabled:opacity-60"
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                  </select>
-                ) : (
-                  <span
-                    className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${
-                      progressStatusStyles[deliverable.status] ||
-                      progressStatusStyles.pending
-                    }`}
-                  >
-                    {progressStatusLabels[deliverable.status] || "Pending"}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-    </section>
-  );
-};
-
 const OrderItemsOverview = ({
   order,
   canManageProgress = false,
   updatingProgressKey = "",
   onProgressUpdate,
   renderServiceExtras,
+  onDeliverySave,
+  compact = false,
 }) => {
   const items =
     Array.isArray(order?.items) && order.items.length
@@ -220,14 +53,14 @@ const OrderItemsOverview = ({
 
   return (
     <section className="space-y-4">
-      <div>
+      {!compact && <div>
         <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
           Services
         </p>
         <h2 className="mt-1 text-lg font-medium text-zinc-900">
           Order configuration
         </h2>
-      </div>
+      </div>}
 
       {items.map((item, itemIndex) => {
         const snapshot = item?.serviceSnapshot || {};
@@ -245,7 +78,7 @@ const OrderItemsOverview = ({
             name !== "pricingMode" &&
             value !== undefined &&
             value !== null &&
-            value !== "",
+            !(typeof value === "string" && !value.trim()),
         );
         const selectedOptions = [
           ...(snapshot.pricingOptions || []),
@@ -261,11 +94,11 @@ const OrderItemsOverview = ({
         return (
           <article
             key={item?._id || `${snapshot.name || "service"}-${itemIndex}`}
-            className="rounded-2xl border border-zinc-200 bg-white p-5"
+            className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5"
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h3 className="text-base font-semibold text-zinc-900">
+              <div className="min-w-0 flex-1">
+                <h3 className="break-words text-sm font-semibold text-zinc-900">
                   {snapshot.name || item?.service?.name || "Service"}
                 </h3>
                 {snapshot.category && (
@@ -284,7 +117,7 @@ const OrderItemsOverview = ({
                 {selectedOptions.map((option) => (
                   <span
                     key={`${option.group || "option"}-${option.name}`}
-                    className="rounded-lg bg-zinc-100 px-3 py-1.5 text-xs text-zinc-700"
+                    className="max-w-full break-words rounded-lg bg-zinc-100 px-3 py-1.5 text-xs text-zinc-700"
                   >
                     {option.group ? `${formatLabel(option.group)}: ` : ""}
                     {option.name}
@@ -293,7 +126,7 @@ const OrderItemsOverview = ({
               </div>
             )}
 
-            {snapshot.selectedPricingMode && (
+            {!compact && snapshot.selectedPricingMode && (
               <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
                 <p className="text-xs font-semibold text-zinc-800">
                   {snapshot.selectedPricingMode.label} pricing
@@ -314,7 +147,7 @@ const OrderItemsOverview = ({
               </div>
             )}
 
-            {fields.length > 0 && (
+            {!compact && fields.length > 0 && (
               <dl className="mt-4 grid gap-3 sm:grid-cols-2">
                 {fields.map(([name, value]) => (
                   <div key={name}>
@@ -329,7 +162,7 @@ const OrderItemsOverview = ({
               </dl>
             )}
 
-            {repeatableGroups.map((group) => {
+            {!compact && repeatableGroups.map((group) => {
               const savedItems = Array.isArray(group.items) ? group.items : [];
               const submittedItems = Array.isArray(formData[group.name])
                 ? formData[group.name]
@@ -381,7 +214,7 @@ const OrderItemsOverview = ({
                                 ([, value]) =>
                                   value !== undefined &&
                                   value !== null &&
-                                  value !== "" &&
+                                  !(typeof value === "string" && !value.trim()) &&
                                   !(Array.isArray(value) && !value.length),
                               )
                               .map(([name, value]) => (
@@ -404,9 +237,12 @@ const OrderItemsOverview = ({
             })}
 
             {renderServiceExtras?.(item)}
+            <ServiceDelivery item={item} onSave={onDeliverySave} />
 
             <ServiceProgress
               item={item}
+              compact={compact}
+              inactive={["cancelled", "rejected", "failed"].includes(order?.orderStatus)}
               canManage={canManageProgress}
               updatingKey={updatingProgressKey}
               onUpdate={onProgressUpdate}

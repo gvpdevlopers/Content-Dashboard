@@ -1,3 +1,5 @@
+import StatusBadge from "../components/OrderStatusBadge";
+import { hasProjectDetails } from "../utils/orderResources";
 import { useEffect, useState } from "react";
 
 import {
@@ -199,7 +201,7 @@ const OrderDetails = () => {
 
           <Link
             to="/dashboard/orders"
-            className="
+            className="dashboard-action dashboard-action--secondary
               group
               mt-6
               inline-flex
@@ -271,7 +273,8 @@ const OrderDetails = () => {
         ([key, value]) =>
           value !== null &&
           value !== undefined &&
-          value !== "" &&
+          !(typeof value === "string" && !value.trim()) &&
+          !(Array.isArray(value) && value.length === 0) &&
           !service.repeatableGroups?.some((group) => group.name === key),
       );
 
@@ -480,7 +483,7 @@ const OrderDetails = () => {
                 <Package
                   size={18}
                   strokeWidth={1.6}
-                  className="text-zinc-500"
+                  className="icon-accent-blue text-zinc-500"
                 />
               </div>
 
@@ -807,7 +810,7 @@ const OrderDetails = () => {
                       type="button"
                       onClick={handleCodVerification}
                       disabled={codLoading || codPin.length !== 6}
-                      className="
+                      className="dashboard-action dashboard-action--primary
                         group
                         inline-flex
                         h-12
@@ -902,14 +905,19 @@ const OrderDetails = () => {
         >
           <RetryOnlinePayment order={order} onPaid={setOrder} />
           <AdCreditBreakdown order={order} />
+          {order.paymentMethod === "month_end" && !["paid", "collected"].includes(order.paymentStatus) && (
+            <p className="mb-4 text-xs leading-5 text-zinc-500">Payment is due at the end of the month and remains pending until receipt is confirmed.</p>
+          )}
           <InfoRow
             label="Method"
             value={
-              order.paymentMethod === "online"
-                ? "Pay Online"
-                : order.paymentMethod === "cheque"
-                  ? "Cheque"
-                  : "Cash on Delivery"
+              order.paymentMethod === "month_end"
+                ? "Pay on Month-End"
+                : order.paymentMethod === "online"
+                  ? "Pay Online"
+                  : order.paymentMethod === "cheque"
+                    ? "Cheque"
+                    : "Cash on Delivery"
             }
           />
 
@@ -1013,6 +1021,9 @@ const OrderDetails = () => {
           REQUIREMENTS / DYNAMIC FORM DATA
       ====================================================== */}
 
+      {(dynamicFields.length > 0 || hasProjectDetails(order.additionalRequirements) ||
+        (!order.items?.length && (service.repeatableGroups || []).some((group) =>
+          (formData[group.name] || group.items || []).length > 0))) && (
       <div
         className="
           group
@@ -1099,7 +1110,7 @@ const OrderDetails = () => {
 
           {/* Dynamic Fields */}
 
-          {dynamicFields.length > 0 ? (
+          {dynamicFields.length > 0 && (
             <div className="mt-7 grid gap-4 sm:grid-cols-2">
               {dynamicFields.map(([key, value]) => (
                 <DetailField
@@ -1108,23 +1119,6 @@ const OrderDetails = () => {
                   value={formatDynamicValue(value)}
                 />
               ))}
-            </div>
-          ) : (
-            <div
-              className="
-                mt-7
-                rounded-2xl
-                border border-dashed
-                border-zinc-200
-                bg-zinc-50
-                px-5
-                py-8
-                text-center
-              "
-            >
-              <p className="text-sm text-zinc-500">
-                No additional project details were provided.
-              </p>
             </div>
           )}
 
@@ -1147,7 +1141,7 @@ const OrderDetails = () => {
 
           {/* Additional Requirements */}
 
-          {order.additionalRequirements && (
+          {hasProjectDetails(order.additionalRequirements) && (
             <div className="mt-4">
               <DetailField
                 label="Additional Requirements"
@@ -1158,6 +1152,7 @@ const OrderDetails = () => {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 };
@@ -1262,7 +1257,7 @@ const ClientOrderResource = ({ title, name, url }) => (
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="
+        className="dashboard-action dashboard-action--primary
           mt-3
           inline-flex
           cursor-pointer
@@ -1553,52 +1548,6 @@ const DetailField = ({ label, value, fullWidth = false }) => {
 /* =========================================================
    STATUS BADGE
 ========================================================= */
-
-const StatusBadge = ({ status }) => {
-  const normalizedStatus = status || "unknown";
-
-  const styles = {
-    pending: "border-amber-200 bg-amber-50 text-amber-700",
-
-    processing: "border-blue-200 bg-blue-50 text-blue-700",
-
-    in_progress: "border-blue-200 bg-blue-50 text-blue-700",
-
-    completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
-
-    cancelled: "border-red-200 bg-red-50 text-red-700",
-
-    rejected: "border-red-200 bg-red-50 text-red-700",
-
-    delivered: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  };
-
-  return (
-    <span
-      className={`
-        inline-flex
-        shrink-0
-        items-center
-        gap-1.5
-        rounded-full
-        border
-        px-3
-        py-1.5
-        text-[11px]
-        font-medium
-        transition
-        duration-200
-        ${
-          styles[normalizedStatus] || "border-zinc-200 bg-zinc-50 text-zinc-600"
-        }
-      `}
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
-
-      {formatStatus(normalizedStatus)}
-    </span>
-  );
-};
 
 /* =========================================================
    PAYMENT STATUS

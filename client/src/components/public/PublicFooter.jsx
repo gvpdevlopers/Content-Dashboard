@@ -63,9 +63,9 @@ const PublicFooter = () => {
       src="/small_logo.png"
       alt=""
       aria-hidden="true"
-      className="pointer-events-none absolute left-1/2 top-1/2 z-0 h-auto max-h-[100%] w-[clamp(18rem,90vw,1100px)] -translate-x-1/2 -translate-y-1/2 object-contain opacity-5"
+      className="pointer-events-none absolute right-0 top-[calc(50%-2.5rem)] z-0 hidden h-auto w-96 translate-x-[45%] -translate-y-1/2 object-contain opacity-[0.045] min-[480px]:block sm:w-[min(48rem,80vw)] lg:w-[min(56rem,80vw)]"
       initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-      whileInView={{ opacity: 0.1, y: 0 }}
+      whileInView={{ opacity: 0.045, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
       transition={{
         duration: reduceMotion ? 0 : 0.7,

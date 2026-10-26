@@ -38,7 +38,13 @@ const getUserOrders = async (userId) => {
   return response.data;
 };
 
+const updatePaymentPermissions = async (userId, allowMonthEndPayment) => {
+  const response = await api.patch(`/users/${userId}/payment-permissions`, { allowMonthEndPayment });
+  return response.data;
+};
+
 const adminUserService = {
+  updatePaymentPermissions,
   createUser,
   getUsers,
   getUserById,

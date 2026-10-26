@@ -23,6 +23,7 @@ const AdminCreateUser = () => {
     username: "",
     password: "",
     role: "client",
+    allowMonthEndPayment: false,
   });
 
   const [loading, setLoading] = useState(false);
@@ -35,6 +36,7 @@ const AdminCreateUser = () => {
     setFormData((previous) => ({
       ...previous,
       [name]: value,
+      ...(name === "role" && value !== "client" ? { allowMonthEndPayment: false } : {}),
     }));
   };
 
@@ -79,7 +81,7 @@ const AdminCreateUser = () => {
         <button
           type="button"
           onClick={() => navigate("/admin/users")}
-          className="
+          className="dashboard-action dashboard-action--tertiary
             group
             mb-5
             inline-flex
@@ -455,7 +457,7 @@ const AdminCreateUser = () => {
                 Role
               </label>
 
-              <CustomSelect
+              <CustomSelect aria-label="User role"
                 value={formData.role}
                 onChange={(value) =>
                   handleChange({
@@ -487,6 +489,22 @@ const AdminCreateUser = () => {
               </p>
             </div>
           </div>
+
+          {formData.role === "client" && (
+            <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+              <input
+                type="checkbox"
+                checked={formData.allowMonthEndPayment}
+                onChange={(event) => setFormData((current) => ({ ...current, allowMonthEndPayment: event.target.checked }))}
+                disabled={loading}
+                className="mt-0.5 h-4 w-4 accent-zinc-900"
+              />
+              <span>
+                <span className="block text-sm font-medium text-zinc-900">Allow Pay on Month-End</span>
+                <span className="mt-1 block text-xs leading-5 text-zinc-500">Let this client place orders with payment due at the end of the month.</span>
+              </span>
+            </label>
+          )}
 
           {/* =================================================
               MESSAGES
@@ -531,7 +549,7 @@ const AdminCreateUser = () => {
               type="button"
               onClick={() => navigate("/admin/users")}
               disabled={loading}
-              className="
+              className="dashboard-action dashboard-action--secondary
                 inline-flex
                 items-center
                 justify-center
@@ -559,7 +577,7 @@ const AdminCreateUser = () => {
             <button
               type="submit"
               disabled={loading}
-              className="
+              className="dashboard-action dashboard-action--primary
                 group
                 inline-flex
                 items-center

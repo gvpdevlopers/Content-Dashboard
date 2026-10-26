@@ -301,7 +301,7 @@ const CodManagement = () => {
             type="button"
             onClick={() => loadOrders(true)}
             disabled={refreshing}
-            className="
+            className="dashboard-action dashboard-action--secondary
               group/refresh
               inline-flex
               items-center
@@ -495,7 +495,7 @@ const CodManagement = () => {
               lg:shrink-0
             "
           >
-            <CustomSelect
+            <CustomSelect aria-label="Filter payment collections"
               value={filter}
               onChange={setFilter}
               options={[
@@ -864,7 +864,7 @@ const CodOrderCard = ({ order }) => {
                 text-emerald-700
               "
             >
-              <CheckCircle2 size={17} />
+              <CheckCircle2 className="icon-accent-green" size={17} />
               Payment Confirmed
             </div>
           ) : pin ? (
@@ -898,7 +898,7 @@ const CodOrderCard = ({ order }) => {
               type="button"
               onClick={generatePin}
               disabled={loading}
-              className="
+              className="dashboard-action dashboard-action--primary
                 inline-flex
                 w-full
                 items-center
@@ -1316,7 +1316,7 @@ const PaymentBadge = ({ status }) => {
         }
       `}
     >
-      {collected ? <CheckCircle2 size={11} /> : <Clock3 size={11} />}
+      {collected ? <CheckCircle2 className="icon-accent-green" size={11} /> : <Clock3 className="icon-accent-amber" size={11} />}
 
       {collected ? "Payment Done" : "Payment Pending"}
     </span>

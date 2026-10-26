@@ -200,7 +200,7 @@ const EmployeeDashboard = () => {
 
               <Link
                 to="/staff/orders"
-                className="
+                className="dashboard-action dashboard-action--secondary
                   inline-flex
                   h-10
                   shrink-0
@@ -393,7 +393,7 @@ const EmployeeDashboard = () => {
                   text-center
                 "
               >
-                <Package size={22} className="mx-auto text-zinc-400" />
+                <Package size={22} className="icon-accent-blue mx-auto text-zinc-400" />
 
                 <p
                   className="

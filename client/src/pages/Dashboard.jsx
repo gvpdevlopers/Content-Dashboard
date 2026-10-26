@@ -242,7 +242,7 @@ const Dashboard = () => {
 
           <Link
             to="/dashboard/new-order"
-            className="
+            className="dashboard-action dashboard-action--primary
               group/button
               relative
               mt-7
@@ -269,22 +269,6 @@ const Dashboard = () => {
               active:scale-[0.99]
             "
           >
-            <span
-              className="
-                absolute
-                inset-0
-                bg-gradient-to-r
-                from-zinc-800
-                via-zinc-900
-                to-zinc-800
-                opacity-0
-                transition-opacity
-                duration-300
-                ease-out
-                group-hover/button:opacity-100
-              "
-            />
-
             <span
               className="
                 relative
@@ -339,7 +323,7 @@ const Dashboard = () => {
           <button
             type="button"
             onClick={loadOrders}
-            className="
+            className="dashboard-action dashboard-action--secondary
               inline-flex
               shrink-0
               items-center
@@ -376,6 +360,7 @@ const Dashboard = () => {
         "
       >
         <StatCard
+          tone="blue"
           icon={Package}
           label="Total Orders"
           value={loading ? "—" : stats.total}
@@ -383,6 +368,7 @@ const Dashboard = () => {
         />
 
         <StatCard
+          tone="blue"
           icon={Clock3}
           label="In Progress"
           value={loading ? "—" : stats.inProgress}
@@ -390,6 +376,7 @@ const Dashboard = () => {
         />
 
         <StatCard
+          tone="green"
           icon={FileCheck2}
           label="Completed"
           value={loading ? "—" : stats.completed}
@@ -397,6 +384,7 @@ const Dashboard = () => {
         />
 
         <StatCard
+          tone="amber"
           icon={WalletCards}
           label="Pending Payment"
           value={loading ? "—" : stats.pendingPayment}
@@ -636,7 +624,7 @@ const Dashboard = () => {
 
               <a
                 href={`tel:${supportPhone}`}
-                className="
+                className="dashboard-action dashboard-action--primary
     group/support
     inline-flex
     items-center
@@ -802,7 +790,7 @@ const Dashboard = () => {
                 <Package
                   size={21}
                   strokeWidth={1.5}
-                  className="text-zinc-400"
+                  className="icon-accent-blue text-zinc-400"
                 />
               </div>
 
@@ -881,7 +869,7 @@ const Dashboard = () => {
    STAT CARD
 ========================================================= */
 
-const StatCard = ({ icon: Icon, label, value, description }) => {
+const StatCard = ({ icon: Icon, label, value, description, tone = "slate" }) => {
   return (
     <div
       className="
@@ -935,12 +923,7 @@ const StatCard = ({ icon: Icon, label, value, description }) => {
           <Icon
             size={18}
             strokeWidth={1.6}
-            className="
-              text-zinc-500
-              transition-colors
-              duration-200
-              group-hover:text-zinc-800
-            "
+            className={`icon-accent-${tone} transition-colors duration-150`}
           />
         </div>
 

@@ -38,6 +38,8 @@ const AdminUserDetails = () => {
 
   const [updatingStatus, setUpdatingStatus] =
     useState(false);
+  const [monthEndAllowed, setMonthEndAllowed] = useState(false);
+  const [savingPaymentPermission, setSavingPaymentPermission] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
@@ -51,6 +53,7 @@ const AdminUserDetails = () => {
         await adminUserService.getUserById(id);
 
       setUser(response.user);
+      setMonthEndAllowed(response.user?.allowMonthEndPayment === true);
     } catch (error) {
       console.error(
         "Get admin user details error:",
@@ -103,6 +106,21 @@ const AdminUserDetails = () => {
      USER STATUS
   ====================================================== */
 
+  const handlePaymentPermissionSave = async (event) => {
+    event.preventDefault();
+    try {
+      setSavingPaymentPermission(true);
+      const response = await adminUserService.updatePaymentPermissions(id, monthEndAllowed);
+      setUser(response.user);
+      setMonthEndAllowed(response.user.allowMonthEndPayment === true);
+      toast.success("Payment permission updated.");
+    } catch (saveError) {
+      toast.error(saveError.response?.data?.message || "Unable to update payment permission.");
+    } finally {
+      setSavingPaymentPermission(false);
+    }
+  };
+
   const toggleUserStatus = async () => {
     if (!user || user.role === "admin") {
       return;
@@ -121,7 +139,7 @@ const AdminUserDetails = () => {
         );
 
       if (response.user) {
-        setUser(response.user);
+        setUser((current) => ({ ...current, ...response.user }));
       } else {
         setUser((currentUser) => ({
           ...currentUser,
@@ -330,7 +348,7 @@ const AdminUserDetails = () => {
 
           <Link
             to="/admin/users"
-            className="
+            className="dashboard-action dashboard-action--secondary
               group
               mt-6
               inline-flex
@@ -713,6 +731,29 @@ const AdminUserDetails = () => {
         </div>
       </section>
 
+      {user.role === "client" && (
+        <form onSubmit={handlePaymentPermissionSave} className="mt-6 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
+          <h2 className="text-sm font-semibold text-zinc-900">Edit payment permission</h2>
+          <label className="mt-4 flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={monthEndAllowed}
+              onChange={(event) => setMonthEndAllowed(event.target.checked)}
+              disabled={savingPaymentPermission}
+              className="mt-0.5 h-4 w-4 accent-zinc-900"
+            />
+            <span>
+              <span className="block text-sm font-medium text-zinc-900">Allow Pay on Month-End</span>
+              <span className="mt-1 block text-xs leading-5 text-zinc-500">Let this client place orders with payment due at the end of the month. Disabling this affects future orders.</span>
+            </span>
+          </label>
+          <button type="submit" disabled={savingPaymentPermission || monthEndAllowed === (user.allowMonthEndPayment === true)}
+            className="dashboard-action dashboard-action--primary mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-zinc-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50">
+            {savingPaymentPermission ? "Saving..." : "Save payment permission"}
+          </button>
+        </form>
+      )}
+
       <form
         onSubmit={handleResetPassword}
         className="mt-6 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6"
@@ -754,7 +795,7 @@ const AdminUserDetails = () => {
           <button
             type="submit"
             disabled={resettingPassword || newPassword.length < 6}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-zinc-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="dashboard-action dashboard-action--primary inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-zinc-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {resettingPassword && <Loader2 size={16} className="animate-spin" />}
             {resettingPassword ? "Resetting..." : "Reset password"}
@@ -987,7 +1028,7 @@ const AdminUserDetails = () => {
             >
               <Package
                 size={18}
-                className="text-zinc-500"
+                className="icon-accent-blue text-zinc-500"
                 strokeWidth={1.6}
               />
             </div>
@@ -1751,7 +1792,7 @@ const AdminOrderMobileCard = ({
 
       <Link
         to={`/admin/orders/${order._id}`}
-        className="
+        className="dashboard-action dashboard-action--primary
           group
           mt-5
           flex
@@ -1944,7 +1985,7 @@ const EmptyOrders = () => {
           shadow-sm
         "
       >
-        <Package
+        <Package className="icon-accent-blue"
           size={22}
           strokeWidth={1.6}
         />
@@ -1982,6 +2023,7 @@ const EmptyOrders = () => {
 const formatStatus = (
   status
 ) => {
+  if (status === "month_end") return "Pay on Month-End";
   if (!status) {
     return "Unknown";
   }

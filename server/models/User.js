@@ -36,6 +36,11 @@ const userSchema = new mongoose.Schema(
       default: "client",
     },
 
+    allowMonthEndPayment: {
+      type: Boolean,
+      default: false,
+    },
+
     tokenVersion: {
       type: Number,
       default: 0,

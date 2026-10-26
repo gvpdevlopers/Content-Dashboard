@@ -63,7 +63,7 @@ const protect = async (req, res, next) => {
     }
 
     const user = await User.findById(userId).select(
-      "_id role isActive tokenVersion",
+      "_id role isActive tokenVersion allowMonthEndPayment",
     );
 
     if (
@@ -81,6 +81,7 @@ const protect = async (req, res, next) => {
       ...decoded,
       _id: user._id,
       role: user.role,
+      allowMonthEndPayment: user.role === "client" && user.allowMonthEndPayment === true,
     };
 
     next();

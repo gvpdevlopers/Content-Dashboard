@@ -408,6 +408,8 @@ const serviceSnapshotSchema = new mongoose.Schema(
       trim: true,
     },
 
+    supportsDelivery: { type: Boolean, default: undefined },
+
     slug: {
       type: String,
       default: "",
@@ -727,6 +729,14 @@ const couponSnapshotSchema = new mongoose.Schema(
 
 const orderItemSchema = new mongoose.Schema(
   {
+    delivery: {
+      type: new mongoose.Schema({
+        url: { type: String, trim: true, maxlength: 2048, default: "" },
+        updatedAt: { type: Date, required: true },
+        updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+      }, { _id: false }),
+      default: undefined,
+    },
     service: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Service",
@@ -1002,7 +1012,7 @@ const orderSchema = new mongoose.Schema(
 
     paymentMethod: {
       type: String,
-      enum: ["cod", "online", "cheque"],
+      enum: ["cod", "online", "cheque", "month_end"],
       required: true,
     },
 
@@ -1012,6 +1022,16 @@ const orderSchema = new mongoose.Schema(
       required: function () {
         return this.paymentMethod === "cheque";
       },
+      default: undefined,
+    },
+
+    monthEndPaymentHistory: {
+      type: [{
+        from: { type: String, required: true },
+        to: { type: String, required: true },
+        changedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+        changedAt: { type: Date, required: true },
+      }],
       default: undefined,
     },
 

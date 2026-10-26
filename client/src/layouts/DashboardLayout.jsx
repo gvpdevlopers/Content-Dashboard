@@ -1,3 +1,4 @@
+import "../styles/dashboard.css";
 import { NavLink, Outlet } from "react-router-dom";
 import { useState } from "react";
 import {
@@ -38,7 +39,7 @@ const DashboardLayout = () => {
   const userInitial = user?.name?.charAt(0)?.toUpperCase() || "G";
 
   return (
-    <div className="min-h-screen bg-[#f7f7f8] text-zinc-900">
+    <div className="dashboard-ui min-h-screen bg-[#f7f7f8] text-zinc-900">
       {/* =====================================================
           MOBILE HEADER
       ====================================================== */}

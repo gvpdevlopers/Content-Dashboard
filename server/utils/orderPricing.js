@@ -1,9 +1,11 @@
 const {
   ONLINE_GST_RATE,
+  MONTH_END_GST_RATE,
   CHEQUE_DIRECT_COLLECTION_GST_RATE,
 } = require("../config/paymentPricing");
 
 const getGstRate = (paymentMethod, chequeType) => {
+  if (paymentMethod === "month_end") return MONTH_END_GST_RATE;
   if (
     paymentMethod === "online" ||
     (paymentMethod === "cheque" && chequeType === "with_gst")
@@ -19,6 +21,7 @@ const getGstRate = (paymentMethod, chequeType) => {
 };
 
 const getPaymentPricingConfig = () => ({
+  month_end: MONTH_END_GST_RATE,
   cod: 0,
   online: ONLINE_GST_RATE,
   chequeWithGst: ONLINE_GST_RATE,

@@ -90,7 +90,13 @@ const getAdminCodOrders = async () => {
   return response.data;
 };
 
+const updateServiceDelivery = async (orderId, itemId, url, staffMode = false) => {
+  const response = await api.patch(`${getOrderRoot(staffMode)}/${orderId}/items/${itemId}/delivery`, { url });
+  return response.data;
+};
+
 const adminOrderService = {
+  updateServiceDelivery,
   getAdminOrders,
   getAdminOrderById,
   updateOrderStatus,

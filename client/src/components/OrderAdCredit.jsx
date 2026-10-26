@@ -75,7 +75,7 @@ export default function OrderAdCredit({ order, staffMode }) {
                   className="mt-1 w-full rounded-lg border border-zinc-300 p-2" />
               </label>
               <button type="button" disabled={busy || !Number(amounts[platform]) || !notes[platform]?.trim()}
-                onClick={() => issue(platform)} className="rounded-lg bg-zinc-900 px-4 py-2 text-sm text-white disabled:opacity-40">
+                onClick={() => issue(platform)} className="dashboard-action dashboard-action--primary rounded-lg bg-zinc-900 px-4 py-2 text-sm text-white disabled:opacity-40">
                 {busy ? "Saving..." : "Add unused spend as credit"}
               </button>
             </div>

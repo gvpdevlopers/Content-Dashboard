@@ -214,7 +214,7 @@ const AdminDashboard = () => {
                   group-hover:text-zinc-800
                 "
               >
-                <Package size={18} strokeWidth={1.6} />
+                <Package className="icon-accent-blue" size={18} strokeWidth={1.6} />
               </div>
 
               <p
@@ -263,7 +263,7 @@ const AdminDashboard = () => {
             type="button"
             onClick={loadDashboard}
             disabled={loading}
-            className="
+            className="dashboard-action dashboard-action--secondary
               group/refresh
               inline-flex
               items-center
@@ -353,6 +353,7 @@ const AdminDashboard = () => {
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
+          tone="slate"
           icon={Users}
           label="Total Clients"
           value={loading ? "—" : totalClients}
@@ -360,6 +361,7 @@ const AdminDashboard = () => {
         />
 
         <StatCard
+          tone="blue"
           icon={Package}
           label="Total Orders"
           value={loading ? "—" : totalOrders}
@@ -367,6 +369,7 @@ const AdminDashboard = () => {
         />
 
         <StatCard
+          tone="blue"
           icon={Clock3}
           label="In Progress"
           value={loading ? "—" : inProgressOrders}
@@ -374,6 +377,7 @@ const AdminDashboard = () => {
         />
 
         <StatCard
+          tone="amber"
           icon={KeyRound}
           label="COD Pending"
           value={loading ? "—" : pendingCodOrders}
@@ -535,7 +539,7 @@ const AdminDashboard = () => {
    STAT CARD
 ========================================================= */
 
-const StatCard = ({ icon: Icon, label, value, description }) => {
+const StatCard = ({ icon: Icon, label, value, description, tone = "slate" }) => {
   return (
     <div
       className="
@@ -588,7 +592,7 @@ const StatCard = ({ icon: Icon, label, value, description }) => {
             group-hover:shadow-sm
           "
         >
-          <Icon size={18} strokeWidth={1.6} />
+          <Icon className={`icon-accent-${tone}`} size={18} strokeWidth={1.6} />
         </div>
 
         <span
@@ -734,7 +738,7 @@ const RecentOrderCard = ({ order }) => {
   return (
     <Link
       to={`/admin/orders/${order._id || order.id}`}
-      className="
+      className="dashboard-action dashboard-action--secondary
         group
         block
         rounded-[22px]
@@ -932,7 +936,7 @@ const EmptyRecentOrders = () => {
           <ClipboardList
             size={20}
             strokeWidth={1.6}
-            className="text-zinc-400"
+            className="icon-accent-blue text-zinc-400"
           />
         </div>
 
@@ -946,7 +950,7 @@ const EmptyRecentOrders = () => {
 
         <Link
           to="/admin/orders"
-          className="
+          className="dashboard-action dashboard-action--primary
             group
             mt-5
             inline-flex
