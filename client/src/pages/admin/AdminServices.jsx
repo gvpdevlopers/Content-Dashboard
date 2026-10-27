@@ -1,3 +1,4 @@
+import ActiveFilters from "../../components/ActiveFilters";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -7,6 +8,7 @@ import {
   Edit3,
   Layers3,
   Plus,
+  Power,
   RefreshCw,
   Search,
   Settings2,
@@ -494,19 +496,9 @@ const AdminServices = () => {
             services
           </p>
 
-          {(searchTerm || statusFilter !== "all") && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchTerm("");
-                setStatusFilter("all");
-              }}
-              className="text-xs font-semibold text-blue-600 transition hover:text-blue-700"
-            >
-              Clear filters
-            </button>
-          )}
+
         </div>
+        <ActiveFilters filters={[{ label: "Search", value: searchTerm.trim() }, { label: "Status", value: statusFilter === "all" ? "" : statusFilter }]} onClear={() => { setSearchTerm(""); setStatusFilter("all"); }} />
       </div>
 
       {/* ======================================================
@@ -699,37 +691,27 @@ const AdminServices = () => {
 
                       {/* Actions */}
                       <td className="px-6 py-5">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="table-actions">
                           <button
                             type="button"
                             onClick={() =>
                               navigate(`/admin/services/${service._id}/edit`)
                             }
-                            className="dashboard-action dashboard-action--secondary inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                            title="Edit service" aria-label={`Edit ${service.name}`}
+                            className="dashboard-action dashboard-action--secondary dashboard-action--icon"
                           >
-                            <Edit3 size={15} />
-                            Edit
+                            <Edit3 size={16} aria-hidden="true" />
                           </button>
 
                           <button
                             type="button"
                             disabled={isToggling}
                             onClick={() => handleToggleStatus(service)}
-                            className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                              service.isActive
-                                ? "border border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
-                                : "border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                            }`}
+                            title={`${service.isActive ? "Deactivate" : "Activate"} service`}
+                            aria-label={`${service.isActive ? "Deactivate" : "Activate"} ${service.name}`}
+                            className="dashboard-action dashboard-action--secondary dashboard-action--icon"
                           >
-                            {isToggling ? (
-                              <RefreshCw size={15} className="animate-spin" />
-                            ) : service.isActive ? (
-                              <ToggleRight size={16} />
-                            ) : (
-                              <ToggleLeft size={16} />
-                            )}
-
-                            {service.isActive ? "Deactivate" : "Activate"}
+                            {isToggling ? <RefreshCw size={16} className="animate-spin" aria-hidden="true" /> : <Power size={16} aria-hidden="true" />}
                           </button>
                         </div>
                       </td>
@@ -861,7 +843,8 @@ const AdminServices = () => {
                     onClick={() =>
                       navigate(`/admin/services/${service._id}/edit`)
                     }
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
+                    title="Edit service" aria-label={`Edit ${service.name}`}
+                    className="dashboard-action dashboard-action--secondary w-full"
                   >
                     <Edit3 size={16} />
                     Edit
@@ -871,7 +854,9 @@ const AdminServices = () => {
                     type="button"
                     disabled={isToggling}
                     onClick={() => handleToggleStatus(service)}
-                    className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    title={`${service.isActive ? "Deactivate" : "Activate"} service`}
+                    aria-label={`${service.isActive ? "Deactivate" : "Activate"} ${service.name}`}
+                    className={`dashboard-action dashboard-action--secondary w-full ${
                       service.isActive
                         ? "border border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
                         : "border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"

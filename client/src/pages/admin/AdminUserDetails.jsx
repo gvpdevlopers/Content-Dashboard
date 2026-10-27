@@ -1,3 +1,4 @@
+import OrderStatusBadge from "../../components/OrderStatusBadge";
 import RoleBadge from "../../components/RoleBadge";
 import { useEffect, useMemo, useState } from "react";
 
@@ -54,6 +55,7 @@ const AdminUserDetails = () => {
 
       setUser(response.user);
       setMonthEndAllowed(response.user?.allowMonthEndPayment === true);
+      return response.user;
     } catch (error) {
       console.error(
         "Get admin user details error:",
@@ -98,8 +100,17 @@ const AdminUserDetails = () => {
       return;
     }
 
-    loadUser();
-    loadOrders();
+    const loadDetails = async () => {
+      const loadedUser = await loadUser();
+      if (loadedUser?.role === "client") {
+        await loadOrders();
+      } else {
+        setOrders([]);
+        setOrdersError("");
+        setOrdersLoading(false);
+      }
+    };
+    loadDetails();
   }, [id]);
 
   /* =====================================================
@@ -807,6 +818,7 @@ const AdminUserDetails = () => {
           STATS
       ====================================================== */}
 
+      {user.role === "client" && (
       <section
         className="
           mt-6
@@ -848,18 +860,14 @@ const AdminUserDetails = () => {
           }
         />
       </section>
+      )}
 
       {/* =====================================================
           MAIN INFORMATION
       ====================================================== */}
 
       <section
-        className="
-          mt-6
-          grid
-          gap-6
-          xl:grid-cols-[0.8fr_1.2fr]
-        "
+        className={`mt-6 grid gap-6 ${user.role === "client" ? "xl:grid-cols-[0.8fr_1.2fr]" : ""}`}
       >
 
         {/* Account Information */}
@@ -944,6 +952,7 @@ const AdminUserDetails = () => {
 
         {/* Order Overview */}
 
+        {user.role === "client" && (
         <InfoCard
           icon={Package}
           eyebrow="Activity"
@@ -985,6 +994,7 @@ const AdminUserDetails = () => {
             />
           </div>
         </InfoCard>
+        )}
 
       </section>
 
@@ -992,6 +1002,7 @@ const AdminUserDetails = () => {
           ORDERS
       ====================================================== */}
 
+      {user.role === "client" && (
       <section
         className="
           mt-6
@@ -1202,6 +1213,7 @@ const AdminUserDetails = () => {
         )}
 
       </section>
+      )}
     </div>
   );
 };
@@ -1597,7 +1609,7 @@ const AdminOrderRow = ({
 
       <Link
         to={`/admin/orders/${order._id}`}
-        className="
+        className="button-action button-action--icon
           flex h-9 w-9
           items-center justify-center
           justify-self-end
@@ -1887,68 +1899,6 @@ const StatusBadge = ({
       {isActive
         ? "Active"
         : "Inactive"}
-    </span>
-  );
-};
-
-/* =========================================================
-   ORDER STATUS BADGE
-========================================================= */
-
-const OrderStatusBadge = ({
-  status,
-}) => {
-  const normalizedStatus =
-    status?.toLowerCase();
-
-  let classes =
-    "border-zinc-200 bg-zinc-50 text-zinc-500";
-
-  if (
-    normalizedStatus ===
-    "completed"
-  ) {
-    classes =
-      "border-emerald-200 bg-emerald-50 text-emerald-700";
-  } else if (
-    normalizedStatus ===
-    "cancelled"
-  ) {
-    classes =
-      "border-red-200 bg-red-50 text-red-600";
-  } else if (
-    normalizedStatus ===
-      "processing" ||
-    normalizedStatus ===
-      "in_progress"
-  ) {
-    classes =
-      "border-blue-200 bg-blue-50 text-blue-700";
-  } else if (
-    normalizedStatus ===
-    "pending"
-  ) {
-    classes =
-      "border-amber-200 bg-amber-50 text-amber-700";
-  }
-
-  return (
-    <span
-      className={`
-        inline-flex
-        whitespace-nowrap
-        rounded-full
-        border
-        px-2.5
-        py-1
-        text-[11px]
-        font-medium
-        ${classes}
-      `}
-    >
-      {formatStatus(
-        status
-      )}
     </span>
   );
 };

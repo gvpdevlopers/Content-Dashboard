@@ -1,3 +1,7 @@
+import PaymentPinDialog from "../components/PaymentPinDialog";
+import { canEnterCashPaymentPin } from "../utils/paymentPin";
+import { toast } from "sonner";
+import PaymentStatusBadge from "../components/PaymentStatusBadge";
 import StatusBadge from "../components/OrderStatusBadge";
 import OrderItemsOverview from "../components/OrderItemsOverview";
 import OrderResourceAction from "../components/OrderResourceAction";
@@ -9,6 +13,7 @@ import orderService from "../services/orderService";
 
 const OrderHistory = () => {
   const [orders, setOrders] = useState([]);
+  const [pinOrder, setPinOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -122,7 +127,7 @@ const OrderHistory = () => {
             className={`
               transition-transform
               duration-500
-              ${loading ? "animate-spin" : "group-hover:rotate-180"}
+              ${loading ? "animate-spin" : ""}
             `}
           />
           Refresh
@@ -134,7 +139,7 @@ const OrderHistory = () => {
       ====================================================== */}
 
       {error && (
-        <div
+        <div role="alert"
           className="
             mb-6
             flex
@@ -160,7 +165,8 @@ const OrderHistory = () => {
           <button
             type="button"
             onClick={loadOrders}
-            className="
+            disabled={loading}
+            className="dashboard-action dashboard-action--secondary
               self-start
               text-sm
               text-red-600
@@ -180,8 +186,8 @@ const OrderHistory = () => {
       ====================================================== */}
 
       {loading ? (
-        <LoadingOrders />
-      ) : orders.length === 0 ? (
+        <div role="status" aria-label="Loading orders"><LoadingOrders /><span className="sr-only">Loading your orders...</span></div>
+      ) : error && orders.length === 0 ? null : orders.length === 0 ? (
         <EmptyOrders />
       ) : (
         <>
@@ -234,7 +240,7 @@ const OrderHistory = () => {
 
             <div>
               {orders.map((order) => (
-                <OrderTableRow key={order._id || order.id} order={order} />
+                <OrderTableRow key={order._id || order.id} order={order} onEnterPin={setPinOrder} />
               ))}
             </div>
           </div>
@@ -245,10 +251,21 @@ const OrderHistory = () => {
 
           <div className="space-y-4 lg:hidden">
             {orders.map((order) => (
-              <OrderMobileCard key={order._id || order.id} order={order} />
+              <OrderMobileCard key={order._id || order.id} order={order} onEnterPin={setPinOrder} />
             ))}
           </div>
         </>
+      )}
+      {pinOrder && (
+        <PaymentPinDialog order={pinOrder} onClose={() => setPinOrder(null)}
+          onVerified={(update) => {
+            const orderId = pinOrder._id || pinOrder.id;
+            setOrders((current) => current.map((order) =>
+              (order._id || order.id) === orderId ? { ...order, ...update } : order,
+            ));
+            setPinOrder(null);
+            toast.success("Cash payment verified.");
+          }} />
       )}
     </div>
   );
@@ -317,7 +334,7 @@ const LoadingOrders = () => {
    DESKTOP ORDER ROW
 ============================================================ */
 
-const OrderTableRow = ({ order }) => {
+const OrderTableRow = ({ order, onEnterPin }) => {
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
   const serviceName = getServiceName(order);
@@ -383,6 +400,7 @@ const OrderTableRow = ({ order }) => {
         ) : (
           <PaymentStatusBadge status={order.paymentStatus} />
         )}
+        <EnterPaymentPinAction order={order} onEnterPin={onEnterPin} />
 
         <p className="mt-1 text-[11px] text-zinc-400">
           {order.paymentMethod === "month_end"
@@ -391,7 +409,7 @@ const OrderTableRow = ({ order }) => {
               ? "Pay Online"
               : order.paymentMethod === "cheque"
                 ? "Cheque"
-                : "Cash on Delivery"}
+                : "Cash Payment"}
         </p>
         {order.paymentMethod === "cheque" && (
           <p className="mt-1 text-[11px] text-zinc-500">
@@ -436,7 +454,7 @@ const OrderTableRow = ({ order }) => {
    MOBILE ORDER CARD
 ============================================================ */
 
-const OrderMobileCard = ({ order }) => {
+const OrderMobileCard = ({ order, onEnterPin }) => {
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
   const serviceName = getServiceName(order);
@@ -570,13 +588,18 @@ const OrderMobileCard = ({ order }) => {
                   ? "Pay Online"
                   : order.paymentMethod === "cheque"
                     ? `Cheque — ${order.chequeType === "with_gst" ? "With GST" : "Direct Collection"}`
-                    : "Cash on Delivery"
+                    : "Cash Payment"
             }
           />
 
           <MobileDetail
             label="Payment Status"
-            value={paymentDone ? "Paid" : formatStatus(order.paymentStatus)}
+            value={
+              <span className="inline-flex flex-col items-start gap-2">
+                <PaymentStatusBadge status={paymentDone ? "paid" : order.paymentStatus} />
+                <EnterPaymentPinAction order={order} onEnterPin={onEnterPin} />
+              </span>
+            }
             paymentDone={paymentDone}
           />
         </div>
@@ -634,6 +657,14 @@ const MobileDetail = ({ label, value, paymentDone = false }) => {
   );
 };
 
+const EnterPaymentPinAction = ({ order, onEnterPin }) => canEnterCashPaymentPin(order) ? (
+  <button type="button" onClick={() => onEnterPin(order)} aria-haspopup="dialog"
+    aria-label={`Enter Payment PIN for ${order.orderNumber || "order"}`}
+    className="dashboard-action dashboard-action--secondary dashboard-action--compact mt-2 w-full min-w-0 [overflow-wrap:anywhere] sm:w-auto">
+    Enter Payment PIN
+  </button>
+) : null;
+
 const InvoiceAction = ({ order }) => (
   <OrderResourceAction url={order.invoice?.url} download label="Invoice" name={order.invoice?.name}
     ariaLabel={`Download invoice for ${order.orderNumber || "order"}`} />
@@ -648,10 +679,10 @@ const ExpandedOrder = ({ order }) => (
         <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-zinc-600">{order.additionalRequirements}</p>
       </section>
     )}
-    <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 pt-4">
       <OrderResourceAction url={order.deliveryLink} label="Open order delivery" />
-      <Link to={`/dashboard/orders/${order._id || order.id}`} className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-700 underline-offset-4 hover:underline">
-        View full details <ArrowRight size={13} aria-hidden="true" />
+      <Link to={`/dashboard/orders/${order._id || order.id}`} className="dashboard-action dashboard-action--primary w-full sm:ml-auto sm:w-auto">
+        View full details <ArrowRight size={15} aria-hidden="true" />
       </Link>
     </div>
   </div>
@@ -671,50 +702,6 @@ const OrderArtifactIndicator = ({ order }) => {
     <p className="mt-1 truncate text-[10px] font-medium text-emerald-700">
       {available.join(" · ")} available
     </p>
-  );
-};
-
-/* ============================================================
-   ORDER STATUS BADGE
-============================================================ */
-
-/* ============================================================
-   PAYMENT STATUS BADGE
-============================================================ */
-
-const PaymentStatusBadge = ({ status }) => {
-  const normalizedStatus = status || "unknown";
-
-  const statusStyles = {
-    paid: "border-emerald-200 bg-emerald-50 text-emerald-700",
-
-    collected: "border-emerald-200 bg-emerald-50 text-emerald-700",
-
-    pending: "border-amber-200 bg-amber-50 text-amber-700",
-
-    processing: "border-blue-200 bg-blue-50 text-blue-700",
-
-    failed: "border-red-200 bg-red-50 text-red-700",
-  };
-
-  return (
-    <span
-      className={`
-        inline-flex
-        rounded-full
-        border
-        px-3
-        py-1.5
-        text-[11px]
-        font-medium
-        ${
-          statusStyles[normalizedStatus] ||
-          "border-zinc-200 bg-zinc-50 text-zinc-600"
-        }
-      `}
-    >
-      {formatStatus(normalizedStatus)}
-    </span>
   );
 };
 
@@ -899,12 +886,5 @@ const formatDate = (date) => {
   });
 };
 
-const formatStatus = (status) => {
-  if (!status) return "Unknown";
-
-  return String(status)
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-};
 
 export default OrderHistory;

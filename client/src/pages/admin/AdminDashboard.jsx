@@ -1,3 +1,4 @@
+import StatusBadge from "../../components/OrderStatusBadge";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -295,7 +296,7 @@ const AdminDashboard = () => {
               className={`
                 transition-transform
                 duration-500
-                ${loading ? "animate-spin" : "group-hover/refresh:rotate-180"}
+                ${loading ? "animate-spin" : ""}
               `}
             />
             Refresh
@@ -836,52 +837,6 @@ const RecentOrderCard = ({ order }) => {
         />
       </div>
     </Link>
-  );
-};
-
-/* =========================================================
-   STATUS BADGE
-========================================================= */
-
-const StatusBadge = ({ status }) => {
-  const normalizedStatus = String(status || "unknown").toLowerCase();
-
-  const styles = {
-    pending: "border-amber-200 bg-amber-50 text-amber-700",
-
-    confirmed: "border-blue-200 bg-blue-50 text-blue-700",
-
-    processing: "border-blue-200 bg-blue-50 text-blue-700",
-
-    in_progress: "border-blue-200 bg-blue-50 text-blue-700",
-
-    completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
-
-    delivered: "border-emerald-200 bg-emerald-50 text-emerald-700",
-
-    cancelled: "border-red-200 bg-red-50 text-red-700",
-
-    rejected: "border-red-200 bg-red-50 text-red-700",
-
-    unknown: "border-zinc-200 bg-zinc-50 text-zinc-500",
-  };
-
-  return (
-    <span
-      className={`
-        inline-flex
-        whitespace-nowrap
-        rounded-full
-        border
-        px-2.5
-        py-1
-        text-[10px]
-        font-medium
-        ${styles[normalizedStatus] || styles.unknown}
-      `}
-    >
-      {formatStatus(normalizedStatus)}
-    </span>
   );
 };
 

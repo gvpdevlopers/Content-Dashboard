@@ -26,7 +26,8 @@ import draftService from "../services/draftService";
 import serviceService from "../services/serviceService";
 import paymentService from "../services/paymentService";
 import CustomSelect from "../components/CustomSelect";
-import { useEffect, useMemo, useRef, useState } from "react";
+import OrderActionSection from "../components/OrderActionSection";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 /*
@@ -211,9 +212,7 @@ const isRepeatableOnlyService = (service) => {
   const serviceFields = Array.isArray(service?.fields) ? service.fields : [];
   const repeatablePricingGroupNames = new Set(
     repeatableGroups.flatMap((group) =>
-      Array.isArray(group.pricingGroups)
-        ? group.pricingGroups.map(String)
-        : [],
+      Array.isArray(group.pricingGroups) ? group.pricingGroups.map(String) : [],
     ),
   );
 
@@ -701,10 +700,7 @@ const restoreOrderItems = (order, activeServices) => {
     const snapshot = savedItem?.serviceSnapshot || {};
     const savedService = savedItem?.service;
     const savedId =
-      savedService?._id ||
-      savedService ||
-      snapshot.serviceId ||
-      snapshot.id;
+      savedService?._id || savedService || snapshot.serviceId || snapshot.id;
     const savedSlug = snapshot.slug || savedService?.slug;
 
     return (
@@ -737,8 +733,12 @@ const restoreOrderItems = (order, activeServices) => {
     const snapshot = savedItem.serviceSnapshot || {};
     const savedFormData = asPlainObject(savedItem.formData);
     const savedSnapshotOptions = [
-      ...(Array.isArray(snapshot.selectedOptions) ? snapshot.selectedOptions : []),
-      ...(Array.isArray(snapshot.pricingOptions) ? snapshot.pricingOptions : []),
+      ...(Array.isArray(snapshot.selectedOptions)
+        ? snapshot.selectedOptions
+        : []),
+      ...(Array.isArray(snapshot.pricingOptions)
+        ? snapshot.pricingOptions
+        : []),
     ];
     const savedSingleOption =
       snapshot.selectedOption || savedSnapshotOptions[0] || null;
@@ -788,8 +788,7 @@ const restoreOrderItems = (order, activeServices) => {
           nextItem.pricingQuantities[group.key] =
             Number.isInteger(quantity) &&
             quantity >= rules.minQuantity &&
-            (rules.maxQuantity === undefined ||
-              quantity <= rules.maxQuantity)
+            (rules.maxQuantity === undefined || quantity <= rules.maxQuantity)
               ? quantity
               : rules.minQuantity;
           nextItem.formData[group.name] = String(currentOption._id);
@@ -817,8 +816,7 @@ const restoreOrderItems = (order, activeServices) => {
         nextItem.formData.quantity =
           Number.isInteger(rawQuantity) &&
           rawQuantity >= rules.minQuantity &&
-          (rules.maxQuantity === undefined ||
-            rawQuantity <= rules.maxQuantity)
+          (rules.maxQuantity === undefined || rawQuantity <= rules.maxQuantity)
             ? rawQuantity
             : rules.minQuantity;
       } else if (savedOptionId || savedItem.amount > 0) {
@@ -836,8 +834,7 @@ const restoreOrderItems = (order, activeServices) => {
       nextItem.formData.quantity =
         Number.isInteger(rawQuantity) &&
         rawQuantity >= rules.minQuantity &&
-        (rules.maxQuantity === undefined ||
-          rawQuantity <= rules.maxQuantity)
+        (rules.maxQuantity === undefined || rawQuantity <= rules.maxQuantity)
           ? rawQuantity
           : rules.minQuantity;
     } else if (savedSingleOption || savedSnapshotOptions.length > 0) {
@@ -900,8 +897,7 @@ const restoreOrderItems = (order, activeServices) => {
         }
 
         for (const pricingGroup of currentPricingGroups) {
-          const savedPricingSnapshot =
-            savedPricingSnapshots[pricingGroup.name];
+          const savedPricingSnapshot = savedPricingSnapshots[pricingGroup.name];
           const savedOptionId =
             savedPricingOptions[pricingGroup.name] ||
             getSavedOptionId(savedPricingSnapshot);
@@ -922,8 +918,7 @@ const restoreOrderItems = (order, activeServices) => {
             restoredEntry.pricingQuantities[pricingGroup.name] =
               Number.isInteger(quantity) &&
               quantity >= rules.minQuantity &&
-              (rules.maxQuantity === undefined ||
-                quantity <= rules.maxQuantity)
+              (rules.maxQuantity === undefined || quantity <= rules.maxQuantity)
                 ? quantity
                 : rules.minQuantity;
           } else if (savedOptionId) {
@@ -1026,7 +1021,10 @@ const SelectionField = ({ field, value, onChange, compact = false }) => {
   };
 
   return (
-    <div>
+    <div
+      role="group"
+      aria-label={`${field.label}${field.required ? " (required)" : " (optional)"}`}
+    >
       <div className="mb-3">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-medium text-zinc-900">
@@ -1060,6 +1058,7 @@ const SelectionField = ({ field, value, onChange, compact = false }) => {
             <button
               key={option.value}
               type="button"
+              aria-pressed={selected}
               onClick={() => {
                 if (isCheckbox) {
                   toggleCheckbox(option.value);
@@ -1133,6 +1132,13 @@ const SelectionField = ({ field, value, onChange, compact = false }) => {
 */
 
 const DynamicField = ({ field, value, onChange, compact = false }) => {
+  const fieldId = useId();
+  const helpId = field.helpText ? `${fieldId}-help` : undefined;
+  const inputAccessibility = {
+    id: fieldId,
+    "aria-required": Boolean(field.required),
+    "aria-describedby": helpId,
+  };
   const type = normalizeFieldType(field);
 
   if (type === "radio" || type === "checkbox") {
@@ -1152,21 +1158,26 @@ const DynamicField = ({ field, value, onChange, compact = false }) => {
     return (
       <div>
         <div className="mb-3">
-          <p className="text-sm font-medium text-zinc-900">
+          <label
+            htmlFor={fieldId}
+            className="text-sm font-medium text-zinc-900"
+          >
             {field.label}
             {field.required && (
               <span className="ml-1 text-red-500" aria-hidden="true">
                 *
               </span>
             )}
-          </p>
+          </label>
 
           <p className="mt-1 text-xs text-zinc-400">
             {field.required ? "Required · Select one" : "Optional · Select one"}
           </p>
         </div>
 
-        <CustomSelect aria-label={field.label}
+        <CustomSelect
+          {...inputAccessibility}
+          aria-label={field.label}
           value={value || ""}
           onChange={(nextValue) => onChange(field.name, nextValue)}
           options={options}
@@ -1174,7 +1185,10 @@ const DynamicField = ({ field, value, onChange, compact = false }) => {
         />
 
         {field.helpText && (
-          <div className="mt-2.5 flex items-start gap-1.5 text-xs leading-5 text-zinc-400">
+          <div
+            id={helpId}
+            className="mt-2.5 flex items-start gap-1.5 text-xs leading-5 text-zinc-500"
+          >
             <Info size={13} className="mt-0.5 shrink-0" />
             <span>{field.helpText}</span>
           </div>
@@ -1193,14 +1207,14 @@ const DynamicField = ({ field, value, onChange, compact = false }) => {
   const label = (
     <div className="mb-3">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-sm font-medium text-zinc-900">
+        <label htmlFor={fieldId} className="text-sm font-medium text-zinc-900">
           {field.label}
           {field.required && (
             <span className="ml-1 text-red-500" aria-hidden="true">
               *
             </span>
           )}
-        </p>
+        </label>
 
         <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
           {field.required ? "Required" : "Optional"}
@@ -1210,7 +1224,10 @@ const DynamicField = ({ field, value, onChange, compact = false }) => {
   );
 
   const helpText = field.helpText ? (
-    <div className="mt-2.5 flex items-start gap-1.5 text-xs leading-5 text-zinc-400">
+    <div
+      id={helpId}
+      className="mt-2.5 flex items-start gap-1.5 text-xs leading-5 text-zinc-500"
+    >
       <Info size={13} className="mt-0.5 shrink-0" />
       <span>{field.helpText}</span>
     </div>
@@ -1222,6 +1239,7 @@ const DynamicField = ({ field, value, onChange, compact = false }) => {
         {label}
 
         <textarea
+          {...inputAccessibility}
           value={value ?? ""}
           onChange={(event) => onChange(field.name, event.target.value)}
           placeholder={field.placeholder || ""}
@@ -1240,6 +1258,7 @@ const DynamicField = ({ field, value, onChange, compact = false }) => {
         {label}
 
         <input
+          {...inputAccessibility}
           type="number"
           value={value ?? ""}
           onChange={(event) => onChange(field.name, event.target.value)}
@@ -1262,6 +1281,7 @@ const DynamicField = ({ field, value, onChange, compact = false }) => {
 
         <div className="flex flex-wrap items-center gap-3">
           <input
+            {...inputAccessibility}
             type="date"
             value={value ?? ""}
             onChange={(event) => onChange(field.name, event.target.value)}
@@ -1290,6 +1310,7 @@ const DynamicField = ({ field, value, onChange, compact = false }) => {
         {label}
 
         <input
+          {...inputAccessibility}
           type="url"
           value={value ?? ""}
           onChange={(event) => onChange(field.name, event.target.value)}
@@ -1307,6 +1328,7 @@ const DynamicField = ({ field, value, onChange, compact = false }) => {
       {label}
 
       <input
+        {...inputAccessibility}
         type="text"
         value={value ?? ""}
         onChange={(event) => onChange(field.name, event.target.value)}
@@ -1477,7 +1499,13 @@ const PaymentOption = ({
   );
 };
 
-const PaymentMethodChip = ({ selected, onClick, icon: Icon, label, disabled }) => (
+const PaymentMethodChip = ({
+  selected,
+  onClick,
+  icon: Icon,
+  label,
+  disabled,
+}) => (
   <button
     type="button"
     onClick={onClick}
@@ -1662,7 +1690,7 @@ const RepeatableGroup = ({
             type="button"
             disabled={disabled}
             onClick={onAdd}
-            className="dashboard-action dashboard-action--secondary inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-all hover:-translate-y-0.5 hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="dashboard-action dashboard-action--secondary inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-semibold text-zinc-700 transition-all hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus size={14} />
             Add Another {group.label || "Item"}
@@ -1737,59 +1765,59 @@ const RepeatableGroup = ({
                     : "mt-4 border-t border-zinc-100 pt-1"
                 }
               >
-              {pricingGroups.length > 0 && (
-                <div className="space-y-4">
-                  {pricingGroups.map((pricingGroup) => {
-                    const title = pricingGroup.name
-                      ? pricingGroup.name.charAt(0).toUpperCase() +
-                        pricingGroup.name.slice(1)
-                      : "Options";
+                {pricingGroups.length > 0 && (
+                  <div className="space-y-4">
+                    {pricingGroups.map((pricingGroup) => {
+                      const title = pricingGroup.name
+                        ? pricingGroup.name.charAt(0).toUpperCase() +
+                          pricingGroup.name.slice(1)
+                        : "Options";
 
-                    const required = isRequiredRepeatablePricingGroup(
-                      group,
-                      pricingGroup.name,
-                    );
+                      const required = isRequiredRepeatablePricingGroup(
+                        group,
+                        pricingGroup.name,
+                      );
 
-                    const selectedOptionId =
-                      entry?.pricingOptions?.[pricingGroup.name];
+                      const selectedOptionId =
+                        entry?.pricingOptions?.[pricingGroup.name];
 
-                    return (
-                      <div key={pricingGroup.key}>
-                        <div className="mb-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-medium text-zinc-900">
-                              {title}
+                      return (
+                        <div key={pricingGroup.key}>
+                          <div className="mb-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-medium text-zinc-900">
+                                {title}
+                              </p>
+
+                              <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+                                {required ? "Required" : "Optional"}
+                              </span>
+                            </div>
+
+                            <p className="mt-1 text-xs text-zinc-400">
+                              Select one
                             </p>
-
-                            <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
-                              {required ? "Required" : "Optional"}
-                            </span>
                           </div>
 
-                          <p className="mt-1 text-xs text-zinc-400">
-                            Select one
-                          </p>
-                        </div>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            {pricingGroup.options.map((option) => {
+                              const optionSelected =
+                                String(selectedOptionId) === String(option._id);
 
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          {pricingGroup.options.map((option) => {
-                            const optionSelected =
-                              String(selectedOptionId) === String(option._id);
+                              const rules = getQuantityRules(service, option);
 
-                            const rules = getQuantityRules(service, option);
+                              const optionQuantity = optionSelected
+                                ? Number(
+                                    entry?.pricingQuantities?.[
+                                      pricingGroup.name
+                                    ] ?? rules.minQuantity,
+                                  )
+                                : rules.minQuantity;
 
-                            const optionQuantity = optionSelected
-                              ? Number(
-                                  entry?.pricingQuantities?.[
-                                    pricingGroup.name
-                                  ] ?? rules.minQuantity,
-                                )
-                              : rules.minQuantity;
-
-                            return (
-                              <div
-                                key={option._id}
-                                className={`
+                              return (
+                                <div
+                                  key={option._id}
+                                  className={`
                                   relative rounded-2xl border p-3 sm:p-4
                                   transition-all duration-200
                                   ${
@@ -1798,22 +1826,22 @@ const RepeatableGroup = ({
                                       : "border-zinc-200 bg-white hover:-translate-y-0.5 hover:border-zinc-300 hover:bg-zinc-50"
                                   }
                                 `}
-                              >
-                                <button
-                                  type="button"
-                                  disabled={disabled}
-                                  onClick={() =>
-                                    onPricingOptionChange(
-                                      entryIndex,
-                                      pricingGroup.name,
-                                      option,
-                                    )
-                                  }
-                                  className="w-full text-left disabled:cursor-not-allowed"
                                 >
-                                  <div className="flex items-start gap-3">
-                                    <span
-                                      className={`
+                                  <button
+                                    type="button"
+                                    disabled={disabled}
+                                    onClick={() =>
+                                      onPricingOptionChange(
+                                        entryIndex,
+                                        pricingGroup.name,
+                                        option,
+                                      )
+                                    }
+                                    className="w-full text-left disabled:cursor-not-allowed"
+                                  >
+                                    <div className="flex items-start gap-3">
+                                      <span
+                                        className={`
                                         mt-0.5 flex h-5 w-5 shrink-0
                                         items-center justify-center
                                         rounded-full border
@@ -1823,158 +1851,161 @@ const RepeatableGroup = ({
                                             : "border-zinc-300 bg-white"
                                         }
                                       `}
-                                    >
-                                      {optionSelected && (
-                                        <Check size={12} strokeWidth={2.5} />
-                                      )}
-                                    </span>
-
-                                    <span className="min-w-0 flex-1">
-                                      <span
-                                        className={`block text-sm font-semibold ${
-                                          optionSelected
-                                            ? "text-white"
-                                            : "text-zinc-900"
-                                        }`}
                                       >
-                                        {option.name}
+                                        {optionSelected && (
+                                          <Check size={12} strokeWidth={2.5} />
+                                        )}
                                       </span>
 
-                                      {option.description && (
+                                      <span className="min-w-0 flex-1">
                                         <span
-                                          className={`mt-1 block text-xs leading-5 ${
+                                          className={`block text-sm font-semibold ${
                                             optionSelected
-                                              ? "text-white/50"
+                                              ? "text-white"
+                                              : "text-zinc-900"
+                                          }`}
+                                        >
+                                          {option.name}
+                                        </span>
+
+                                        {option.description && (
+                                          <span
+                                            className={`mt-1 block text-xs leading-5 ${
+                                              optionSelected
+                                                ? "text-white/50"
+                                                : "text-zinc-500"
+                                            }`}
+                                          >
+                                            {option.description}
+                                          </span>
+                                        )}
+
+                                        <span
+                                          className={`mt-1.5 block text-xs font-medium ${
+                                            optionSelected
+                                              ? "text-white/70"
                                               : "text-zinc-500"
                                           }`}
                                         >
-                                          {option.description}
+                                          {formatCurrency(option.price)} /{" "}
+                                          {option.unit || "unit"}
                                         </span>
-                                      )}
-
-                                      <span
-                                        className={`mt-1.5 block text-xs font-medium ${
-                                          optionSelected
-                                            ? "text-white/70"
-                                            : "text-zinc-500"
-                                        }`}
-                                      >
-                                        {formatCurrency(option.price)} /{" "}
-                                        {option.unit || "unit"}
                                       </span>
-                                    </span>
-                                  </div>
-                                </button>
-
-                                {optionSelected && (
-                                  <div className="mt-3 border-t border-white/10 pt-3">
-                                    <div className="flex flex-col gap-2 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
-                                      <div className="min-w-0">
-                                        <p className="text-[11px] font-medium text-white/50">
-                                          Quantity
-                                        </p>
-
-                                        <p className="mt-0.5 text-[11px] text-white/35">
-                                          Minimum: {rules.minQuantity}
-                                        </p>
-                                      </div>
-
-                                      <QuantityControl
-                                        className="self-start"
-                                        quantity={optionQuantity}
-                                        minQuantity={rules.minQuantity}
-                                        maxQuantity={rules.maxQuantity}
-                                        unit={option.unit || "unit"}
-                                        dark
-                                        onChange={(nextQuantity) =>
-                                          onPricingQuantityChange(
-                                            entryIndex,
-                                            pricingGroup.name,
-                                            nextQuantity,
-                                          )
-                                        }
-                                      />
                                     </div>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
+                                  </button>
+
+                                  {optionSelected && (
+                                    <div className="mt-3 border-t border-white/10 pt-3">
+                                      <div className="flex flex-col gap-2 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
+                                        <div className="min-w-0">
+                                          <p className="text-[11px] font-medium text-white/50">
+                                            Quantity
+                                          </p>
+
+                                          <p className="mt-0.5 text-[11px] text-white/35">
+                                            Minimum: {rules.minQuantity}
+                                          </p>
+                                        </div>
+
+                                        <QuantityControl
+                                          className="self-start"
+                                          quantity={optionQuantity}
+                                          minQuantity={rules.minQuantity}
+                                          maxQuantity={rules.maxQuantity}
+                                          unit={option.unit || "unit"}
+                                          dark
+                                          onChange={(nextQuantity) =>
+                                            onPricingQuantityChange(
+                                              entryIndex,
+                                              pricingGroup.name,
+                                              nextQuantity,
+                                            )
+                                          }
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                      );
+                    })}
+                  </div>
+                )}
 
-              {requiredFields.length > 0 && (
-                <div className="mt-4 space-y-4">
-                  {requiredFields.map((field) => (
-                    <DynamicField
-                      key={field.name}
-                      field={field}
-                      value={entry?.fields?.[field.name]}
-                      onChange={(fieldName, value) =>
-                        onFieldChange(entryIndex, fieldName, value)
-                      }
-                      compact
-                    />
-                  ))}
-                </div>
-              )}
-
-              {optionalFields.length > 0 && (
-                <div
-                  className={`${
-                    requiredFields.length > 0
-                      ? "mt-6 border-t border-zinc-100 pt-5"
-                      : "mt-5"
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => toggleOptionalField(optionalOpenKey)}
-                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-left transition hover:border-zinc-300 hover:bg-white"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-zinc-800">
-                        Optional details
-                      </p>
-
-                      <p className="mt-0.5 text-xs text-zinc-400">
-                        Add any additional information for this{" "}
-                        {String(group.label || "item").toLowerCase()}.
-                      </p>
-                    </div>
-
-                    {openOptionalFields[optionalOpenKey] ? (
-                      <ChevronUp size={16} className="shrink-0 text-zinc-400" />
-                    ) : (
-                      <ChevronDown
-                        size={16}
-                        className="shrink-0 text-zinc-400"
+                {requiredFields.length > 0 && (
+                  <div className="mt-4 space-y-4">
+                    {requiredFields.map((field) => (
+                      <DynamicField
+                        key={field.name}
+                        field={field}
+                        value={entry?.fields?.[field.name]}
+                        onChange={(fieldName, value) =>
+                          onFieldChange(entryIndex, fieldName, value)
+                        }
+                        compact
                       />
-                    )}
-                  </button>
+                    ))}
+                  </div>
+                )}
 
-                  {openOptionalFields[optionalOpenKey] && (
-                    <div className="mt-4 space-y-4">
-                      {optionalFields.map((field) => (
-                        <DynamicField
-                          key={field.name}
-                          field={field}
-                          value={entry?.fields?.[field.name]}
-                          onChange={(fieldName, value) =>
-                            onFieldChange(entryIndex, fieldName, value)
-                          }
-                          compact
+                {optionalFields.length > 0 && (
+                  <div
+                    className={`${
+                      requiredFields.length > 0
+                        ? "mt-6 border-t border-zinc-100 pt-5"
+                        : "mt-5"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleOptionalField(optionalOpenKey)}
+                      className="flex w-full items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-left transition hover:border-zinc-300 hover:bg-white"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-zinc-800">
+                          Optional details
+                        </p>
+
+                        <p className="mt-0.5 text-xs text-zinc-400">
+                          Add any additional information for this{" "}
+                          {String(group.label || "item").toLowerCase()}.
+                        </p>
+                      </div>
+
+                      {openOptionalFields[optionalOpenKey] ? (
+                        <ChevronUp
+                          size={16}
+                          className="shrink-0 text-zinc-400"
                         />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                      ) : (
+                        <ChevronDown
+                          size={16}
+                          className="shrink-0 text-zinc-400"
+                        />
+                      )}
+                    </button>
+
+                    {openOptionalFields[optionalOpenKey] && (
+                      <div className="mt-4 space-y-4">
+                        {optionalFields.map((field) => (
+                          <DynamicField
+                            key={field.name}
+                            field={field}
+                            value={entry?.fields?.[field.name]}
+                            onChange={(fieldName, value) =>
+                              onFieldChange(entryIndex, fieldName, value)
+                            }
+                            compact
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}
@@ -2007,16 +2038,30 @@ const NewOrder = () => {
   const [services, setServices] = useState([]);
   const [adCreditData, setAdCreditData] = useState(null);
   const [adCreditError, setAdCreditError] = useState("");
-  const [selectedAdCredit, setSelectedAdCredit] = useState({ metaAds: false, googleAds: false });
+  const [selectedAdCredit, setSelectedAdCredit] = useState({
+    metaAds: false,
+    googleAds: false,
+  });
   const [adCreditRefresh, setAdCreditRefresh] = useState(0);
   useEffect(() => {
     let active = true;
-    adCreditService.getMine().then((data) => {
-      if (active) { setAdCreditData(data); setAdCreditError(""); }
-    }).catch((loadError) => {
-      if (active) setAdCreditError(loadError.response?.data?.message || "Unable to load ad credit.");
-    });
-    return () => { active = false; };
+    adCreditService
+      .getMine()
+      .then((data) => {
+        if (active) {
+          setAdCreditData(data);
+          setAdCreditError("");
+        }
+      })
+      .catch((loadError) => {
+        if (active)
+          setAdCreditError(
+            loadError.response?.data?.message || "Unable to load ad credit.",
+          );
+      });
+    return () => {
+      active = false;
+    };
   }, [adCreditRefresh]);
   const [orderItems, setOrderItems] = useState([]);
 
@@ -2060,6 +2105,11 @@ const NewOrder = () => {
   const [loadingServiceId, setLoadingServiceId] = useState("");
 
   const [error, setError] = useState("");
+  const [validationServiceId, setValidationServiceId] = useState("");
+  const errorRef = useRef(null);
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
 
   const [submitting, setSubmitting] = useState(false);
   const submitInFlight = useRef(false);
@@ -2115,7 +2165,9 @@ const NewOrder = () => {
       try {
         const response = await draftService.listDrafts();
         if (mounted) {
-          setSavedDrafts(Array.isArray(response?.drafts) ? response.drafts : []);
+          setSavedDrafts(
+            Array.isArray(response?.drafts) ? response.drafts : [],
+          );
           setDraftsError("");
         }
       } catch (loadError) {
@@ -2149,9 +2201,13 @@ const NewOrder = () => {
 
         if (
           !rates ||
-          !["cod", "online", "chequeWithGst", "chequeDirectCollection", "month_end"].every(
-            (key) => Number.isFinite(rates[key]) && rates[key] >= 0,
-          )
+          ![
+            "cod",
+            "online",
+            "chequeWithGst",
+            "chequeDirectCollection",
+            "month_end",
+          ].every((key) => Number.isFinite(rates[key]) && rates[key] >= 0)
         ) {
           throw new Error("Payment tax configuration is unavailable.");
         }
@@ -2417,14 +2473,12 @@ const NewOrder = () => {
   const restoreDraft = (draft) => {
     const draftItems = (draft.services || []).map((savedItem) => {
       const service = services.find(
-        (candidate) =>
-          String(candidate._id) === String(savedItem.serviceId),
+        (candidate) => String(candidate._id) === String(savedItem.serviceId),
       );
       const option = service
         ? getPricingOptions(service).find(
             (candidate) =>
-              String(candidate._id) ===
-              String(savedItem.pricingOptionId || ""),
+              String(candidate._id) === String(savedItem.pricingOptionId || ""),
           )
         : null;
       const selectedOptionSnapshot = option
@@ -3126,27 +3180,49 @@ const NewOrder = () => {
         const name = `${platform}AdSpendAmount`;
         if (!fields.some((field) => field.name === name)) continue;
         const value = Number(item.formData?.[name] || 0);
-        if (Number.isFinite(value) && value > 0) budgets[platform] += Math.round(value * 100) / 100;
+        if (Number.isFinite(value) && value > 0)
+          budgets[platform] += Math.round(value * 100) / 100;
       }
     }
     return budgets;
   }, [orderItems]);
-  const appliedAdCredit = Object.fromEntries(["metaAds", "googleAds"].map((platform) => [platform,
-    selectedAdCredit[platform] && !adCreditError
-      ? Math.min(adSpendBudgets[platform], Number(adCreditData?.available?.[platform] || 0)) : 0,
-  ]));
-  const adCreditTotal = Number((appliedAdCredit.metaAds + appliedAdCredit.googleAds).toFixed(2));
+  const appliedAdCredit = Object.fromEntries(
+    ["metaAds", "googleAds"].map((platform) => [
+      platform,
+      selectedAdCredit[platform] && !adCreditError
+        ? Math.min(
+            adSpendBudgets[platform],
+            Number(adCreditData?.available?.[platform] || 0),
+          )
+        : 0,
+    ]),
+  );
+  const adCreditTotal = Number(
+    (appliedAdCredit.metaAds + appliedAdCredit.googleAds).toFixed(2),
+  );
 
   const renderAdCreditForField = (field, service) => {
     if (service?.slug !== "ads") return null;
-    const platform = field.name === "metaAdsAdSpendAmount" ? "metaAds"
-      : field.name === "googleAdsAdSpendAmount" ? "googleAds" : null;
+    const platform =
+      field.name === "metaAdsAdSpendAmount"
+        ? "metaAds"
+        : field.name === "googleAdsAdSpendAmount"
+          ? "googleAds"
+          : null;
     if (!platform) return null;
-    return <AdCreditCheckout platform={platform} data={adCreditData} error={adCreditError}
-      budgets={adSpendBudgets} selected={selectedAdCredit} onSelect={setSelectedAdCredit}
-      disabled={submitting} onRefresh={() => setAdCreditRefresh((current) => current + 1)} />;
+    return (
+      <AdCreditCheckout
+        platform={platform}
+        data={adCreditData}
+        error={adCreditError}
+        budgets={adSpendBudgets}
+        selected={selectedAdCredit}
+        onSelect={setSelectedAdCredit}
+        disabled={submitting}
+        onRefresh={() => setAdCreditRefresh((current) => current + 1)}
+      />
+    );
   };
-
 
   const currentCouponRequestKey = appliedCouponCode
     ? JSON.stringify({
@@ -3157,9 +3233,7 @@ const NewOrder = () => {
       })
     : "";
   const currentCouponQuote =
-    couponQuote?._requestKey === currentCouponRequestKey
-      ? couponQuote
-      : null;
+    couponQuote?._requestKey === currentCouponRequestKey ? couponQuote : null;
   const currentCouponError =
     couponErrorRequestKey === currentCouponRequestKey ? couponError : "";
   const hasCurrentCouponQuote = Boolean(currentCouponQuote);
@@ -3167,7 +3241,10 @@ const NewOrder = () => {
   const subtotalBeforeAdCredit = currentCouponQuote
     ? Number(currentCouponQuote.taxableSubtotal || 0)
     : Math.max(0, subtotal - couponDiscountTotal);
-  const taxableSubtotal = Math.max(0, Number((subtotalBeforeAdCredit - adCreditTotal).toFixed(2)));
+  const taxableSubtotal = Math.max(
+    0,
+    Number((subtotalBeforeAdCredit - adCreditTotal).toFixed(2)),
+  );
   const currentCouponLoading =
     couponLoading ||
     Boolean(appliedCouponCode && !currentCouponQuote && !currentCouponError);
@@ -3177,9 +3254,15 @@ const NewOrder = () => {
       hasCurrentCouponQuote && adCreditTotal === 0
         ? Number(currentCouponQuote.gstAmount || 0)
         : gstRate === null
-        ? 0
-        : Number(((taxableSubtotal * gstRate) / 100).toFixed(2)),
-    [currentCouponQuote, gstRate, hasCurrentCouponQuote, taxableSubtotal, adCreditTotal],
+          ? 0
+          : Number(((taxableSubtotal * gstRate) / 100).toFixed(2)),
+    [
+      currentCouponQuote,
+      gstRate,
+      hasCurrentCouponQuote,
+      taxableSubtotal,
+      adCreditTotal,
+    ],
   );
 
   const estimatedTotal =
@@ -3190,8 +3273,11 @@ const NewOrder = () => {
         : taxableSubtotal + gstAmount;
 
   const selectPaymentMethod = (method) => {
-    if (!["cod", "online", "cheque", "month_end"].includes(method) ||
-        (method === "month_end" && !allowMonthEndPayment)) return;
+    if (
+      !["cod", "online", "cheque", "month_end"].includes(method) ||
+      (method === "month_end" && !allowMonthEndPayment)
+    )
+      return;
     setPaymentMethod(method);
     if (method !== "cheque") {
       setChequeType("");
@@ -3823,9 +3909,7 @@ const NewOrder = () => {
     ? getDraftQuoteRequestKey()
     : "";
   const currentDraftQuote =
-    draftQuote?.requestKey === currentDraftQuoteRequestKey
-      ? draftQuote
-      : null;
+    draftQuote?.requestKey === currentDraftQuoteRequestKey ? draftQuote : null;
   const currentDraftQuoteError =
     draftQuoteErrorRequestKey === currentDraftQuoteRequestKey
       ? draftQuoteError
@@ -3835,10 +3919,15 @@ const NewOrder = () => {
     event.preventDefault();
     if (submitInFlight.current) return;
     setError("");
+    setValidationServiceId("");
 
-    if (!["cod", "online", "cheque", "month_end"].includes(paymentMethod) ||
-        (paymentMethod === "month_end" && !allowMonthEndPayment)) {
-      setError("Choose a permitted payment method. Pay on Month-End is not enabled for your account.");
+    if (
+      !["cod", "online", "cheque", "month_end"].includes(paymentMethod) ||
+      (paymentMethod === "month_end" && !allowMonthEndPayment)
+    ) {
+      setError(
+        "Choose a permitted payment method. Pay on Month-End is not enabled for your account.",
+      );
       return;
     }
 
@@ -3859,7 +3948,9 @@ const NewOrder = () => {
       appliedCouponCode &&
       (currentCouponLoading || !currentCouponQuote || currentCouponError)
     ) {
-      setError("Wait for the coupon to finish validating before placing your order.");
+      setError(
+        "Wait for the coupon to finish validating before placing your order.",
+      );
       return;
     }
 
@@ -3875,6 +3966,7 @@ const NewOrder = () => {
         setActiveServiceIndex(index);
 
         const erroredServiceId = orderItems[index]?.service?._id;
+        setValidationServiceId(erroredServiceId || "");
 
         if (erroredServiceId) {
           setOpenServiceIds((current) => ({
@@ -3890,7 +3982,11 @@ const NewOrder = () => {
       }
     }
 
-    if (paymentMethod === "online" && estimatedTotal <= 0 && adCreditTotal === 0) {
+    if (
+      paymentMethod === "online" &&
+      estimatedTotal <= 0 &&
+      adCreditTotal === 0
+    ) {
       setError(
         "Online payment requires a payable order amount. Please select a priced service option or use Cash Payment.",
       );
@@ -3900,8 +3996,7 @@ const NewOrder = () => {
     const draftQuoteRequestKey = currentDraftQuoteRequestKey;
     const confirmedDraftQuote =
       draftQuote?.requestKey === draftQuoteRequestKey ? draftQuote : null;
-    const hasConfirmedDraftQuote =
-      Boolean(confirmedDraftQuote?.confirmed);
+    const hasConfirmedDraftQuote = Boolean(confirmedDraftQuote?.confirmed);
 
     if (editingDraftId && !hasConfirmedDraftQuote) {
       if (confirmedDraftQuote) {
@@ -4114,7 +4209,11 @@ const NewOrder = () => {
       if (responseData?.code === "MONTH_END_NOT_ALLOWED") {
         setAllowMonthEndPayment(false);
       }
-      if (String(responseData?.message || "").toLowerCase().includes("ad credit")) {
+      if (
+        String(responseData?.message || "")
+          .toLowerCase()
+          .includes("ad credit")
+      ) {
         setAdCreditRefresh((current) => current + 1);
       }
       if (
@@ -4139,8 +4238,8 @@ const NewOrder = () => {
       } else {
         const message =
           responseData?.message ||
-            submitError.message ||
-            "Unable to process your order.";
+          submitError.message ||
+          "Unable to process your order.";
         setError(message);
         toast.error(message);
       }
@@ -4168,7 +4267,10 @@ const NewOrder = () => {
 
   if (loadingServices) {
     return (
-      <div className="mx-auto flex min-h-[60vh] w-full max-w-[1180px] items-center justify-center px-5">
+      <div
+        role="status"
+        className="mx-auto flex min-h-[60vh] w-full max-w-[1180px] items-center justify-center px-5"
+      >
         <div className="flex flex-col items-center gap-3">
           <Loader2 size={22} className="animate-spin text-zinc-400" />
 
@@ -4193,14 +4295,41 @@ const NewOrder = () => {
           </div>
 
           <h2 className="mt-4 text-lg font-semibold text-zinc-900">
-            No services available
+            {error ? "Unable to load services" : "No services available"}
           </h2>
 
           <p className="mt-2 text-sm leading-6 text-zinc-500">
-            There are currently no active services available for ordering.
+            {error
+              ? "Your service list could not be loaded. Please try again."
+              : "There are currently no active services available for ordering."}
           </p>
 
-          {error && <p className="mt-4 text-xs text-red-500">{error}</p>}
+          {error ? (
+            <>
+              <p
+                ref={errorRef}
+                tabIndex={-1}
+                role="alert"
+                className="mt-4 text-xs text-red-700"
+              >
+                {error}
+              </p>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="dashboard-action dashboard-action--primary mt-5"
+              >
+                Try again
+              </button>
+            </>
+          ) : (
+            <a
+              href="/contact"
+              className="dashboard-action dashboard-action--secondary mt-5"
+            >
+              Contact support
+            </a>
+          )}
         </div>
       </div>
     );
@@ -4213,7 +4342,9 @@ const NewOrder = () => {
   */
 
   return (
-    <div className="mx-auto w-full max-w-[1180px] px-2 py-6 sm:px-5 sm:py-10">
+    <div
+      className={`mx-auto w-full max-w-[1180px] px-2 py-6 sm:px-5 sm:py-10 ${orderItems.length ? "new-order-has-shortcut" : ""}`}
+    >
       <form onSubmit={handleSubmit}>
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           {/* ================================================================
@@ -4221,27 +4352,18 @@ const NewOrder = () => {
           ================================================================= */}
 
           <div className="min-w-0 space-y-6">
-            <section className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3.5 shadow-[0_8px_24px_rgba(0,0,0,0.035)] sm:flex-row sm:items-center sm:justify-between sm:px-5">
-                <div className="flex min-w-0 items-start gap-3">
-                  <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-500">
-                    {loadingPreviousOrders ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : (
-                      <History className="icon-accent-blue" size={16} />
-                    )}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-zinc-900">
-                      Ordering again?
-                    </p>
-                    <p className="mt-0.5 text-xs leading-5 text-zinc-500">
-                      Repeat a previous order and review its current pricing.
-                    </p>
-                  </div>
-                </div>
-
+            <div className="order-actions-panel">
+              <OrderActionSection
+                title="Ordering Again?"
+                icon={<History size={16} aria-hidden="true" />}
+              >
+                <p className="mb-3 text-xs leading-5 text-zinc-500">
+                  Repeat a previous order and review its current pricing.
+                </p>
                 {loadingPreviousOrders ? (
-                  <p className="text-xs text-zinc-500">Checking your latest order…</p>
+                  <p className="text-xs text-zinc-500">
+                    Checking your latest order…
+                  </p>
                 ) : previousOrdersError ? (
                   <p className="text-xs text-red-700">{previousOrdersError}</p>
                 ) : latestPreviousOrder ? (
@@ -4261,95 +4383,93 @@ const NewOrder = () => {
                     You haven’t placed any orders yet.
                   </p>
                 )}
-            </section>
-
-            <section className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 shadow-[0_8px_24px_rgba(0,0,0,0.035)] sm:px-5">
-              <div className="flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600">
-                  <Save size={16} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-sm font-semibold text-zinc-900">
-                    Saved Drafts
-                  </h2>
-                  <p className="mt-0.5 text-xs leading-5 text-zinc-500">
-                    Save a configuration now and return to finish it later.
+              </OrderActionSection>
+              <OrderActionSection
+                title="Saved Drafts"
+                icon={<Save size={16} aria-hidden="true" />}
+                badge={
+                  editingDraftId ? (
+                    <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-700">
+                      Editing draft
+                    </span>
+                  ) : savedDrafts.length > 0 ? (
+                    <span className="text-xs text-zinc-500">
+                      {savedDrafts.length}
+                    </span>
+                  ) : null
+                }
+              >
+                {draftNotice && (
+                  <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                    {draftNotice}
                   </p>
-                </div>
-                {editingDraftId && (
-                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-medium text-emerald-700">
-                    Editing draft
-                  </span>
                 )}
-              </div>
-
-              {draftNotice && (
-                <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-                  {draftNotice}
-                </p>
-              )}
-              {draftsError && (
-                <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                  {draftsError}
-                </p>
-              )}
-
-              {loadingDrafts ? (
-                <p className="mt-3 flex items-center gap-2 text-xs text-zinc-500">
-                  <Loader2 size={14} className="animate-spin" />
-                  Loading saved drafts...
-                </p>
-              ) : savedDrafts.length === 0 ? (
-                !draftsError && (
-                  <p className="mt-3 text-xs text-zinc-500">
-                    You don’t have any saved drafts yet.
+                {draftsError && (
+                  <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                    {draftsError}
                   </p>
-                )
-              ) : (
-                <ul className="mt-4 space-y-2">
-                  {savedDrafts.map((draft) => (
-                    <li
-                      key={draft._id}
-                      className="draft-row flex min-w-0 flex-col gap-3 rounded-xl border border-zinc-100 bg-zinc-50/50 p-3 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-zinc-800">
-                          {getDraftLabel(draft)}
-                        </p>
-                        <p className="mt-1 text-xs leading-5 text-zinc-500">
-                          {(draft.services || []).length}{" "}
-                          {(draft.services || []).length === 1
-                            ? "service"
-                            : "services"}{" "}
-                          · Updated{" "}
-                          {formatDraftDate(draft.updatedAt)}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2 sm:ml-4">
-                        <button
-                          type="button"
-                          disabled={draftBusy || loadingServices}
-                          onClick={() => handleOpenDraft(draft._id)}
-                          className="dashboard-action dashboard-action--primary rounded-lg bg-zinc-900 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-zinc-700 disabled:opacity-50"
-                        >
-                          Resume
-                        </button>
-                        <button
-                          type="button"
-                          disabled={draftBusy}
-                          onClick={() => handleDeleteDraft(draft._id)}
-                          aria-label={`Delete ${getDraftLabel(draft)}`}
-                          className="dashboard-action dashboard-action--secondary text-red-600"
-                        >
-                          <Trash2 size={15} className="icon-accent-red" aria-hidden="true" />
-                          Delete
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
+                )}
+
+                {loadingDrafts ? (
+                  <p className="mt-3 flex items-center gap-2 text-xs text-zinc-500">
+                    <Loader2 size={14} className="animate-spin" />
+                    Loading saved drafts...
+                  </p>
+                ) : savedDrafts.length === 0 ? (
+                  !draftsError && (
+                    <p className="mt-3 text-xs text-zinc-500">
+                      You don’t have any saved drafts yet.
+                    </p>
+                  )
+                ) : (
+                  <ul className="order-drafts-list space-y-2">
+                    {savedDrafts.map((draft) => (
+                      <li
+                        key={draft._id}
+                        className="draft-row flex min-w-0 flex-col gap-2 rounded-xl border border-zinc-100 bg-zinc-50/50 p-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="break-words text-sm font-medium text-zinc-800">
+                            {getDraftLabel(draft)}
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-zinc-500">
+                            {(draft.services || []).length}{" "}
+                            {(draft.services || []).length === 1
+                              ? "service"
+                              : "services"}{" "}
+                            · Updated {formatDraftDate(draft.updatedAt)}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={draftBusy || loadingServices}
+                            onClick={() => handleOpenDraft(draft._id)}
+                            className="dashboard-action dashboard-action--primary rounded-lg bg-zinc-900 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-zinc-700 disabled:opacity-50"
+                          >
+                            Resume
+                          </button>
+                          <button
+                            type="button"
+                            disabled={draftBusy}
+                            onClick={() => handleDeleteDraft(draft._id)}
+                            aria-label={`Delete ${getDraftLabel(draft)}`}
+                            className="dashboard-action dashboard-action--secondary text-red-600"
+                          >
+                            <Trash2
+                              size={15}
+                              className="icon-accent-red"
+                              aria-hidden="true"
+                            />
+                            Delete
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </OrderActionSection>
+            </div>
 
             {/* ==============================================================
                 SERVICE CHECKLIST
@@ -4384,7 +4504,10 @@ const NewOrder = () => {
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
                       {repeatOrderIssues.map((issue) => (
-                        <p key={issue} className="text-xs leading-5 text-amber-900">
+                        <p
+                          key={issue}
+                          className="text-xs leading-5 text-amber-900"
+                        >
                           {issue}
                         </p>
                       ))}
@@ -4436,8 +4559,8 @@ const NewOrder = () => {
                   const isGroupedPricing = Boolean(item?.isGroupedPricing);
                   const hasServiceLevelPricing = Boolean(
                     item &&
-                      pricingOptions.length > 0 &&
-                      !isRepeatableOnlyService(item.service),
+                    pricingOptions.length > 0 &&
+                    !isRepeatableOnlyService(item.service),
                   );
 
                   const activeFields = item ? getActiveFieldsForItem(item) : [];
@@ -4475,8 +4598,10 @@ const NewOrder = () => {
                   return (
                     <div
                       key={serviceId}
+                      id={`order-service-${serviceId}`}
+                      tabIndex={-1}
                       className={`
-                        overflow-hidden rounded-[22px] border
+                        scroll-mt-28 overflow-hidden rounded-[22px] border
                         transition-all duration-300
                         ${
                           selected
@@ -4538,7 +4663,6 @@ const NewOrder = () => {
                                 {service.name}
                               </span>
                             </span>
-
                           </button>
                         </div>
 
@@ -4589,7 +4713,9 @@ const NewOrder = () => {
                               type="button"
                               onClick={() => handleServiceNameClick(serviceId)}
                               aria-label={`${
-                                openServiceIds[serviceId] ? "Collapse" : "Expand"
+                                openServiceIds[serviceId]
+                                  ? "Collapse"
+                                  : "Expand"
                               } ${service.name} configuration`}
                               aria-expanded={Boolean(openServiceIds[serviceId])}
                               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-500 transition hover:border-zinc-300 hover:text-zinc-900"
@@ -4610,8 +4736,6 @@ const NewOrder = () => {
 
                       {selected && item && openServiceIds[serviceId] && (
                         <div className="border-t border-zinc-200 p-4 sm:px-4 py-6">
-
-
                           {gridPricingModes.length > 0 && (
                             <div className="mb-7">
                               <div>
@@ -4635,21 +4759,24 @@ const NewOrder = () => {
                                       type="button"
                                       disabled={submitting}
                                       onClick={() =>
-                                        updateItem(selectedIndex, (current) => ({
-                                          ...current,
-                                          formData: {
-                                            ...(current.formData || {}),
-                                            pricingMode: mode.key,
-                                            quantity:
-                                              current.formData?.pricingMode ===
-                                              mode.key
-                                                ? getItemQuantity(current)
-                                                : getQuantityRules(
-                                                    current.service,
-                                                    null,
-                                                  ).minQuantity,
-                                          },
-                                        }))
+                                        updateItem(
+                                          selectedIndex,
+                                          (current) => ({
+                                            ...current,
+                                            formData: {
+                                              ...(current.formData || {}),
+                                              pricingMode: mode.key,
+                                              quantity:
+                                                current.formData
+                                                  ?.pricingMode === mode.key
+                                                  ? getItemQuantity(current)
+                                                  : getQuantityRules(
+                                                      current.service,
+                                                      null,
+                                                    ).minQuantity,
+                                            },
+                                          }),
+                                        )
                                       }
                                       aria-pressed={isSelected}
                                       className={`rounded-2xl border p-4 text-left transition ${
@@ -4684,7 +4811,9 @@ const NewOrder = () => {
                                 <p className="mt-3 text-xs text-zinc-500">
                                   {getItemQuantity(item)}{" "}
                                   {selectedGridPricingMode.unit}
-                                  {getItemQuantity(item) === 1 ? "" : "s"} ·{" "}
+                                  {getItemQuantity(item) === 1
+                                    ? ""
+                                    : "s"} ·{" "}
                                   {getItemQuantity(item) *
                                     selectedGridPricingMode.itemsPerUnit}{" "}
                                   total posts · Line total{" "}
@@ -4909,7 +5038,9 @@ const NewOrder = () => {
                                           >
                                             <DynamicField
                                               field={field}
-                                              value={item.formData?.[field.name]}
+                                              value={
+                                                item.formData?.[field.name]
+                                              }
                                               onChange={(fieldName, value) =>
                                                 handleFieldChange(
                                                   selectedIndex,
@@ -4918,7 +5049,10 @@ const NewOrder = () => {
                                                 )
                                               }
                                             />
-                                            {renderAdCreditForField(field, service)}
+                                            {renderAdCreditForField(
+                                              field,
+                                              service,
+                                            )}
                                           </div>
                                         ))}
                                       </div>
@@ -5157,8 +5291,8 @@ const NewOrder = () => {
                                   </p>
 
                                   <p className="mt-1 text-xs leading-5 text-zinc-500">
-                                    Add multiple independent configurations where
-                                    required.
+                                    Add multiple independent configurations
+                                    where required.
                                   </p>
                                 </div>
                               )}
@@ -5284,13 +5418,15 @@ const NewOrder = () => {
 
             {orderItems.length > 0 && (
               <>
-
                 <section className="rounded-[24px] border border-zinc-200 bg-white p-5 shadow-[0_10px_35px_rgba(0,0,0,0.04)] sm:p-7">
                   <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">
                     Step 2
                   </p>
 
-                  <h2 className="mt-1.5 text-lg font-semibold text-zinc-900">
+                  <h2
+                    id="new-order-requirements-label"
+                    className="mt-1.5 text-lg font-semibold text-zinc-900"
+                  >
                     Additional requirements
                   </h2>
 
@@ -5299,6 +5435,7 @@ const NewOrder = () => {
                   </p>
 
                   <textarea
+                    aria-labelledby="new-order-requirements-label"
                     value={additionalRequirements}
                     onChange={(event) =>
                       setAdditionalRequirements(event.target.value)
@@ -5331,7 +5468,9 @@ const NewOrder = () => {
                     Choose how you'd like to complete the payment.
                   </p>
 
-                  <div className={`mt-5 grid gap-3 ${allowMonthEndPayment ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
+                  <div
+                    className={`mt-5 grid gap-3 ${allowMonthEndPayment ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}
+                  >
                     <PaymentOption
                       selected={paymentMethod === "cod"}
                       onClick={() => selectPaymentMethod("cod")}
@@ -5371,10 +5510,19 @@ const NewOrder = () => {
                     )}
                   </div>
                   {allowMonthEndPayment && (
-                    <p className="mt-3 text-xs leading-5 text-zinc-500">Your account is eligible for Pay on Month-End. Place your order now and pay at the end of the month.</p>
+                    <p className="mt-3 text-xs leading-5 text-zinc-500">
+                      Your account is eligible for Pay on Month-End. Place your
+                      order now and pay at the end of the month.
+                    </p>
                   )}
                   {paymentMethod === "month_end" && !allowMonthEndPayment && (
-                    <p role="alert" className="mt-3 text-xs leading-5 text-red-600">Pay on Month-End is no longer enabled. Choose another payment method.</p>
+                    <p
+                      role="alert"
+                      className="mt-3 text-xs leading-5 text-red-600"
+                    >
+                      Pay on Month-End is no longer enabled. Choose another
+                      payment method.
+                    </p>
                   )}
 
                   {paymentMethod === "cheque" && (
@@ -5432,11 +5580,14 @@ const NewOrder = () => {
                           ))}
                           <div className="flex justify-between border-t border-amber-200 pt-2 text-xs text-amber-900">
                             <span>
-                              Taxable subtotal · GST ({currentDraftQuote.gstRate}%)
+                              Taxable subtotal · GST (
+                              {currentDraftQuote.gstRate}%)
                             </span>
                             <span>
-                              {formatCurrency(currentDraftQuote.taxableSubtotal)} ·{" "}
-                              {formatCurrency(currentDraftQuote.gstAmount)}
+                              {formatCurrency(
+                                currentDraftQuote.taxableSubtotal,
+                              )}{" "}
+                              · {formatCurrency(currentDraftQuote.gstAmount)}
                             </span>
                           </div>
                           <div className="flex items-center justify-between gap-3 pt-1">
@@ -5478,12 +5629,33 @@ const NewOrder = () => {
                   )}
 
                   {(error ||
-                    (["online", "month_end"].includes(paymentMethod) && paymentPricingError)) && (
-                    <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-                      <p className="text-xs leading-5 text-red-700">
-                        {error ||
-                          (["online", "month_end"].includes(paymentMethod) && paymentPricingError)}
+                    (["online", "month_end"].includes(paymentMethod) &&
+                      paymentPricingError)) && (
+                    <div
+                      ref={errorRef}
+                      tabIndex={-1}
+                      role="alert"
+                      className="mt-4 scroll-mt-28 rounded-xl border border-red-200 bg-red-50 px-4 py-3"
+                    >
+                      <p className="text-sm font-medium text-red-800">
+                        Your order needs attention
                       </p>
+                      <p className="mt-1 text-xs leading-5 text-red-700">
+                        {error ||
+                          (["online", "month_end"].includes(paymentMethod) &&
+                            paymentPricingError)}
+                      </p>
+                      {validationServiceId &&
+                        orderItems.some(
+                          (item) => item.service._id === validationServiceId,
+                        ) && (
+                          <a
+                            href={`#order-service-${validationServiceId}`}
+                            className="mt-2 inline-flex min-h-11 items-center text-xs font-medium text-red-800 underline underline-offset-4"
+                          >
+                            Review service configuration
+                          </a>
+                        )}
                     </div>
                   )}
 
@@ -5514,22 +5686,25 @@ const NewOrder = () => {
                         draftBusy ||
                         Boolean(
                           editingDraftId &&
-                            currentDraftQuote &&
-                            !currentDraftQuote.confirmed,
+                          currentDraftQuote &&
+                          !currentDraftQuote.confirmed,
                         ) ||
                         currentCouponLoading ||
                         Boolean(
                           appliedCouponCode &&
-                            (!hasCurrentCouponQuote || currentCouponError),
+                          (!hasCurrentCouponQuote || currentCouponError),
                         ) ||
                         (["online", "month_end"].includes(paymentMethod) &&
                           (paymentPricingLoading || !paymentPricing)) ||
-                        (paymentMethod === "month_end" && !allowMonthEndPayment) ||
+                        (paymentMethod === "month_end" &&
+                          !allowMonthEndPayment) ||
                         Boolean(loadingServiceId) ||
                         !orderItems.length ||
-                        (paymentMethod === "online" && estimatedTotal <= 0 && adCreditTotal === 0)
+                        (paymentMethod === "online" &&
+                          estimatedTotal <= 0 &&
+                          adCreditTotal === 0)
                       }
-                      className="dashboard-action dashboard-action--primary group flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-zinc-900 px-5 py-3.5 text-sm font-semibold text-white shadow-[0_8px_25px_rgba(24,24,27,0.12)] transition-all duration-300 ease-out hover:bg-zinc-800 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="dashboard-action dashboard-action--primary group flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-zinc-900 px-5 py-3.5 text-sm font-semibold text-white shadow-[0_8px_25px_rgba(24,24,27,0.12)] transition-all duration-300 ease-out hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {submitting || draftQuoteLoading ? (
                         <>
@@ -5581,80 +5756,87 @@ const NewOrder = () => {
               RIGHT SUMMARY
           ================================================================= */}
 
-          <aside className="order-summary-scroll min-w-0 self-start lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
-              {orderItems.length === 0 ? (
-                <section className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-6 sm:p-7">
-                  <div className="flex min-h-[280px] flex-col items-center justify-center text-center">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-zinc-200 bg-white text-zinc-300">
-                      <CreditCard size={20} />
-                    </div>
-
-                    <h2 className="mt-4 text-base font-semibold text-zinc-800">
-                      Your order summary
-                    </h2>
-
-                    <p className="mt-2 max-w-[260px] text-sm leading-6 text-zinc-400">
-                      Select one or more services to see your configuration and
-                      pricing summary here.
-                    </p>
+          <aside
+            id="new-order-summary"
+            tabIndex={-1}
+            aria-label="Order summary"
+            className="scroll-mt-28 order-summary-scroll min-w-0 self-start lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto"
+          >
+            {orderItems.length === 0 ? (
+              <section className="rounded-[24px] border border-zinc-200 bg-zinc-50 p-6 sm:p-7">
+                <div className="flex min-h-[280px] flex-col items-center justify-center text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-zinc-200 bg-white text-zinc-300">
+                    <CreditCard size={20} />
                   </div>
-                </section>
-              ) : (
-                <section className="overflow-hidden rounded-[24px] border border-zinc-800 bg-zinc-950 shadow-[0_20px_60px_rgba(0,0,0,0.12)]">
-                  <div className="p-5 sm:p-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-xs font-medium uppercase tracking-[0.16em] text-white/35">
-                          Order summary
-                        </p>
 
-                        <h2 className="mt-1.5 text-lg font-semibold text-white">
-                          {orderItems.length}{" "}
-                          {orderItems.length === 1 ? "service" : "services"}
-                        </h2>
-                      </div>
+                  <h2 className="mt-4 text-base font-semibold text-zinc-800">
+                    Your order summary
+                  </h2>
 
-                      <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/60">
-                        <CreditCard size={16} />
-                      </div>
+                  <p className="mt-2 max-w-[260px] text-sm leading-6 text-zinc-400">
+                    Select one or more services to see your configuration and
+                    pricing summary here.
+                  </p>
+                </div>
+              </section>
+            ) : (
+              <section className="overflow-hidden rounded-[24px] border border-zinc-800 bg-zinc-950 shadow-[0_20px_60px_rgba(0,0,0,0.12)]">
+                <div className="p-5 sm:p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-[0.16em] text-white/35">
+                        Order summary
+                      </p>
+
+                      <h2 className="mt-1.5 text-lg font-semibold text-white">
+                        {orderItems.length}{" "}
+                        {orderItems.length === 1 ? "service" : "services"}
+                      </h2>
                     </div>
 
-                    <div className="mt-6 space-y-3">
-                      {orderItems.map((item, index) => {
-                        const itemAmount = itemEstimates[index] || 0;
-                        const serviceId = String(item.service._id);
-                        const expanded = expandedSummaryServices.has(serviceId);
-                        const serviceCouponLine =
-                          currentCouponQuote?.serviceBreakdown?.find(
-                            (line) => String(line.serviceId) === serviceId,
-                          );
-                        const discountedItemAmount = serviceCouponLine
-                          ? Number(serviceCouponLine.discountedAmount)
-                          : itemAmount;
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/60">
+                      <CreditCard size={16} />
+                    </div>
+                  </div>
 
-                        const selectedOptions = item.isGroupedPricing
-                          ? Object.values(
-                              item.selectedPricingOptions || {},
-                            ).filter(Boolean)
-                          : item.selectedPricingOption
-                            ? [item.selectedPricingOption]
-                            : [];
-
-                        const quantityInfo = getQuantityInfo(item);
-                        const gridPricingMode = getGridPricingMode(
-                          item.service,
-                          item.formData?.pricingMode,
+                  <div className="mt-6 space-y-3">
+                    {orderItems.map((item, index) => {
+                      const itemAmount = itemEstimates[index] || 0;
+                      const serviceId = String(item.service._id);
+                      const expanded = expandedSummaryServices.has(serviceId);
+                      const serviceCouponLine =
+                        currentCouponQuote?.serviceBreakdown?.find(
+                          (line) => String(line.serviceId) === serviceId,
                         );
-                        const repeatableGroups = getRepeatableGroups(item.service);
-                        const hasBasePriceLine =
-                          selectedOptions.length === 0 &&
-                          Number(item.service.basePrice || 0) > 0 &&
-                          item.service.pricingType !== "custom";
+                      const discountedItemAmount = serviceCouponLine
+                        ? Number(serviceCouponLine.discountedAmount)
+                        : itemAmount;
 
-                        return (
-                          <article
-                            key={serviceId}
-                            className={`
+                      const selectedOptions = item.isGroupedPricing
+                        ? Object.values(
+                            item.selectedPricingOptions || {},
+                          ).filter(Boolean)
+                        : item.selectedPricingOption
+                          ? [item.selectedPricingOption]
+                          : [];
+
+                      const quantityInfo = getQuantityInfo(item);
+                      const gridPricingMode = getGridPricingMode(
+                        item.service,
+                        item.formData?.pricingMode,
+                      );
+                      const repeatableGroups = getRepeatableGroups(
+                        item.service,
+                      );
+                      const hasBasePriceLine =
+                        selectedOptions.length === 0 &&
+                        Number(item.service.basePrice || 0) > 0 &&
+                        item.service.pricingType !== "custom";
+
+                      return (
+                        <article
+                          key={serviceId}
+                          className={`
                               w-full rounded-2xl border p-3.5
                               transition-all duration-200
                               ${
@@ -5663,663 +5845,685 @@ const NewOrder = () => {
                                   : "border-white/5 bg-white/[0.03]"
                               }
                             `}
-                          >
-                            <div className="flex items-start gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setActiveServiceIndex(index)}
-                                className="min-w-0 flex-1 rounded-lg text-left"
-                              >
-                                <p className="text-[10px] uppercase tracking-wide text-white/35">
-                                  Service {index + 1}
+                        >
+                          <div className="flex items-start gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setActiveServiceIndex(index)}
+                              className="min-w-0 flex-1 rounded-lg text-left"
+                            >
+                              <p className="text-[10px] uppercase tracking-wide text-white/35">
+                                Service {index + 1}
+                              </p>
+
+                              <p className="mt-1 truncate text-sm font-medium text-white">
+                                {item.service.name}
+                              </p>
+
+                              {quantityInfo.hasQuantity && (
+                                <p className="mt-1 text-[10px] text-white/30">
+                                  Qty {quantityInfo.quantity}{" "}
+                                  {quantityInfo.unit || ""}
+                                  {gridPricingMode &&
+                                    ` · ${quantityInfo.quantity * gridPricingMode.itemsPerUnit} posts`}
                                 </p>
+                              )}
+                            </button>
 
-                                <p className="mt-1 truncate text-sm font-medium text-white">
-                                  {item.service.name}
+                            <div className="shrink-0 pt-3 text-right">
+                              {serviceCouponLine?.discountAmount > 0 && (
+                                <p className="text-[10px] text-white/35 line-through">
+                                  {formatCurrency(itemAmount)}
                                 </p>
-
-                                {quantityInfo.hasQuantity && (
-                                  <p className="mt-1 text-[10px] text-white/30">
-                                    Qty {quantityInfo.quantity}{" "}
-                                    {quantityInfo.unit || ""}
-                                    {gridPricingMode &&
-                                      ` · ${quantityInfo.quantity * gridPricingMode.itemsPerUnit} posts`}
-                                  </p>
-                                )}
-                              </button>
-
-                              <div className="shrink-0 pt-3 text-right">
-                                {serviceCouponLine?.discountAmount > 0 && (
-                                  <p className="text-[10px] text-white/35 line-through">
-                                    {formatCurrency(itemAmount)}
-                                  </p>
-                                )}
-                                <p className="text-sm font-medium text-white">
+                              )}
+                              <p className="text-sm font-medium text-white">
                                 {isCustomUnpricedItem(item)
                                   ? "Custom"
                                   : formatCurrency(discountedItemAmount)}
-                                </p>
-                              </div>
-
-                              <button
-                                type="button"
-                                disabled={submitting || Boolean(loadingServiceId)}
-                                onClick={() => handleToggleService(serviceId)}
-                                aria-label={`Remove ${item.service.name} from order`}
-                                title={`Remove ${item.service.name} from order`}
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/50 transition hover:bg-red-500/10 hover:text-red-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-40"
-                              >
-                                <Trash2 size={16} aria-hidden="true" />
-                              </button>
-
-                              <button
-                                type="button"
-                                aria-expanded={expanded}
-                                aria-label={`${expanded ? "Hide" : "Show"} ${item.service.name} pricing details`}
-                                onClick={() =>
-                                  setExpandedSummaryServices((current) => {
-                                    const next = new Set(current);
-                                    if (next.has(serviceId)) {
-                                      next.delete(serviceId);
-                                    } else {
-                                      next.add(serviceId);
-                                    }
-                                    return next;
-                                  })
-                                }
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/50 transition hover:bg-white/10 hover:text-white"
-                              >
-                                {expanded ? (
-                                  <ChevronUp size={16} aria-hidden="true" />
-                                ) : (
-                                  <ChevronDown size={16} aria-hidden="true" />
-                                )}
-                              </button>
+                              </p>
                             </div>
 
-                            {expanded && (
-                              <div className="mt-3 space-y-3 border-t border-white/10 pt-3">
-                                {selectedOptions.length > 0 &&
-                                  selectedOptions.map((option) => {
-                                    const groupKey =
-                                      String(option.group || "").trim() ||
-                                      "__ungrouped__";
-                                    const optionQuantity = item.isGroupedPricing
-                                      ? getGroupedOptionQuantity(
-                                          item,
-                                          groupKey,
-                                          option,
-                                        )
-                                      : getItemQuantity(item);
-                                    const lineTotal =
-                                      Number(option.price || 0) * optionQuantity;
+                            <button
+                              type="button"
+                              disabled={submitting || Boolean(loadingServiceId)}
+                              onClick={() => handleToggleService(serviceId)}
+                              aria-label={`Remove ${item.service.name} from order`}
+                              title={`Remove ${item.service.name} from order`}
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/50 transition hover:bg-red-500/10 hover:text-red-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <Trash2 size={16} aria-hidden="true" />
+                            </button>
 
-                                    return (
-                                      <div
-                                        key={option._id}
-                                        className="flex items-start justify-between gap-3"
-                                      >
-                                        <div className="min-w-0">
-                                          <p className="truncate text-xs text-white/75">
-                                            {option.name}
-                                          </p>
-                                          <p className="mt-0.5 text-[10px] text-white/35">
-                                            {optionQuantity} ×{" "}
-                                            {formatCurrency(option.price)} /{" "}
-                                            {option.unit || "unit"}
-                                          </p>
-                                        </div>
-                                        <p className="shrink-0 text-xs text-white/70">
-                                          {formatCurrency(lineTotal)}
+                            <button
+                              type="button"
+                              aria-expanded={expanded}
+                              aria-label={`${expanded ? "Hide" : "Show"} ${item.service.name} pricing details`}
+                              onClick={() =>
+                                setExpandedSummaryServices((current) => {
+                                  const next = new Set(current);
+                                  if (next.has(serviceId)) {
+                                    next.delete(serviceId);
+                                  } else {
+                                    next.add(serviceId);
+                                  }
+                                  return next;
+                                })
+                              }
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/50 transition hover:bg-white/10 hover:text-white"
+                            >
+                              {expanded ? (
+                                <ChevronUp size={16} aria-hidden="true" />
+                              ) : (
+                                <ChevronDown size={16} aria-hidden="true" />
+                              )}
+                            </button>
+                          </div>
+
+                          {expanded && (
+                            <div className="mt-3 space-y-3 border-t border-white/10 pt-3">
+                              {selectedOptions.length > 0 &&
+                                selectedOptions.map((option) => {
+                                  const groupKey =
+                                    String(option.group || "").trim() ||
+                                    "__ungrouped__";
+                                  const optionQuantity = item.isGroupedPricing
+                                    ? getGroupedOptionQuantity(
+                                        item,
+                                        groupKey,
+                                        option,
+                                      )
+                                    : getItemQuantity(item);
+                                  const lineTotal =
+                                    Number(option.price || 0) * optionQuantity;
+
+                                  return (
+                                    <div
+                                      key={option._id}
+                                      className="flex items-start justify-between gap-3"
+                                    >
+                                      <div className="min-w-0">
+                                        <p className="truncate text-xs text-white/75">
+                                          {option.name}
+                                        </p>
+                                        <p className="mt-0.5 text-[10px] text-white/35">
+                                          {optionQuantity} ×{" "}
+                                          {formatCurrency(option.price)} /{" "}
+                                          {option.unit || "unit"}
                                         </p>
                                       </div>
-                                    );
-                                  })}
-
-                                {hasBasePriceLine && (
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                      <p className="text-xs text-white/75">
-                                        {item.service.pricingType === "fixed"
-                                          ? "Service price"
-                                          : item.service.name}
-                                      </p>
-                                      <p className="mt-0.5 text-[10px] text-white/35">
-                                        {quantityInfo.quantity} ×{" "}
-                                        {formatCurrency(
-                                          gridPricingMode?.unitPrice ??
-                                            item.service.basePrice,
-                                        )}{" "}
-                                        /{" "}
-                                        {gridPricingMode?.unit ||
-                                          item.service.unit ||
-                                          "unit"}
-                                        {gridPricingMode &&
-                                          ` · ${gridPricingMode.label} · ${gridPricingMode.itemsPerUnit} posts per unit`}
+                                      <p className="shrink-0 text-xs text-white/70">
+                                        {formatCurrency(lineTotal)}
                                       </p>
                                     </div>
-                                    <p className="shrink-0 text-xs text-white/70">
-                                      {formatCurrency(
-                                        Number(
-                                          gridPricingMode?.unitPrice ??
-                                            item.service.basePrice ??
-                                            0,
-                                        ) *
-                                          (item.service.pricingType === "fixed"
-                                            ? 1
-                                            : quantityInfo.quantity),
-                                      )}
-                                    </p>
-                                  </div>
-                                )}
-
-                                {repeatableGroups.map((group) => {
-                                  const entries = Array.isArray(
-                                    item.formData?.[group.name],
-                                  )
-                                    ? item.formData[group.name]
-                                    : [];
-                                  const pricingGroups =
-                                    getRepeatableGroupPricingGroups(
-                                      item.service,
-                                      group,
-                                    );
-
-                                  return entries.map((entry, entryIndex) => {
-                                    const selectedEntryOptions =
-                                      pricingGroups.flatMap(
-                                        (pricingGroup) => {
-                                          const selectedId =
-                                            entry?.pricingOptions?.[
-                                              pricingGroup.name
-                                            ];
-                                          const option =
-                                            pricingGroup.options.find(
-                                              (candidate) =>
-                                                String(candidate._id) ===
-                                                String(selectedId),
-                                            );
-
-                                          if (!option) {
-                                            return [];
-                                          }
-
-                                          const rules = getQuantityRules(
-                                            item.service,
-                                            option,
-                                          );
-                                          const rawQuantity =
-                                            entry?.pricingQuantities?.[
-                                              pricingGroup.name
-                                            ];
-                                          const optionQuantity =
-                                            rawQuantity !== undefined &&
-                                            rawQuantity !== null
-                                              ? Number(rawQuantity)
-                                              : rules.minQuantity;
-
-                                          return [
-                                            {
-                                              option,
-                                              quantity: optionQuantity,
-                                              lineTotal:
-                                                Number(option.price || 0) *
-                                                optionQuantity,
-                                            },
-                                          ];
-                                        },
-                                      );
-                                    const entryFieldPrice =
-                                      getFieldValuesPrice(
-                                        getActiveFieldsForRepeatableEntry(
-                                          item.service,
-                                          group,
-                                          entry,
-                                        ),
-                                        entry?.fields || entry,
-                                      );
-                                    const entryPricingTotal =
-                                      getRepeatableEntryPricingTotal(
-                                        item.service,
-                                        group,
-                                        entry,
-                                      ) + entryFieldPrice;
-
-                                    return (
-                                      <div
-                                        key={`${group.name}-${entryIndex}`}
-                                        className="rounded-xl border border-white/10 bg-black/10 p-3"
-                                      >
-                                        <div className="mb-2 flex items-center justify-between gap-3">
-                                          <p className="text-[11px] font-semibold text-white/75">
-                                            {group.label || "Item"}{" "}
-                                            {entryIndex + 1}
-                                          </p>
-                                          <p className="text-[10px] text-white/35">
-                                            Reel subtotal{" "}
-                                            {formatCurrency(entryPricingTotal)}
-                                          </p>
-                                        </div>
-
-                                        {selectedEntryOptions.map(
-                                          ({ option, quantity, lineTotal }) => (
-                                            <div
-                                              key={option._id}
-                                              className="flex items-start justify-between gap-3 py-1"
-                                            >
-                                              <div className="min-w-0">
-                                                <p className="truncate text-xs text-white/65">
-                                                  {option.name}
-                                                </p>
-                                                <p className="mt-0.5 text-[10px] text-white/35">
-                                                  {quantity} ×{" "}
-                                                  {formatCurrency(option.price)}{" "}
-                                                  / {option.unit || "unit"}
-                                                </p>
-                                              </div>
-                                              <p className="shrink-0 text-xs text-white/55">
-                                                {formatCurrency(lineTotal)}
-                                              </p>
-                                            </div>
-                                          ),
-                                        )}
-
-                                        {entryFieldPrice > 0 && (
-                                          <div className="flex items-center justify-between gap-3 border-t border-white/10 pt-2">
-                                            <p className="text-[10px] text-white/40">
-                                              Applicable charges
-                                            </p>
-                                            <p className="text-xs text-white/55">
-                                              {formatCurrency(entryFieldPrice)}
-                                            </p>
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  });
+                                  );
                                 })}
 
-                                {getSelectedFieldsPrice(item) > 0 && (
-                                  <div className="flex items-center justify-between gap-3">
-                                    <p className="text-xs text-white/45">
-                                      Applicable charges
+                              {hasBasePriceLine && (
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <p className="text-xs text-white/75">
+                                      {item.service.pricingType === "fixed"
+                                        ? "Service price"
+                                        : item.service.name}
                                     </p>
-                                    <p className="text-xs text-white/65">
+                                    <p className="mt-0.5 text-[10px] text-white/35">
+                                      {quantityInfo.quantity} ×{" "}
                                       {formatCurrency(
-                                        getSelectedFieldsPrice(item),
-                                      )}
+                                        gridPricingMode?.unitPrice ??
+                                          item.service.basePrice,
+                                      )}{" "}
+                                      /{" "}
+                                      {gridPricingMode?.unit ||
+                                        item.service.unit ||
+                                        "unit"}
+                                      {gridPricingMode &&
+                                        ` · ${gridPricingMode.label} · ${gridPricingMode.itemsPerUnit} posts per unit`}
                                     </p>
                                   </div>
-                                )}
+                                  <p className="shrink-0 text-xs text-white/70">
+                                    {formatCurrency(
+                                      Number(
+                                        gridPricingMode?.unitPrice ??
+                                          item.service.basePrice ??
+                                          0,
+                                      ) *
+                                        (item.service.pricingType === "fixed"
+                                          ? 1
+                                          : quantityInfo.quantity),
+                                    )}
+                                  </p>
+                                </div>
+                              )}
 
-                                {serviceCouponLine && (
-                                  <div className="flex items-start justify-between gap-3 rounded-lg bg-white/[0.04] px-2.5 py-2">
-                                    <div>
-                                      <p className="text-xs text-emerald-200/80">
-                                        Coupon discount (
-                                        {serviceCouponLine.discountPercent}%)
-                                      </p>
-                                      {serviceCouponLine.eligibleAmount <
-                                        serviceCouponLine.originalAmount && (
-                                        <p className="mt-0.5 text-[10px] text-white/35">
-                                          Applied to{" "}
-                                          {formatCurrency(
-                                            serviceCouponLine.eligibleAmount,
-                                          )}{" "}
-                                          eligible charges
+                              {repeatableGroups.map((group) => {
+                                const entries = Array.isArray(
+                                  item.formData?.[group.name],
+                                )
+                                  ? item.formData[group.name]
+                                  : [];
+                                const pricingGroups =
+                                  getRepeatableGroupPricingGroups(
+                                    item.service,
+                                    group,
+                                  );
+
+                                return entries.map((entry, entryIndex) => {
+                                  const selectedEntryOptions =
+                                    pricingGroups.flatMap((pricingGroup) => {
+                                      const selectedId =
+                                        entry?.pricingOptions?.[
+                                          pricingGroup.name
+                                        ];
+                                      const option = pricingGroup.options.find(
+                                        (candidate) =>
+                                          String(candidate._id) ===
+                                          String(selectedId),
+                                      );
+
+                                      if (!option) {
+                                        return [];
+                                      }
+
+                                      const rules = getQuantityRules(
+                                        item.service,
+                                        option,
+                                      );
+                                      const rawQuantity =
+                                        entry?.pricingQuantities?.[
+                                          pricingGroup.name
+                                        ];
+                                      const optionQuantity =
+                                        rawQuantity !== undefined &&
+                                        rawQuantity !== null
+                                          ? Number(rawQuantity)
+                                          : rules.minQuantity;
+
+                                      return [
+                                        {
+                                          option,
+                                          quantity: optionQuantity,
+                                          lineTotal:
+                                            Number(option.price || 0) *
+                                            optionQuantity,
+                                        },
+                                      ];
+                                    });
+                                  const entryFieldPrice = getFieldValuesPrice(
+                                    getActiveFieldsForRepeatableEntry(
+                                      item.service,
+                                      group,
+                                      entry,
+                                    ),
+                                    entry?.fields || entry,
+                                  );
+                                  const entryPricingTotal =
+                                    getRepeatableEntryPricingTotal(
+                                      item.service,
+                                      group,
+                                      entry,
+                                    ) + entryFieldPrice;
+
+                                  return (
+                                    <div
+                                      key={`${group.name}-${entryIndex}`}
+                                      className="rounded-xl border border-white/10 bg-black/10 p-3"
+                                    >
+                                      <div className="mb-2 flex items-center justify-between gap-3">
+                                        <p className="text-[11px] font-semibold text-white/75">
+                                          {group.label || "Item"}{" "}
+                                          {entryIndex + 1}
                                         </p>
+                                        <p className="text-[10px] text-white/35">
+                                          Reel subtotal{" "}
+                                          {formatCurrency(entryPricingTotal)}
+                                        </p>
+                                      </div>
+
+                                      {selectedEntryOptions.map(
+                                        ({ option, quantity, lineTotal }) => (
+                                          <div
+                                            key={option._id}
+                                            className="flex items-start justify-between gap-3 py-1"
+                                          >
+                                            <div className="min-w-0">
+                                              <p className="truncate text-xs text-white/65">
+                                                {option.name}
+                                              </p>
+                                              <p className="mt-0.5 text-[10px] text-white/35">
+                                                {quantity} ×{" "}
+                                                {formatCurrency(option.price)} /{" "}
+                                                {option.unit || "unit"}
+                                              </p>
+                                            </div>
+                                            <p className="shrink-0 text-xs text-white/55">
+                                              {formatCurrency(lineTotal)}
+                                            </p>
+                                          </div>
+                                        ),
+                                      )}
+
+                                      {entryFieldPrice > 0 && (
+                                        <div className="flex items-center justify-between gap-3 border-t border-white/10 pt-2">
+                                          <p className="text-[10px] text-white/40">
+                                            Applicable charges
+                                          </p>
+                                          <p className="text-xs text-white/55">
+                                            {formatCurrency(entryFieldPrice)}
+                                          </p>
+                                        </div>
                                       )}
                                     </div>
-                                    <p className="shrink-0 text-xs font-medium text-emerald-200">
-                                      −
-                                      {formatCurrency(
-                                        serviceCouponLine.discountAmount,
-                                      )}
-                                    </p>
-                                  </div>
-                                )}
+                                  );
+                                });
+                              })}
 
-                                {itemAmount > 0 && (
-                                  <div className="flex items-center justify-between gap-3 border-t border-white/10 pt-2">
-                                    <p className="text-[10px] uppercase tracking-wide text-white/35">
-                                      {serviceCouponLine
-                                        ? "After discount"
-                                        : "Service subtotal"}
-                                    </p>
-                                    <p className="text-xs font-medium text-white/75">
-                                      {formatCurrency(discountedItemAmount)}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </article>
-                        );
-                      })}
-                    </div>
+                              {getSelectedFieldsPrice(item) > 0 && (
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="text-xs text-white/45">
+                                    Applicable charges
+                                  </p>
+                                  <p className="text-xs text-white/65">
+                                    {formatCurrency(
+                                      getSelectedFieldsPrice(item),
+                                    )}
+                                  </p>
+                                </div>
+                              )}
 
-                    <div className="mt-5 border-t border-white/10 pt-4">
-                      <label
-                        htmlFor="order-coupon-code"
-                        className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/35"
-                      >
-                        Discount coupon
-                      </label>
-                      <div className="mt-2 flex gap-2">
-                        <input
-                          id="order-coupon-code"
-                          value={couponInput}
-                          disabled={Boolean(appliedCouponCode) || submitting}
-                          onChange={(event) =>
-                            setCouponInput(event.target.value.toUpperCase())
-                          }
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              if (couponInput.trim()) {
-                                setCouponError("");
-                                setAppliedCouponCode(
-                                  couponInput.trim().toUpperCase(),
-                                );
-                              }
-                            }
-                          }}
-                          placeholder="Enter coupon code"
-                          className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm uppercase !text-white caret-white outline-none placeholder:normal-case placeholder:text-white/25 focus:border-white/25 disabled:opacity-60"
-                        />
-                        {appliedCouponCode ? (
-                          <button
-                            type="button"
-                            disabled={submitting}
-                            onClick={() => {
-                              setAppliedCouponCode("");
-                              setCouponInput("");
-                              setCouponQuote(null);
-                              setCouponError("");
-                              setCouponErrorRequestKey("");
-                              setCouponLoading(false);
-                            }}
-                            className="dashboard-action dashboard-action--tertiary dashboard-action--inverse shrink-0 rounded-xl border border-white/15 px-3 py-2.5 text-xs font-medium text-white/70 hover:bg-white/10"
-                          >
-                            Remove
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={
-                              !couponInput.trim() ||
-                              !orderItems.length ||
-                              currentCouponLoading ||
-                              submitting
-                            }
-                            onClick={() => {
+                              {serviceCouponLine && (
+                                <div className="flex items-start justify-between gap-3 rounded-lg bg-white/[0.04] px-2.5 py-2">
+                                  <div>
+                                    <p className="text-xs text-emerald-200/80">
+                                      Coupon discount (
+                                      {serviceCouponLine.discountPercent}%)
+                                    </p>
+                                    {serviceCouponLine.eligibleAmount <
+                                      serviceCouponLine.originalAmount && (
+                                      <p className="mt-0.5 text-[10px] text-white/35">
+                                        Applied to{" "}
+                                        {formatCurrency(
+                                          serviceCouponLine.eligibleAmount,
+                                        )}{" "}
+                                        eligible charges
+                                      </p>
+                                    )}
+                                  </div>
+                                  <p className="shrink-0 text-xs font-medium text-emerald-200">
+                                    −
+                                    {formatCurrency(
+                                      serviceCouponLine.discountAmount,
+                                    )}
+                                  </p>
+                                </div>
+                              )}
+
+                              {itemAmount > 0 && (
+                                <div className="flex items-center justify-between gap-3 border-t border-white/10 pt-2">
+                                  <p className="text-[10px] uppercase tracking-wide text-white/35">
+                                    {serviceCouponLine
+                                      ? "After discount"
+                                      : "Service subtotal"}
+                                  </p>
+                                  <p className="text-xs font-medium text-white/75">
+                                    {formatCurrency(discountedItemAmount)}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </article>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-5 border-t border-white/10 pt-4">
+                    <label
+                      htmlFor="order-coupon-code"
+                      className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/35"
+                    >
+                      Discount coupon
+                    </label>
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        id="order-coupon-code"
+                        value={couponInput}
+                        disabled={Boolean(appliedCouponCode) || submitting}
+                        onChange={(event) =>
+                          setCouponInput(event.target.value.toUpperCase())
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            if (couponInput.trim()) {
                               setCouponError("");
                               setAppliedCouponCode(
                                 couponInput.trim().toUpperCase(),
                               );
-                            }}
-                            className="dashboard-action dashboard-action--primary dashboard-action--inverse shrink-0 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Apply
-                          </button>
-                        )}
-                      </div>
-                      {currentCouponLoading && (
-                        <p className="mt-2 flex items-center gap-1.5 text-xs text-white/45">
-                          <Loader2 size={13} className="animate-spin" />
-                          Checking coupon against your order...
-                        </p>
-                      )}
-                      {currentCouponError && !currentCouponLoading && (
-                        <p className="mt-2 text-xs text-red-300">
-                          {currentCouponError}
-                        </p>
-                      )}
-                      {hasCurrentCouponQuote && !currentCouponLoading && (
-                        <p className="mt-2 text-xs text-emerald-200">
-                          {currentCouponQuote.code} applied successfully.
-                        </p>
+                            }
+                          }
+                        }}
+                        placeholder="Enter coupon code"
+                        className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm uppercase !text-white caret-white outline-none placeholder:normal-case placeholder:text-white/25 focus:border-white/25 disabled:opacity-60"
+                      />
+                      {appliedCouponCode ? (
+                        <button
+                          type="button"
+                          disabled={submitting}
+                          onClick={() => {
+                            setAppliedCouponCode("");
+                            setCouponInput("");
+                            setCouponQuote(null);
+                            setCouponError("");
+                            setCouponErrorRequestKey("");
+                            setCouponLoading(false);
+                          }}
+                          className="dashboard-action dashboard-action--tertiary dashboard-action--inverse shrink-0 rounded-xl border border-white/15 px-3 py-2.5 text-xs font-medium text-white/70 hover:bg-white/10"
+                        >
+                          Remove
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={
+                            !couponInput.trim() ||
+                            !orderItems.length ||
+                            currentCouponLoading ||
+                            submitting
+                          }
+                          onClick={() => {
+                            setCouponError("");
+                            setAppliedCouponCode(
+                              couponInput.trim().toUpperCase(),
+                            );
+                          }}
+                          className="dashboard-action dashboard-action--primary dashboard-action--inverse shrink-0 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Apply
+                        </button>
                       )}
                     </div>
+                    {currentCouponLoading && (
+                      <p className="mt-2 flex items-center gap-1.5 text-xs text-white/45">
+                        <Loader2 size={13} className="animate-spin" />
+                        Checking coupon against your order...
+                      </p>
+                    )}
+                    {currentCouponError && !currentCouponLoading && (
+                      <p className="mt-2 text-xs text-red-300">
+                        {currentCouponError}
+                      </p>
+                    )}
+                    {hasCurrentCouponQuote && !currentCouponLoading && (
+                      <p className="mt-2 text-xs text-emerald-200">
+                        {currentCouponQuote.code} applied successfully.
+                      </p>
+                    )}
+                  </div>
 
-                    <div className="mt-5 space-y-3 border-t border-white/10 pt-5">
-                      <div className="flex items-center justify-between gap-4">
-                        <p className="text-xs text-white/40">
-                          {hasCurrentCouponQuote
-                            ? "Original subtotal"
-                            : "Subtotal"}
-                        </p>
-
-                        <p className="text-sm font-medium text-white">
-                          {formatCurrency(subtotal)}
-                        </p>
-                      </div>
-
-                      {hasCurrentCouponQuote && (
-                        <>
-                          <div className="flex items-center justify-between gap-4">
-                            <div>
-                              <p className="text-xs text-emerald-200/80">
-                                Coupon {currentCouponQuote.code}
-                              </p>
-                              <p className="mt-0.5 text-[10px] text-white/30">
-                                Service-specific discounts
-                              </p>
-                            </div>
-                            <p className="text-sm font-medium text-emerald-200">
-                              −{formatCurrency(couponDiscountTotal)}
-                            </p>
-                          </div>
-                          <div className="flex items-center justify-between gap-4">
-                            <p className="text-xs text-white/40">
-                              {adCreditTotal > 0 ? "Subtotal after coupon" : "Taxable subtotal"}
-                            </p>
-                            <p className="text-sm font-medium text-white">
-                              {formatCurrency(subtotalBeforeAdCredit)}
-                            </p>
-                          </div>
-                          <div className="space-y-1 border-l border-white/10 pl-3">
-                            {currentCouponQuote.serviceBreakdown
-                              .filter((line) => line.discountAmount > 0)
-                              .map((line) => (
-                                <div
-                                  key={line.serviceId}
-                                  className="flex justify-between gap-3 text-[10px] text-white/40"
-                                >
-                                  <span className="truncate">
-                                    {line.serviceName} ({line.discountPercent}%)
-                                  </span>
-                                  <span className="shrink-0">
-                                    −{formatCurrency(line.discountAmount)}
-                                  </span>
-                                </div>
-                              ))}
-                          </div>
-                        </>
-                      )}
-
-                      {adCreditTotal > 0 && (
-                        <div className="flex items-center justify-between text-sm text-emerald-300">
-                          <span>Ad credit applied</span><span>-{formatCurrency(adCreditTotal)}</span>
-                        </div>
-                      )}
-
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <p className="text-xs text-white/40">
-                            GST{hasCurrentCouponQuote ? " on taxable subtotal" : ""}
-                          </p>
-
-                          <p className="mt-0.5 text-[10px] text-white/25">
-                            {gstRate === null
-                              ? paymentMethod === "cheque" && chequeType
-                                ? "Loading tax rate"
-                                : paymentMethod === "cheque"
-                                  ? "Choose a cheque type"
-                                  : "Loading tax rate"
-                              : paymentMethod === "cod"
-                                ? `${gstRate}% for Cash Payment`
-                                : paymentMethod === "cheque" &&
-                                    chequeType === "direct_collection"
-                                  ? `${gstRate}% for Self Cash Cheque`
-                                  : `${gstRate}% on subtotal`}
-                          </p>
-                        </div>
-
-                        <p className="text-sm font-medium text-white">
-                          {gstRate === null ? "—" : formatCurrency(gstAmount)}
-                        </p>
-                      </div>
-
-                      <div className="flex items-end justify-between gap-4 border-t border-white/10 pt-5">
-                        <div>
-                          <p className="text-xs text-white/40">
-                            Estimated total
-                          </p>
-
-                          {hasCustomUnpricedService && (
-                            <p className="mt-1 text-[11px] leading-4 text-white/30">
-                              Final pricing will be confirmed by our team.
-                            </p>
-                          )}
-                        </div>
-
-                        <p className="shrink-0 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-                          {hasCustomUnpricedService
-                            ? "Custom"
-                            : estimatedTotal === null
-                              ? "Loading"
-                              : formatCurrency(estimatedTotal)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 border-t border-white/10 pt-4">
-                      <p className="mb-2.5 text-[10px] font-medium uppercase tracking-[0.14em] text-white/35">
-                        Payment method
+                  <div className="mt-5 space-y-3 border-t border-white/10 pt-5">
+                    <div className="flex items-center justify-between gap-4">
+                      <p className="text-xs text-white/40">
+                        {hasCurrentCouponQuote
+                          ? "Original subtotal"
+                          : "Subtotal"}
                       </p>
 
-                      <div className={`grid gap-2 ${allowMonthEndPayment ? "grid-cols-2" : "grid-cols-3"}`}>
-                        <PaymentMethodChip
-                          selected={paymentMethod === "cod"}
-                          onClick={() => selectPaymentMethod("cod")}
-                          icon={Banknote}
-                          label="Cash Payment"
-                        />
-                        <PaymentMethodChip
-                          selected={paymentMethod === "online"}
-                          onClick={() => selectPaymentMethod("online")}
-                          icon={CreditCard}
-                          label="Pay Online"
-                          disabled={
-                            hasCustomUnpricedService && subtotal <= 0
-                          }
-                        />
-                        <PaymentMethodChip
-                          selected={paymentMethod === "cheque"}
-                          onClick={() => selectPaymentMethod("cheque")}
-                          icon={Landmark}
-                          label="Cheque"
-                        />
-                        {allowMonthEndPayment && (
-                          <PaymentMethodChip
-                            selected={paymentMethod === "month_end"}
-                            onClick={() => selectPaymentMethod("month_end")}
-                            icon={CalendarDays}
-                            label="Pay on Month-End"
-                          />
-                        )}
-                      </div>
-                      {allowMonthEndPayment && (
-                        <p className="mt-2 text-[11px] leading-4 text-white/50">Eligible for month-end payment. Payment is due at the end of the month.</p>
-                      )}
-
-                      {paymentMethod === "cheque" && (
-                        <div className="mt-2 grid grid-cols-2 gap-2">
-                          <ChequeOption
-                            compact
-                            selected={chequeType === "with_gst"}
-                            onClick={() => setChequeType("with_gst")}
-                            title="With GST"
-                          />
-                          <ChequeOption
-                            compact
-                            selected={chequeType === "direct_collection"}
-                            onClick={() => setChequeType("direct_collection")}
-                            title="Self Cash Cheque"
-                          />
-                        </div>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={handleSaveDraft}
-                        disabled={
-                          draftBusy ||
-                          submitting ||
-                          !orderItems.length ||
-                          Boolean(loadingServiceId)
-                        }
-                        className="dashboard-action dashboard-action--secondary dashboard-action--inverse mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {draftBusy ? (
-                          <Loader2 size={14} className="animate-spin" />
-                        ) : (
-                          <Save size={14} />
-                        )}
-                        {editingDraftId ? "Update Draft" : "Save as Draft"}
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={
-                          submitting ||
-                          draftQuoteLoading ||
-                          draftBusy ||
-                          Boolean(
-                            editingDraftId &&
-                            currentDraftQuote &&
-                            !currentDraftQuote.confirmed,
-                          ) ||
-                          currentCouponLoading ||
-                          Boolean(
-                            appliedCouponCode &&
-                              (!hasCurrentCouponQuote || currentCouponError),
-                          ) ||
-                          (["online", "month_end"].includes(paymentMethod) &&
-                            (paymentPricingLoading || !paymentPricing)) ||
-                          (paymentMethod === "month_end" && !allowMonthEndPayment) ||
-                          Boolean(loadingServiceId) ||
-                          !orderItems.length ||
-                          (paymentMethod === "online" &&
-                            estimatedTotal !== null &&
-                            estimatedTotal <= 0 && adCreditTotal === 0)
-                        }
-                        className="dashboard-action dashboard-action--primary dashboard-action--inverse mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-zinc-950 transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {submitting || draftQuoteLoading ? (
-                          <>
-                            <Loader2 size={14} className="animate-spin" />
-                            {submitting ? "Processing..." : "Checking price..."}
-                          </>
-                        ) : (
-                          <>
-                            {editingDraftId && !currentDraftQuote
-                              ? "Review current total"
-                              : paymentMethod === "online"
-                                ? "Continue to payment"
-                                : "Place Order"}
-                            <ArrowRight size={14} aria-hidden="true" />
-                          </>
-                        )}
-                      </button>
+                      <p className="text-sm font-medium text-white">
+                        {formatCurrency(subtotal)}
+                      </p>
                     </div>
 
+                    {hasCurrentCouponQuote && (
+                      <>
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-xs text-emerald-200/80">
+                              Coupon {currentCouponQuote.code}
+                            </p>
+                            <p className="mt-0.5 text-[10px] text-white/30">
+                              Service-specific discounts
+                            </p>
+                          </div>
+                          <p className="text-sm font-medium text-emerald-200">
+                            −{formatCurrency(couponDiscountTotal)}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <p className="text-xs text-white/40">
+                            {adCreditTotal > 0
+                              ? "Subtotal after coupon"
+                              : "Taxable subtotal"}
+                          </p>
+                          <p className="text-sm font-medium text-white">
+                            {formatCurrency(subtotalBeforeAdCredit)}
+                          </p>
+                        </div>
+                        <div className="space-y-1 border-l border-white/10 pl-3">
+                          {currentCouponQuote.serviceBreakdown
+                            .filter((line) => line.discountAmount > 0)
+                            .map((line) => (
+                              <div
+                                key={line.serviceId}
+                                className="flex justify-between gap-3 text-[10px] text-white/40"
+                              >
+                                <span className="truncate">
+                                  {line.serviceName} ({line.discountPercent}%)
+                                </span>
+                                <span className="shrink-0">
+                                  −{formatCurrency(line.discountAmount)}
+                                </span>
+                              </div>
+                            ))}
+                        </div>
+                      </>
+                    )}
+
+                    {adCreditTotal > 0 && (
+                      <div className="flex items-center justify-between text-sm text-emerald-300">
+                        <span>Ad credit applied</span>
+                        <span>-{formatCurrency(adCreditTotal)}</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-xs text-white/40">
+                          GST
+                          {hasCurrentCouponQuote ? " on taxable subtotal" : ""}
+                        </p>
+
+                        <p className="mt-0.5 text-[10px] text-white/25">
+                          {gstRate === null
+                            ? paymentMethod === "cheque" && chequeType
+                              ? "Loading tax rate"
+                              : paymentMethod === "cheque"
+                                ? "Choose a cheque type"
+                                : "Loading tax rate"
+                            : paymentMethod === "cod"
+                              ? `${gstRate}% for Cash Payment`
+                              : paymentMethod === "cheque" &&
+                                  chequeType === "direct_collection"
+                                ? `${gstRate}% for Self Cash Cheque`
+                                : `${gstRate}% on subtotal`}
+                        </p>
+                      </div>
+
+                      <p className="text-sm font-medium text-white">
+                        {gstRate === null ? "—" : formatCurrency(gstAmount)}
+                      </p>
+                    </div>
+
+                    <div className="flex items-end justify-between gap-4 border-t border-white/10 pt-5">
+                      <div>
+                        <p className="text-xs text-white/40">Estimated total</p>
+
+                        {hasCustomUnpricedService && (
+                          <p className="mt-1 text-[11px] leading-4 text-white/30">
+                            Final pricing will be confirmed by our team.
+                          </p>
+                        )}
+                      </div>
+
+                      <p className="shrink-0 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+                        {hasCustomUnpricedService
+                          ? "Custom"
+                          : estimatedTotal === null
+                            ? "Loading"
+                            : formatCurrency(estimatedTotal)}
+                      </p>
+                    </div>
                   </div>
-                </section>
-              )}
+
+                  <div className="mt-5 border-t border-white/10 pt-4">
+                    <p className="mb-2.5 text-[10px] font-medium uppercase tracking-[0.14em] text-white/35">
+                      Payment method
+                    </p>
+
+                    <div
+                      className={`grid gap-2 ${allowMonthEndPayment ? "grid-cols-2" : "grid-cols-3"}`}
+                    >
+                      <PaymentMethodChip
+                        selected={paymentMethod === "cod"}
+                        onClick={() => selectPaymentMethod("cod")}
+                        icon={Banknote}
+                        label="Cash Payment"
+                      />
+                      <PaymentMethodChip
+                        selected={paymentMethod === "online"}
+                        onClick={() => selectPaymentMethod("online")}
+                        icon={CreditCard}
+                        label="Pay Online"
+                        disabled={hasCustomUnpricedService && subtotal <= 0}
+                      />
+                      <PaymentMethodChip
+                        selected={paymentMethod === "cheque"}
+                        onClick={() => selectPaymentMethod("cheque")}
+                        icon={Landmark}
+                        label="Cheque"
+                      />
+                      {allowMonthEndPayment && (
+                        <PaymentMethodChip
+                          selected={paymentMethod === "month_end"}
+                          onClick={() => selectPaymentMethod("month_end")}
+                          icon={CalendarDays}
+                          label="Pay on Month-End"
+                        />
+                      )}
+                    </div>
+                    {allowMonthEndPayment && (
+                      <p className="mt-2 text-[11px] leading-4 text-white/50">
+                        Eligible for month-end payment. Payment is due at the
+                        end of the month.
+                      </p>
+                    )}
+
+                    {paymentMethod === "cheque" && (
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <ChequeOption
+                          compact
+                          selected={chequeType === "with_gst"}
+                          onClick={() => setChequeType("with_gst")}
+                          title="With GST"
+                        />
+                        <ChequeOption
+                          compact
+                          selected={chequeType === "direct_collection"}
+                          onClick={() => setChequeType("direct_collection")}
+                          title="Self Cash Cheque"
+                        />
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleSaveDraft}
+                      disabled={
+                        draftBusy ||
+                        submitting ||
+                        !orderItems.length ||
+                        Boolean(loadingServiceId)
+                      }
+                      className="dashboard-action dashboard-action--secondary dashboard-action--inverse mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {draftBusy ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Save size={14} />
+                      )}
+                      {editingDraftId ? "Update Draft" : "Save as Draft"}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={
+                        submitting ||
+                        draftQuoteLoading ||
+                        draftBusy ||
+                        Boolean(
+                          editingDraftId &&
+                          currentDraftQuote &&
+                          !currentDraftQuote.confirmed,
+                        ) ||
+                        currentCouponLoading ||
+                        Boolean(
+                          appliedCouponCode &&
+                          (!hasCurrentCouponQuote || currentCouponError),
+                        ) ||
+                        (["online", "month_end"].includes(paymentMethod) &&
+                          (paymentPricingLoading || !paymentPricing)) ||
+                        (paymentMethod === "month_end" &&
+                          !allowMonthEndPayment) ||
+                        Boolean(loadingServiceId) ||
+                        !orderItems.length ||
+                        (paymentMethod === "online" &&
+                          estimatedTotal !== null &&
+                          estimatedTotal <= 0 &&
+                          adCreditTotal === 0)
+                      }
+                      className="dashboard-action dashboard-action--primary dashboard-action--inverse mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-zinc-950 transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {submitting || draftQuoteLoading ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          {submitting ? "Processing..." : "Checking price..."}
+                        </>
+                      ) : (
+                        <>
+                          {editingDraftId && !currentDraftQuote
+                            ? "Review current total"
+                            : paymentMethod === "online"
+                              ? "Continue to payment"
+                              : "Place Order"}
+                          <ArrowRight size={14} aria-hidden="true" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </section>
+            )}
           </aside>
         </div>
       </form>
+      {orderItems.length > 0 && (
+        <nav className="mobile-order-review" aria-label="Order review shortcut">
+          <div className="min-w-0">
+            <p className="text-[11px] text-zinc-500">Estimated total</p>
+            <p className="text-base font-semibold text-zinc-900">
+              {hasCustomUnpricedService
+                ? "Custom pricing"
+                : estimatedTotal === null
+                  ? "Loading..."
+                  : formatCurrency(estimatedTotal)}
+            </p>
+          </div>
+          <a
+            href="#new-order-summary"
+            className="dashboard-action dashboard-action--primary shrink-0"
+          >
+            Review order <ArrowRight size={15} aria-hidden="true" />
+          </a>
+        </nav>
+      )}
     </div>
   );
 };

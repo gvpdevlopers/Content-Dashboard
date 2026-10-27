@@ -1,3 +1,7 @@
+import ConfirmDialog from "../../components/ConfirmDialog";
+import ActiveFilters from "../../components/ActiveFilters";
+import FormFeedback from "../../components/FormFeedback";
+import CustomSelect from "../../components/CustomSelect";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Check,
@@ -6,6 +10,8 @@ import {
   Loader2,
   Pencil,
   Plus,
+  Power,
+  Search,
   RefreshCw,
   TicketPercent,
   Trash2,
@@ -54,6 +60,15 @@ const AdminCoupons = () => {
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [loadError, setLoadError] = useState("");
+  const [formError, setFormError] = useState("");
+  const [formSuccess, setFormSuccess] = useState("");
+  const [couponToDelete, setCouponToDelete] = useState(null);
+  const [deletingId, setDeletingId] = useState("");
+  const [togglingId, setTogglingId] = useState("");
+  const [deleteError, setDeleteError] = useState("");
   const [editingId, setEditingId] = useState("");
   const [expandedUsageId, setExpandedUsageId] = useState("");
   const [usagesByCoupon, setUsagesByCoupon] = useState({});
@@ -63,6 +78,7 @@ const AdminCoupons = () => {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError("");
       const [couponResponse, serviceResponse] = await Promise.all([
         couponService.listCoupons(),
         serviceService.getAdminServices(),
@@ -83,6 +99,7 @@ const AdminCoupons = () => {
         }),
       }));
     } catch (error) {
+      setLoadError(errorMessage(error));
       toast.error(errorMessage(error));
     } finally {
       setLoading(false);
@@ -102,7 +119,16 @@ const AdminCoupons = () => {
     [services],
   );
 
+  const filteredCoupons = useMemo(() => coupons.filter((coupon) => {
+    const query = search.trim().toLowerCase();
+    const matchesSearch = !query || String(coupon.code || "").toLowerCase().includes(query);
+    const matchesStatus = statusFilter === "all" || (statusFilter === "active" ? coupon.isActive : !coupon.isActive);
+    return matchesSearch && matchesStatus;
+  }), [coupons, search, statusFilter]);
+
   const resetForm = () => {
+    setFormError("");
+    setFormSuccess("");
     setForm({
       ...emptyForm,
       serviceDiscounts: sortedServices.map((service) => ({
@@ -126,6 +152,8 @@ const AdminCoupons = () => {
 
   const startEditing = (coupon) => {
     setEditingId(coupon._id);
+    setFormError("");
+    setFormSuccess("");
     setForm({
       code: coupon.code,
       serviceDiscounts: sortedServices.map((service) => {
@@ -148,7 +176,10 @@ const AdminCoupons = () => {
 
   const saveCoupon = async (event) => {
     event.preventDefault();
+    if (saving) return;
     setSaving(true);
+    setFormError("");
+    setFormSuccess("");
     try {
       const payload = {
         ...form,
@@ -171,8 +202,10 @@ const AdminCoupons = () => {
         : await couponService.createCoupon(payload);
       toast.success(response.message || "Coupon saved.");
       resetForm();
+      setFormSuccess(response.message || "Coupon saved successfully.");
       await loadData();
     } catch (error) {
+      setFormError(errorMessage(error));
       toast.error(errorMessage(error));
     } finally {
       setSaving(false);
@@ -180,6 +213,8 @@ const AdminCoupons = () => {
   };
 
   const toggleCoupon = async (coupon) => {
+    if (togglingId) return;
+    setTogglingId(coupon._id);
     try {
       const payload = {
         code: coupon.code,
@@ -198,23 +233,25 @@ const AdminCoupons = () => {
       await loadData();
     } catch (error) {
       toast.error(errorMessage(error));
+    } finally {
+      setTogglingId("");
     }
   };
 
   const removeCoupon = async (coupon) => {
-    if (
-      !window.confirm(
-        `Delete coupon ${coupon.code}? Coupons with redemptions cannot be deleted.`,
-      )
-    ) {
-      return;
-    }
+    if (!coupon || deletingId) return;
+    setDeletingId(coupon._id);
+    setDeleteError("");
     try {
       const response = await couponService.deleteCoupon(coupon._id);
       toast.success(response.message);
+      setCouponToDelete(null);
       await loadData();
     } catch (error) {
+      setDeleteError(errorMessage(error));
       toast.error(errorMessage(error));
+    } finally {
+      setDeletingId("");
     }
   };
 
@@ -272,6 +309,8 @@ const AdminCoupons = () => {
 
       <form
         onSubmit={saveCoupon}
+        aria-busy={saving}
+        onInvalid={() => setFormError("Please complete the highlighted fields before saving.")}
         className="rounded-[24px] border border-zinc-200 bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)] sm:p-7"
       >
         <div className="flex items-center justify-between gap-3">
@@ -440,6 +479,8 @@ const AdminCoupons = () => {
           </div>
         </fieldset>
 
+        <FormFeedback message={formError} />
+        <FormFeedback message={formSuccess} tone="success" />
         <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-zinc-100 pt-5">
           {editingId && (
             <button
@@ -462,7 +503,7 @@ const AdminCoupons = () => {
             ) : (
               <Plus size={15} />
             )}
-            {editingId ? "Save changes" : "Create coupon"}
+            {saving ? "Saving..." : editingId ? "Save changes" : "Create coupon"}
           </button>
         </div>
       </form>
@@ -473,24 +514,39 @@ const AdminCoupons = () => {
           <p className="mt-1 text-xs text-zinc-500">
             Used coupons are retained for order history and cannot be deleted.
           </p>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <label className="relative min-w-0 flex-1">
+              <span className="sr-only">Search coupons by code</span>
+              <Search size={16} aria-hidden="true" className="pointer-events-none absolute left-3 top-3.5 text-zinc-400" />
+              <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search coupon codes..."
+                className="min-h-11 w-full rounded-xl border border-zinc-200 bg-zinc-50 py-2.5 pl-9 pr-3 text-sm" />
+            </label>
+            <div className="w-full sm:w-48">
+              <CustomSelect aria-label="Filter coupons by status" value={statusFilter} onChange={setStatusFilter}
+                options={[{ value: "all", label: "All statuses" }, { value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]} />
+            </div>
+          </div>
+          <ActiveFilters filters={[{ label: "Search", value: search.trim() }, { label: "Status", value: statusFilter === "all" ? "" : statusFilter }]} onClear={() => { setSearch(""); setStatusFilter("all"); }} />
+          {!loading && !loadError && <p role="status" className="mt-3 text-xs text-zinc-500">Showing {filteredCoupons.length} of {coupons.length} coupons</p>}
+          <FormFeedback message={loadError} />
         </div>
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-14 text-sm text-zinc-400">
             <Loader2 size={17} className="animate-spin" /> Loading coupons...
           </div>
-        ) : coupons.length === 0 ? (
+        ) : loadError && coupons.length === 0 ? null : filteredCoupons.length === 0 ? (
           <div className="flex flex-col items-center py-14 text-center">
             <TicketPercent size={24} className="text-zinc-300" />
             <p className="mt-3 text-sm font-medium text-zinc-700">
-              No coupons yet
+              {coupons.length ? "No matching coupons" : "No coupons yet"}
             </p>
             <p className="mt-1 text-xs text-zinc-400">
-              Create your first coupon using the form above.
+              {coupons.length ? "Change your search or clear the active filters." : "Create your first coupon using the form above."}
             </p>
           </div>
         ) : (
           <div className="divide-y divide-zinc-100">
-            {coupons.map((coupon) => {
+            {filteredCoupons.map((coupon) => {
               const expanded = expandedUsageId === coupon._id;
               const usage = usagesByCoupon[coupon._id] || [];
               return (
@@ -531,11 +587,12 @@ const AdminCoupons = () => {
                           : ""}
                       </p>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="table-actions">
                       <button
                         type="button"
                         onClick={() => toggleUsage(coupon._id)}
-                        className="dashboard-action dashboard-action--secondary inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                        title="View coupon usage" aria-expanded={expanded} aria-controls={`coupon-usage-${coupon._id}`}
+                        className="dashboard-action dashboard-action--secondary"
                       >
                         {loadingUsageId === coupon._id ? (
                           <Loader2 size={14} className="animate-spin" />
@@ -549,30 +606,36 @@ const AdminCoupons = () => {
                       <button
                         type="button"
                         onClick={() => startEditing(coupon)}
-                        className="dashboard-action dashboard-action--secondary inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                        disabled={saving || loading}
+                        title="Edit coupon" aria-label={`Edit ${coupon.code}`}
+                        className="dashboard-action dashboard-action--secondary dashboard-action--icon"
                       >
-                        <Pencil size={13} /> Edit
+                        <Pencil size={16} aria-hidden="true" />
                       </button>
                       <button
                         type="button"
                         onClick={() => toggleCoupon(coupon)}
-                        className="dashboard-action dashboard-action--secondary rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-600 hover:bg-zinc-50"
+                        disabled={saving || loading || Boolean(togglingId)}
+                        title={`${coupon.isActive ? "Deactivate" : "Activate"} coupon`} aria-label={`${coupon.isActive ? "Deactivate" : "Activate"} ${coupon.code}`}
+                        className="dashboard-action dashboard-action--secondary dashboard-action--icon"
                       >
-                        {coupon.isActive ? "Deactivate" : "Activate"}
+                        {togglingId === coupon._id ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Power size={16} aria-hidden="true" />}
                       </button>
                       <button
                         type="button"
-                        onClick={() => removeCoupon(coupon)}
+                        onClick={() => { setDeleteError(""); setCouponToDelete(coupon); }}
+                        disabled={saving || loading || Boolean(deletingId)}
+                        title="Delete coupon"
                         className="dashboard-action--icon dashboard-action dashboard-action--destructive rounded-lg border border-red-100 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
                         aria-label={`Delete ${coupon.code}`}
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={16} aria-hidden="true" />
                       </button>
                     </div>
                   </div>
 
                   {expanded && (
-                    <div className="border-t border-zinc-100 bg-zinc-50/60 px-5 py-4 sm:px-6">
+                    <div id={`coupon-usage-${coupon._id}`} className="border-t border-zinc-100 bg-zinc-50/60 px-5 py-4 sm:px-6">
                       {usage.length === 0 ? (
                         <p className="text-xs text-zinc-500">
                           No successful redemptions recorded.
@@ -630,6 +693,10 @@ const AdminCoupons = () => {
           </div>
         )}
       </section>
+      <ConfirmDialog open={Boolean(couponToDelete)} title="Delete this coupon?"
+        description={`Delete coupon ${couponToDelete?.code || ""}? Coupons with redemptions cannot be deleted.`}
+        confirmLabel="Delete coupon" destructive loading={Boolean(deletingId)} error={deleteError}
+        onConfirm={() => removeCoupon(couponToDelete)} onCancel={() => { setCouponToDelete(null); setDeleteError(""); }} />
     </div>
   );
 };

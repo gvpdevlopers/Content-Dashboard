@@ -1,3 +1,5 @@
+import SharedOrderStatusBadge from "../components/OrderStatusBadge";
+import PaymentStatusBadge from "../components/PaymentStatusBadge";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -266,7 +268,6 @@ const Dashboard = () => {
               hover:bg-zinc-800
               hover:text-white
               hover:shadow-[0_12px_34px_rgba(0,0,0,0.10)]
-              active:scale-[0.99]
             "
           >
             <span
@@ -337,7 +338,6 @@ const Dashboard = () => {
               transition-all
               duration-200
               hover:bg-red-100
-              active:scale-[0.98]
             "
           >
             <RefreshCw size={14} />
@@ -643,10 +643,9 @@ const Dashboard = () => {
     hover:border-zinc-900
     hover:bg-zinc-900
     hover:text-white
-    active:scale-[0.98]
   "
               >
-                <span className="text-zinc-800 transition-colors duration-200 group-hover/support:text-white">
+                <span className="text-white transition-colors duration-200 group-hover/support:text-white">
                   {supportPhone}
                 </span>
               </a>
@@ -1118,106 +1117,14 @@ const RecentOrder = ({ order }) => {
    PAYMENT BADGE
 ========================================================= */
 
-const PaymentBadge = ({ paymentStatus, isCodPaymentDone }) => {
-  if (
-    isCodPaymentDone ||
-    ["paid", "completed", "success", "successful"].includes(paymentStatus)
-  ) {
-    return (
-      <span
-        className="
-          rounded-full
-          border border-emerald-200
-          bg-emerald-50
-          px-3
-          py-1.5
-          text-[11px]
-          font-medium
-          text-emerald-700
-        "
-      >
-        Payment Done
-      </span>
-    );
-  }
-
-  if (paymentStatus === "pending") {
-    return (
-      <span
-        className="
-          rounded-full
-          border border-amber-200
-          bg-amber-50
-          px-3
-          py-1.5
-          text-[11px]
-          font-medium
-          text-amber-700
-        "
-      >
-        Payment Pending
-      </span>
-    );
-  }
-
-  return (
-    <span
-      className="
-        rounded-full
-        border border-zinc-200
-        bg-zinc-50
-        px-3
-        py-1.5
-        text-[11px]
-        font-medium
-        text-zinc-600
-      "
-    >
-      {formatStatus(paymentStatus)}
-    </span>
-  );
-};
-
+const PaymentBadge = ({ paymentStatus, isCodPaymentDone }) => (
+  <PaymentStatusBadge status={isCodPaymentDone || ["paid", "completed", "success", "successful"].includes(paymentStatus) ? "paid" : paymentStatus} />
+);
 /* =========================================================
    STATUS BADGE
 ========================================================= */
 
-const StatusBadge = ({ label, type }) => {
-  const styles = {
-    pending: "border-zinc-200 bg-zinc-50 text-zinc-600",
-
-    confirmed: "border-blue-200 bg-blue-50 text-blue-700",
-
-    in_progress: "border-cyan-200 bg-cyan-50 text-cyan-700",
-
-    processing: "border-cyan-200 bg-cyan-50 text-cyan-700",
-
-    completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
-
-    delivered: "border-emerald-200 bg-emerald-50 text-emerald-700",
-
-    cancelled: "border-red-200 bg-red-50 text-red-700",
-
-    rejected: "border-red-200 bg-red-50 text-red-700",
-  };
-
-  return (
-    <span
-      className={`
-        rounded-full
-        border
-        px-3
-        py-1.5
-        text-[11px]
-        font-medium
-        ${styles[type] || styles.pending}
-      `}
-    >
-      {label}
-    </span>
-  );
-};
-
+const StatusBadge = ({ type }) => <SharedOrderStatusBadge status={type} />;
 /* =========================================================
    STATUS FORMATTER
 ========================================================= */

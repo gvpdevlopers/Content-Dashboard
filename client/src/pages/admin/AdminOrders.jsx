@@ -1,3 +1,6 @@
+import ActiveFilters from "../../components/ActiveFilters";
+import PaymentStatusBadge from "../../components/PaymentStatusBadge";
+import StatusBadge from "../../components/OrderStatusBadge";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -142,7 +145,7 @@ const AdminOrders = () => {
   };
 
   return (
-    <div className="mx-auto max-w-[1500px] animate-fade-up">
+    <div className="mx-auto w-full min-w-0 max-w-[1500px] animate-fade-up">
       {/* =====================================================
           PAGE HEADER
       ====================================================== */}
@@ -323,7 +326,7 @@ const AdminOrders = () => {
                   ${
                     refreshing
                       ? "animate-spin"
-                      : "group-hover/refresh:rotate-180"
+                      : ""
                   }
                 `}
               />
@@ -339,7 +342,7 @@ const AdminOrders = () => {
       ====================================================== */}
 
       {error && (
-        <div
+        <div role="alert"
           className="
             mb-6
             flex
@@ -536,43 +539,16 @@ const AdminOrders = () => {
 
           {/* Clear */}
 
-          {hasFilters && (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="dashboard-action dashboard-action--secondary
-                inline-flex
-                h-[50px]
-                shrink-0
-                items-center
-                justify-center
-                gap-2
-                rounded-xl
-                border border-zinc-200
-                bg-white
-                px-4
-                text-sm
-                text-zinc-500
-                shadow-sm
-                transition-all
-                duration-200
-                hover:border-zinc-300
-                hover:bg-zinc-50
-                hover:text-zinc-900
-              "
-            >
-              <X size={15} />
-              Clear
-            </button>
-          )}
+
         </div>
+        <ActiveFilters filters={[{ label: "Search", value: search.trim() }, { label: "Order status", value: statusFilter === "all" ? "" : statusFilter.replace(/_/g, " ") }, { label: "Payment", value: paymentFilter === "all" ? "" : paymentFilter }]} onClear={clearFilters} />
       </section>
 
       {/* =====================================================
           RESULT COUNT
       ====================================================== */}
 
-      {!loading && (
+      {!loading && !error && (
         <div
           className="
             mb-4
@@ -598,7 +574,7 @@ const AdminOrders = () => {
       ====================================================== */}
 
       {loading ? (
-        <div
+        <div role="status" aria-label="Loading orders"
           className="
             relative
             flex
@@ -660,7 +636,7 @@ const AdminOrders = () => {
             </div>
           </div>
         </div>
-      ) : filteredOrders.length === 0 ? (
+      ) : error && filteredOrders.length === 0 ? null : filteredOrders.length === 0 ? (
         <EmptyOrders hasFilters={hasFilters} onClear={clearFilters} />
       ) : (
         <>
@@ -757,6 +733,7 @@ const AdminOrderRow = ({ order, orderPath }) => {
   return (
     <Link
       to={`${orderPath}/${order._id}`}
+      title="View order details"
       className="
         group
         grid
@@ -831,21 +808,8 @@ const AdminOrderRow = ({ order, orderPath }) => {
 
       <div className="flex justify-end">
         <span
-          className="
-            flex h-9 w-9
-            items-center justify-center
-            rounded-lg
-            border border-zinc-200
-            bg-white
-            text-zinc-400
-            shadow-sm
-            transition-all
-            duration-300
-            group-hover:border-zinc-900
-            group-hover:bg-zinc-900
-            group-hover:text-white
-            group-hover:shadow-md
-          "
+          title="View order details" aria-hidden="true"
+          className="table-action-indicator transition-colors group-hover:bg-zinc-50"
         >
           <ArrowRight
             size={16}
@@ -899,9 +863,16 @@ const AdminOrderMobileCard = ({ order, orderPath }) => {
   return (
     <Link
       to={`${orderPath}/${order._id}`}
-      className="dashboard-action dashboard-action--secondary
+      title="View order details"
+      className="
         group
         block
+        w-full
+        min-w-0
+        text-left
+        focus-visible:outline-2
+        focus-visible:outline-offset-2
+        focus-visible:outline-slate-500
         rounded-2xl
         border border-zinc-200
         bg-white
@@ -1068,7 +1039,7 @@ const AdminOrderMobileCard = ({ order, orderPath }) => {
 
         <span
           className="
-            flex h-9 w-9
+            table-action-indicator
             items-center
             justify-center
             rounded-lg
@@ -1098,72 +1069,6 @@ const AdminOrderMobileCard = ({ order, orderPath }) => {
 };
 
 /* =========================================================
-   STATUS BADGE
-========================================================= */
-
-const StatusBadge = ({ status }) => {
-  const config = {
-    pending: {
-      label: "Pending",
-      className: "border-amber-200 bg-amber-50 text-amber-700",
-    },
-
-    processing: {
-      label: "Processing",
-      className: "border-blue-200 bg-blue-50 text-blue-700",
-    },
-
-    in_progress: {
-      label: "In Progress",
-      className: "border-purple-200 bg-purple-50 text-purple-700",
-    },
-
-    completed: {
-      label: "Completed",
-      className: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    },
-
-    delivered: {
-      label: "Delivered",
-      className: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    },
-
-    cancelled: {
-      label: "Cancelled",
-      className: "border-red-200 bg-red-50 text-red-700",
-    },
-
-    rejected: {
-      label: "Rejected",
-      className: "border-red-200 bg-red-50 text-red-700",
-    },
-  };
-
-  const current = config[status] || {
-    label: formatStatus(status),
-    className: "border-zinc-200 bg-zinc-50 text-zinc-500",
-  };
-
-  return (
-    <span
-      className={`
-        inline-flex
-        whitespace-nowrap
-        rounded-full
-        border
-        px-2.5
-        py-1
-        text-[10px]
-        font-medium
-        ${current.className}
-      `}
-    >
-      {current.label}
-    </span>
-  );
-};
-
-/* =========================================================
    PAYMENT BADGE
 ========================================================= */
 
@@ -1181,55 +1086,13 @@ const PaymentBadge = ({ method, status }) => {
               ? formatStatus(method)
               : "—";
 
-  const statusConfig = {
-    paid: {
-      label: "Paid",
-      className: "text-emerald-600",
-    },
-
-    collected: {
-      label: "Collected",
-      className: "text-emerald-600",
-    },
-
-    pending: {
-      label: "Pending",
-      className: "text-amber-600",
-    },
-
-    failed: {
-      label: "Failed",
-      className: "text-red-600",
-    },
-
-    refunded: {
-      label: "Refunded",
-      className: "text-blue-600",
-    },
-  };
-
-  const current = statusConfig[status] || {
-    label: formatStatus(status),
-    className: "text-zinc-400",
-  };
-
   return (
-    <div>
+    <div className="min-w-0 space-y-1.5">
       <p className="text-xs text-zinc-600">{methodLabel}</p>
-
-      <p
-        className={`
-          mt-0.5
-          text-[10px]
-          ${current.className}
-        `}
-      >
-        {current.label}
-      </p>
+      <PaymentStatusBadge status={status} />
     </div>
   );
 };
-
 /* =========================================================
    EMPTY STATE
 ========================================================= */

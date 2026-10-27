@@ -1,3 +1,5 @@
+import PaymentStatusBadge from "../../components/PaymentStatusBadge";
+import StatusBadge from "../../components/OrderStatusBadge";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -752,7 +754,7 @@ const AdminOrderDetails = () => {
                   ${
                     refreshing
                       ? "animate-spin"
-                      : "group-hover/refresh:rotate-180"
+                      : ""
                   }
                 `}
               />
@@ -2214,82 +2216,6 @@ const EmptySubmittedData = () => {
         This service did not require any additional client-submitted fields.
       </p>
     </div>
-  );
-};
-
-/* =========================================================
-   STATUS BADGE
-========================================================= */
-
-const StatusBadge = ({ status }) => {
-  const config = {
-    pending: "border-amber-200 bg-amber-50 text-amber-700",
-
-    processing: "border-blue-200 bg-blue-50 text-blue-700",
-
-    in_progress: "border-purple-200 bg-purple-50 text-purple-700",
-
-    completed: "border-emerald-200 bg-emerald-50 text-emerald-700",
-
-    delivered: "border-emerald-200 bg-emerald-50 text-emerald-700",
-
-    cancelled: "border-red-200 bg-red-50 text-red-700",
-
-    rejected: "border-red-200 bg-red-50 text-red-700",
-  };
-
-  return (
-    <span
-      className={`
-        inline-flex
-        whitespace-nowrap
-        rounded-full
-        border
-        px-2.5
-        py-1
-        text-[10px]
-        font-medium
-        ${config[status] || "border-zinc-200 bg-zinc-50 text-zinc-500"}
-      `}
-    >
-      {formatStatus(status)}
-    </span>
-  );
-};
-
-/* =========================================================
-   PAYMENT STATUS BADGE
-========================================================= */
-
-const PaymentStatusBadge = ({ status }) => {
-  const config = {
-    pending: "border-amber-200 bg-amber-50 text-amber-700",
-
-    processing: "border-blue-200 bg-blue-50 text-blue-700",
-
-    paid: "border-emerald-200 bg-emerald-50 text-emerald-700",
-
-    collected: "border-emerald-200 bg-emerald-50 text-emerald-700",
-
-    failed: "border-red-200 bg-red-50 text-red-700",
-  };
-
-  return (
-    <span
-      className={`
-        inline-flex
-        whitespace-nowrap
-        rounded-full
-        border
-        px-2.5
-        py-1
-        text-[10px]
-        font-medium
-        ${config[status] || "border-zinc-200 bg-zinc-50 text-zinc-500"}
-      `}
-    >
-      Payment: {formatStatus(status)}
-    </span>
   );
 };
 

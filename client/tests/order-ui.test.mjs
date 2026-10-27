@@ -1,3 +1,5 @@
+import { getModalViewport, getSelectPortalTarget, lockBodyScroll } from "../src/utils/modal.js";
+import { canEnterCashPaymentPin, getVerifiedPaymentUpdate } from "../src/utils/paymentPin.js";
 import test, { before, after } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "vite";
@@ -7,14 +9,19 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { validResourceUrl, hasProjectDetails } from "../src/utils/orderResources.js";
 import { getSelectPlacement, findEnabledOption, findTypeaheadOption } from "../src/utils/selectNavigation.js";
 import { getDraftLabel, formatDraftDate } from "../src/utils/draftLabels.js";
-let server, Progress, Delivery, Resource, Badge, Select;
+let server, Progress, Delivery, Resource, Badge, PaymentBadge, Select, Filters, Feedback, Modal, Confirm;
 before(async () => {
   server = await createServer({ configFile: false, plugins: [react()], optimizeDeps: { noDiscovery: true, entries: [] }, resolve: { preserveSymlinks: true }, server: { middlewareMode: true }, appType: "custom" });
+  Filters = (await server.ssrLoadModule("/src/components/ActiveFilters.jsx")).default;
+  Feedback = (await server.ssrLoadModule("/src/components/FormFeedback.jsx")).default;
+  Modal = (await server.ssrLoadModule("/src/components/Modal.jsx")).default;
+  Confirm = (await server.ssrLoadModule("/src/components/ConfirmDialog.jsx")).default;
   Select = (await server.ssrLoadModule("/src/components/CustomSelect.jsx")).default;
   Progress = (await server.ssrLoadModule("/src/components/ServiceProgress.jsx")).default;
   Delivery = (await server.ssrLoadModule("/src/components/ServiceDelivery.jsx")).default;
   Resource = (await server.ssrLoadModule("/src/components/OrderResourceAction.jsx")).default;
   Badge = (await server.ssrLoadModule("/src/components/OrderStatusBadge.jsx")).default;
+  PaymentBadge = (await server.ssrLoadModule("/src/components/PaymentStatusBadge.jsx")).default;
 });
 after(async () => { await server?.close(); });
 const render = (Component, props) => renderToStaticMarkup(React.createElement(Component, props));
@@ -119,4 +126,125 @@ test("contact form reuses the accessible service select without changing submiss
   assert.match(html, /novalidate=""/i);
   assert.match(html, />Select a service</);
   assert.doesNotMatch(html, /<select/);
+});
+
+
+test("payment badges distinguish pending, failed, refunded and settled payments across views", () => {
+  for (const [status, label, color] of [
+    ["paid", "Paid", "emerald"], ["collected", "Collected", "emerald"],
+    ["pending", "Pending", "amber"], ["processing", "Processing", "blue"],
+    ["failed", "Failed", "red"], ["refunded", "Refunded", "blue"],
+  ]) {
+    const html = render(PaymentBadge, { status });
+    assert.ok(html.includes(`Payment: ${label}`));
+    assert.ok(html.includes(`text-${color}-700`));
+    assert.match(html, /aria-hidden="true"/);
+  }
+  for (const status of [undefined, "chargeback_review"]) {
+    const html = render(PaymentBadge, { status });
+    assert.match(html, /text-zinc-600/);
+    assert.doesNotMatch(html, /emerald/);
+  }
+  assert.match(render(PaymentBadge, { status: "PAID" }), /Payment: Paid/);
+});
+
+test("custom validation can announce required selects without adding browser validation", () => {
+  const html = render(Select, { id: "order-field", value: "", onChange() {}, options: [],
+    "aria-label": "Project type", "aria-required": true, "aria-describedby": "project-help" });
+  assert.match(html, /aria-required="true"/);
+  assert.match(html, /aria-describedby="project-help"/);
+  assert.match(html, /id="order-field"/);
+  assert.doesNotMatch(html, /<input/);
+});
+
+
+test("cash PIN entry is available only for generated active unpaid cash orders", () => {
+  const order = { paymentMethod: "cod", codPinStatus: "active", paymentStatus: "pending", orderStatus: "processing" };
+  assert.equal(canEnterCashPaymentPin(order), true);
+  for (const codPinStatus of [undefined, "not_generated", "expired", "verified", "used"]) {
+    assert.equal(canEnterCashPaymentPin({ ...order, codPinStatus }), false);
+  }
+  for (const paymentMethod of ["online", "cheque", "month_end"]) {
+    assert.equal(canEnterCashPaymentPin({ ...order, paymentMethod }), false);
+  }
+  for (const paymentStatus of ["paid", "collected"]) {
+    assert.equal(canEnterCashPaymentPin({ ...order, paymentStatus }), false);
+  }
+  for (const orderStatus of ["cancelled", "rejected"]) {
+    assert.equal(canEnterCashPaymentPin({ ...order, orderStatus }), false);
+  }
+  assert.equal(canEnterCashPaymentPin(null), false);
+});
+
+test("PIN verification preserves server payment results and the existing cash success fallback", () => {
+  const order = { paymentStatus: "pending", codPinStatus: "active" };
+  const update = getVerifiedPaymentUpdate(order, { order: {
+    paymentStatus: "collected", codPinStatus: "used", codCollectedAt: "2026-10-27T10:00:00Z",
+    codPinVerifiedAt: "2026-10-27T10:00:00Z",
+  } });
+  assert.equal(update.paymentStatus, "collected");
+  assert.equal(update.codPinStatus, "used");
+  assert.equal(update.codCollectedAt, "2026-10-27T10:00:00Z");
+  assert.equal(canEnterCashPaymentPin({ ...order, ...update, paymentMethod: "cod" }), false);
+  const partial = getVerifiedPaymentUpdate(order, { order: { codPinStatus: "used" } });
+  assert.equal(partial.paymentStatus, "pending");
+  assert.equal(partial.codPinStatus, "used");
+  const fallback = getVerifiedPaymentUpdate(order, {});
+  assert.equal(fallback.paymentStatus, "collected");
+  assert.equal(fallback.codPinStatus, "used");
+  assert.equal(order.paymentStatus, "pending");
+});
+
+
+test("active filters show selected values, escape search text and keep clearing outside form submission", () => {
+  assert.equal(render(Filters, { filters: [{ label: "Search", value: "  " }, { label: "Status", value: "" }], onClear() {} }), "");
+  const html = render(Filters, { filters: [{ label: "Search", value: "<script>alert(1)</script>" }, { label: "Status", value: "active" }], onClear() {} });
+  assert.match(html, /aria-label="Active filters"/);
+  assert.match(html, /aria-label="Clear all filters"/);
+  assert.match(html, /type="button"/);
+  assert.ok(html.includes("active"));
+  assert.doesNotMatch(html, /<script>/);
+});
+
+test("form feedback announces errors and successful saves with different live priorities", () => {
+  assert.equal(render(Feedback, { message: "" }), "");
+  assert.match(render(Feedback, { message: "Unable to save." }), /role="alert"/);
+  const saved = render(Feedback, { message: "Saved.", tone: "success" });
+  assert.match(saved, /role="status"/);
+  assert.match(saved, /Saved\./);
+  assert.match(saved, /aria-hidden="true"/);
+});
+
+test("nested dialog scroll locks restore the original page state regardless of close order", () => {
+  for (const reverse of [false, true]) {
+    const body = { style: { overflow: "auto" } };
+    const first = lockBodyScroll(body);
+    const second = lockBodyScroll(body);
+    assert.equal(body.style.overflow, "hidden");
+    const release = reverse ? [second, first] : [first, second];
+    release[0]();
+    assert.equal(body.style.overflow, "hidden");
+    release[1]();
+    assert.equal(body.style.overflow, "auto");
+    release[1]();
+    assert.equal(body.style.overflow, "auto");
+  }
+});
+
+test("modal positioning follows keyboard-reduced viewport height and vertical offset", () => {
+  assert.deepEqual(getModalViewport({ height: 800, offsetTop: 0 }, 800), { height: 800, top: 0 });
+  assert.deepEqual(getModalViewport({ height: 280, offsetTop: 120 }, 800), { height: 280, top: 120 });
+  assert.deepEqual(getModalViewport(null, 640), { height: 640, top: 0 });
+  assert.deepEqual(getModalViewport({ height: 0, offsetTop: -10 }, 640), { height: 640, top: 0 });
+  assert.equal(render(Modal, { open: false }), "");
+  assert.equal(render(Confirm, { open: false }), "");
+});
+
+
+test("select menus inside native dialogs stay in the interactive top layer", () => {
+  const body = {};
+  const dialog = {};
+  assert.equal(getSelectPortalTarget({ closest(selector) { assert.equal(selector, "dialog[open]"); return dialog; } }, body), dialog);
+  assert.equal(getSelectPortalTarget({ closest() { return null; } }, body), body);
+  assert.equal(getSelectPortalTarget(null, body), body);
 });

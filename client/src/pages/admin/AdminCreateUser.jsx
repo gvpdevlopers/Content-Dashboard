@@ -1,3 +1,4 @@
+import FormFeedback from "../../components/FormFeedback";
 import { useState } from "react";
 
 import {
@@ -177,6 +178,7 @@ const AdminCreateUser = () => {
 
       <form
         onSubmit={handleSubmit}
+        aria-busy={loading}
         className="
           relative
           overflow-hidden
@@ -510,22 +512,7 @@ const AdminCreateUser = () => {
               MESSAGES
           ================================================== */}
 
-          {error && (
-            <div
-              className="
-                mt-6
-                rounded-xl
-                border border-red-200
-                bg-red-50
-                px-4
-                py-3
-                text-sm
-                text-red-600
-              "
-            >
-              {error}
-            </div>
-          )}
+          <FormFeedback message={error} />
 
           {/* =================================================
               SUBMIT
@@ -593,10 +580,8 @@ const AdminCreateUser = () => {
                 shadow-[0_8px_25px_rgba(0,0,0,0.08)]
                 transition-all
                 duration-200
-                hover:-translate-y-0.5
                 hover:bg-zinc-800
                 hover:shadow-[0_12px_35px_rgba(0,0,0,0.12)]
-                active:translate-y-0
                 disabled:cursor-not-allowed
                 disabled:opacity-50
               "

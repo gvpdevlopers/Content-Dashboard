@@ -417,12 +417,12 @@ const Login = () => {
                     type="button"
                     onClick={() => setShowPassword((current) => !current)}
                     className="
+                      button-action button-action--icon
                       absolute right-2.5 top-1/2
                       flex h-10 w-10 -translate-y-1/2
                       items-center justify-center rounded-xl
                       text-zinc-400 transition-all duration-200
                       hover:bg-zinc-100 hover:text-zinc-900
-                      active:scale-90
                     "
                     aria-label={
                       showPassword ? "Hide password" : "Show password"
@@ -448,47 +448,8 @@ const Login = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="
-                  group/button relative flex w-full
-                  items-center justify-center gap-2
-                  overflow-hidden rounded-2xl
-                  border border-zinc-900 bg-zinc-900
-                  px-5 py-3.5 text-sm font-semibold text-white
-                  shadow-[0_10px_30px_rgba(0,0,0,0.10)]
-                  transition-all duration-300
-                  hover:-translate-y-0.5 hover:bg-zinc-800
-                  hover:shadow-[0_14px_40px_rgba(0,0,0,0.14)]
-                  active:translate-y-0 active:scale-[0.985]
-                  disabled:cursor-not-allowed disabled:opacity-50
-                "
+                className="public-button public-button--primary w-full rounded-2xl"
               >
-                {/* Sliding shine */}
-                {!loading && (
-                  <span
-                    aria-hidden="true"
-                    className="
-                      pointer-events-none absolute inset-y-0
-                      -left-1/2 w-1/3 -skew-x-12
-                      bg-gradient-to-r from-transparent
-                      via-white/[0.12] to-transparent
-                      transition-transform duration-700
-                      group-hover/button:translate-x-[430%]
-                    "
-                  />
-                )}
-
-                {/* Hover background */}
-                <span
-                  aria-hidden="true"
-                  className="
-                    absolute inset-0
-                    bg-gradient-to-r from-zinc-800
-                    via-zinc-900 to-zinc-800
-                    opacity-0 transition-opacity duration-300
-                    group-hover/button:opacity-100
-                  "
-                />
-
                 <span className="relative flex items-center justify-center gap-2">
                   {loading ? (
                     <>
@@ -500,10 +461,7 @@ const Login = () => {
                       Login
                       <ArrowRight
                         size={18}
-                        className="
-                          transition-all duration-300
-                          group-hover/button:translate-x-1
-                        "
+                        aria-hidden="true"
                       />
                     </>
                   )}

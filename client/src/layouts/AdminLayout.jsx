@@ -401,7 +401,7 @@ const AdminUserMenu = ({ user, userInitial, onLogout }) => {
       <button
         type="button"
         aria-label="Open account menu"
-        className="
+        className="button-action button-action--icon
           flex
           h-9 w-9
           cursor-pointer
@@ -412,12 +412,10 @@ const AdminUserMenu = ({ user, userInitial, onLogout }) => {
           text-sm
           font-semibold
           text-white
-          shadow-[0_5px_20px_rgba(0,0,0,0.10)]
+          shadow-sm
           outline-none
           transition-all
           duration-200
-          hover:scale-105
-          hover:shadow-[0_8px_25px_rgba(0,0,0,0.14)]
           focus-visible:ring-2
           focus-visible:ring-zinc-400
           focus-visible:ring-offset-2

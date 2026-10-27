@@ -18,7 +18,7 @@ export default function AdCreditCheckout({ platform, data, error, budgets, selec
         <button type="button" onClick={onRefresh} disabled={disabled}
           aria-label={`Refresh ${label} credit balance`} title="Refresh balance"
           className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-zinc-200 text-zinc-500 transition hover:bg-zinc-50 hover:text-zinc-900 disabled:opacity-40">
-          <RefreshCw size={13} aria-hidden="true" />
+          <RefreshCw size={13} aria-hidden="true" className="motion-safe:transition-transform motion-safe:duration-500" />
         </button>
       </div>
       {error ? <p role="alert" className="mt-2 text-xs text-amber-700">{error} You can still order without credit.</p> : (

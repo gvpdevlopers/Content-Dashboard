@@ -1,3 +1,4 @@
+import { getSelectPortalTarget } from "../utils/modal";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
@@ -7,7 +8,7 @@ const CustomSelect = ({
   value, onChange, options = [], placeholder = "Select an option", disabled = false,
   id, name, required = false, label, compact = false, className = "", onBlur,
   "aria-label": ariaLabel, "aria-labelledby": labelledBy, "aria-describedby": describedBy,
-  "aria-invalid": invalid,
+  "aria-invalid": invalid, "aria-required": ariaRequired,
 }) => {
   const generatedId = useId();
   const triggerId = id || generatedId;
@@ -18,6 +19,7 @@ const CustomSelect = ({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [placement, setPlacement] = useState(null);
+  const [portalTarget, setPortalTarget] = useState(null);
   const selectedIndex = options.findIndex((option) => option.value === value);
   const selectedOption = options[selectedIndex];
 
@@ -25,6 +27,7 @@ const CustomSelect = ({
   const show = (direction = 1) => {
     if (disabled) return;
     setPlacement(measure());
+    setPortalTarget(getSelectPortalTarget(triggerRef.current, document.body));
     setActiveIndex(selectedIndex >= 0 && !selectedOption.disabled
       ? selectedIndex : findEnabledOption(options, direction > 0 ? -1 : options.length, direction));
     setOpen(true);
@@ -49,7 +52,7 @@ const CustomSelect = ({
       if (rect.bottom < 0 || rect.top > window.innerHeight) setOpen(false);
       else setPlacement(getSelectPlacement(rect, window.innerWidth, window.innerHeight));
     };
-    const escape = (event) => { if (event.key === "Escape") { event.stopPropagation(); setOpen(false); triggerRef.current?.focus(); } };
+    const escape = (event) => { if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setOpen(false); triggerRef.current?.focus(); } };
     document.addEventListener("pointerdown", outside);
     document.addEventListener("focusin", outside);
     document.addEventListener("keydown", escape);
@@ -83,7 +86,7 @@ const CustomSelect = ({
       else setActiveIndex(findEnabledOption(options, activeIndex, direction));
     } else if (key === "Home" || key === "End") {
       event.preventDefault();
-      if (!open) { setPlacement(measure()); setOpen(true); }
+      if (!open) show();
       setActiveIndex(findEnabledOption(options, key === "Home" ? -1 : options.length, key === "Home" ? 1 : -1));
     } else if (key === "Enter" || key === " ") {
       event.preventDefault();
@@ -102,7 +105,7 @@ const CustomSelect = ({
       const next = findTypeaheadOption(options, start, query);
       if (next >= 0) {
         event.preventDefault();
-        if (!open) { setPlacement(measure()); setOpen(true); }
+        if (!open) show();
         setActiveIndex(next);
       }
     }
@@ -118,14 +121,14 @@ const CustomSelect = ({
         aria-haspopup="listbox" aria-expanded={open && !disabled} aria-controls={open ? menuId : undefined}
         aria-activedescendant={open && options[activeIndex] ? `${menuId}-${activeIndex}` : undefined}
         aria-label={ariaLabel || (labelledBy || label ? undefined : placeholder)} aria-labelledby={labelledBy}
-        aria-describedby={describedBy} aria-invalid={invalid} aria-required={required || undefined}
+        aria-describedby={describedBy} aria-invalid={invalid} aria-required={required || ariaRequired || undefined}
         onBlur={(event) => { if (!menuRef.current?.contains(event.relatedTarget)) onBlur?.(event); }}
         onClick={(event) => { event.stopPropagation(); if (open) setOpen(false); else show(); }} onKeyDown={handleKeyDown}
         className={`custom-select-trigger flex w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-left text-sm text-zinc-700 transition-colors duration-150 hover:border-zinc-300 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500 disabled:cursor-not-allowed disabled:opacity-50 ${compact ? "min-h-10 py-2" : "min-h-12 py-3"} ${open ? "border-slate-400 bg-white" : ""}`}>
         <span className={`min-w-0 break-words ${selectedOption ? "text-zinc-900" : "text-zinc-400"}`}>{selectedOption?.label ?? placeholder}</span>
         <ChevronDown size={16} aria-hidden="true" className={`shrink-0 text-slate-400 motion-safe:transition-transform motion-safe:duration-150 ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && !disabled && placement && createPortal(
+      {open && !disabled && placement && portalTarget && createPortal(
         <div ref={menuRef} id={menuId} role="listbox" aria-label={ariaLabel || label || placeholder} aria-labelledby={labelledBy}
           className="custom-select-menu fixed z-[10000] overflow-y-auto overscroll-contain rounded-xl border border-zinc-200 bg-white p-1.5 text-sm shadow-[0_12px_32px_rgba(15,23,42,0.12)]"
           onClick={(event) => event.stopPropagation()}
@@ -140,7 +143,7 @@ const CustomSelect = ({
               {option.value === value && <Check size={14} className="shrink-0 text-slate-600" aria-hidden="true" />}
             </div>
           )) : <p className="px-3 py-4 text-center text-xs text-zinc-400">No options available.</p>}
-        </div>, document.body,
+        </div>, portalTarget,
       )}
     </div>
   );

@@ -519,6 +519,7 @@ const ContactForm = () => {
                 type="button"
                 onClick={resetForm}
                 className="
+                  button-action button-action--ghost
                   mt-5
                   text-sm
                   font-semibold

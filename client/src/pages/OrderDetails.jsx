@@ -1,3 +1,4 @@
+import PaymentStatusBadge from "../components/PaymentStatusBadge";
 import StatusBadge from "../components/OrderStatusBadge";
 import { hasProjectDetails } from "../utils/orderResources";
 import { useEffect, useState } from "react";
@@ -1274,7 +1275,6 @@ const ClientOrderResource = ({ title, name, url }) => (
           duration-200
           hover:bg-zinc-700
           hover:!text-white
-          active:scale-[0.98]
         "
       >
         <span className="!text-white">{name}</span>
@@ -1563,20 +1563,7 @@ const PaymentStatus = ({ status, codPinStatus, paymentMethod }) => {
     (paymentMethod === "cod" &&
       (codPinStatus === "verified" || codPinStatus === "used"));
 
-  return (
-    <span
-      className={`
-        inline-flex
-        items-center
-        gap-1.5
-        ${successful ? "font-medium text-emerald-600" : "text-zinc-500"}
-      `}
-    >
-      {successful && <CheckCircle2 size={14} strokeWidth={1.8} />}
-
-      {successful ? "Payment Done" : formatStatus(normalizedStatus)}
-    </span>
-  );
+  return <PaymentStatusBadge status={successful ? "paid" : normalizedStatus} />;
 };
 
 /* =========================================================

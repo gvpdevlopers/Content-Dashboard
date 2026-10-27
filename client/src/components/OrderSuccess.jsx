@@ -205,8 +205,6 @@ const OrderSuccess = ({ order }) => {
     hover:bg-zinc-800
     hover:!text-white
     hover:shadow-md
-    hover:scale-[1.01]
-    active:scale-[0.99]
   "
 >
   <span className="!text-white">
@@ -245,7 +243,6 @@ const OrderSuccess = ({ order }) => {
               hover:bg-zinc-50
               hover:text-zinc-900
               hover:shadow-sm
-              active:scale-[0.98]
             "
           >
             <ClipboardList size={16} />

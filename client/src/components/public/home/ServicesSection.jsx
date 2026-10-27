@@ -6,7 +6,6 @@ import serviceService from "../../../services/serviceService";
 import Section from "../Section";
 import Reveal from "../Reveal";
 import HeadingCursor from "../HeadingCursor";
-import Magnetic from "../Magnetic";
 import {
   formatStartingPrice,
   getServiceStartingPrice,
@@ -76,10 +75,10 @@ const ServicesSection = () => {
               <span className="text-zinc-400">for what’s next.</span>
             </HeadingCursor>
           </div>
-          <Magnetic>
+          <span className="inline-flex max-w-full">
             <Link
               to="/services"
-              className="group inline-flex w-fit items-center gap-2 pb-1 text-sm font-semibold text-zinc-800 transition-colors hover:text-zinc-500"
+              className="button-action button-action--ghost group inline-flex w-fit items-center gap-2 pb-1 text-sm font-semibold text-zinc-800 transition-colors hover:text-zinc-500"
             >
               All services
               <ArrowUpRight
@@ -88,7 +87,7 @@ const ServicesSection = () => {
                 aria-hidden="true"
               />
             </Link>
-          </Magnetic>
+          </span>
         </Reveal>
 
         <div className="mt-12 border-t border-zinc-300 sm:mt-16">

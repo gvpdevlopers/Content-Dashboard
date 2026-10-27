@@ -1,3 +1,5 @@
+import FormFeedback from "../../components/FormFeedback";
+import Modal from "../../components/Modal";
 import { useEffect, useMemo, useState } from "react";
 import {
   Building2,
@@ -60,6 +62,8 @@ const AdminContactSubmissions = () => {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [submissionToDelete, setSubmissionToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState("");
+  const [detailsFeedback, setDetailsFeedback] = useState(null);
 
   const loadSubmissions = async () => {
     try {
@@ -114,21 +118,6 @@ const AdminContactSubmissions = () => {
     loadSubmissions();
   };
 
-  useEffect(() => {
-    if (!detailsOpen) {
-      return undefined;
-    }
-
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape" && !submissionToDelete) {
-        setDetailsOpen(false);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [detailsOpen, submissionToDelete]);
-
   const filteredSubmissions = useMemo(() => {
     const query = search.trim().toLowerCase();
 
@@ -157,6 +146,7 @@ const AdminContactSubmissions = () => {
   const openDetails = async (submissionId) => {
     setDetailsOpen(true);
     setDetailsLoading(true);
+    setDetailsFeedback(null);
     setDetailsError("");
     setSelectedSubmission(null);
 
@@ -182,6 +172,7 @@ const AdminContactSubmissions = () => {
 
     try {
       setUpdatingStatus(true);
+      setDetailsFeedback(null);
       const data =
         await contactSubmissionService.updateContactSubmissionStatus(
           selectedSubmission._id,
@@ -196,8 +187,10 @@ const AdminContactSubmissions = () => {
         ),
       );
       toast.success("Contact submission status updated.");
+      setDetailsFeedback({ message: "Contact submission status updated.", tone: "success" });
     } catch (updateError) {
       console.error("Update contact submission status error:", updateError);
+      setDetailsFeedback({ message: updateError.response?.data?.message || "Unable to update contact submission status.", tone: "error" });
       toast.error(
         updateError.response?.data?.message ||
           "Unable to update contact submission status.",
@@ -214,6 +207,7 @@ const AdminContactSubmissions = () => {
 
     try {
       setDeleting(true);
+      setDeleteErrorMessage("");
       await contactSubmissionService.deleteContactSubmission(
         submissionToDelete._id,
       );
@@ -228,6 +222,7 @@ const AdminContactSubmissions = () => {
       toast.success("Contact submission deleted.");
     } catch (deleteError) {
       console.error("Delete contact submission error:", deleteError);
+      setDeleteErrorMessage(deleteError.response?.data?.message || "Unable to delete contact submission.");
       toast.error(
         deleteError.response?.data?.message ||
           "Unable to delete contact submission.",
@@ -423,21 +418,7 @@ const AdminContactSubmissions = () => {
         </div>
       )}
 
-      {detailsOpen && (
-        <div
-          className="fixed inset-0 z-[90] flex items-end justify-center bg-zinc-950/45 p-0 backdrop-blur-sm sm:items-center sm:p-4"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setDetailsOpen(false);
-            }
-          }}
-        >
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="contact-submission-title"
-            className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl border border-zinc-200 bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-7"
-          >
+      <Modal open={detailsOpen} titleId="contact-submission-title" onClose={() => setDetailsOpen(false)} busy={updatingStatus || deleting} className="max-w-2xl">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-400">
@@ -541,6 +522,7 @@ const AdminContactSubmissions = () => {
                     Delete
                   </button>
                 </div>
+                <FormFeedback message={detailsFeedback?.message} tone={detailsFeedback?.tone} />
                 {updatingStatus && (
                   <p className="mt-2 text-xs text-zinc-400" role="status">
                     Saving status...
@@ -548,9 +530,7 @@ const AdminContactSubmissions = () => {
                 )}
               </>
             ) : null}
-          </section>
-        </div>
-      )}
+      </Modal>
 
       <ConfirmDialog
         open={Boolean(submissionToDelete)}
@@ -559,8 +539,9 @@ const AdminContactSubmissions = () => {
         confirmLabel="Delete enquiry"
         destructive
         loading={deleting}
+        error={deleteErrorMessage}
         onConfirm={deleteSubmission}
-        onCancel={() => setSubmissionToDelete(null)}
+        onCancel={() => { setSubmissionToDelete(null); setDeleteErrorMessage(""); }}
       />
     </div>
   );

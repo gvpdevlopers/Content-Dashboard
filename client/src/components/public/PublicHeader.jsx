@@ -189,6 +189,7 @@ const PublicHeader = () => {
           type="button"
           onClick={() => setIsMenuOpen((current) => !current)}
           className="
+            button-action button-action--icon
             focus-ring
             inline-flex
             h-10

@@ -157,7 +157,7 @@ const Services = () => {
             <button
               type="button"
               onClick={() => setReloadKey((current) => current + 1)}
-              className="mt-4 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-zinc-900 underline underline-offset-4"
+              className="button-action button-action--ghost mt-4 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-zinc-900 underline underline-offset-4"
             >
               <RefreshCw size={15} aria-hidden="true" />
               Try again

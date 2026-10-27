@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 import Section from "../Section";
 import Reveal from "../Reveal";
 import HeadingCursor from "../HeadingCursor";
-import Magnetic from "../Magnetic";
 
 const process = [
   {
@@ -39,15 +38,15 @@ const AboutProcess = () => (
             Thoughtful at every step.
           </HeadingCursor>
         </div>
-        <Magnetic>
+        <span className="inline-flex max-w-full">
           <Link
             to="/contact"
-            className="group inline-flex w-fit items-center gap-2 pb-1 text-sm font-semibold text-zinc-800 transition-colors hover:text-zinc-500"
+            className="button-action button-action--ghost group inline-flex w-fit items-center gap-2 pb-1 text-sm font-semibold text-zinc-800 transition-colors hover:text-zinc-500"
           >
             Start a conversation
             <ArrowUpRight size={16} className="transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden="true" />
           </Link>
-        </Magnetic>
+        </span>
       </Reveal>
 
       <ol className="mt-12 border-t border-zinc-300 sm:mt-16">

@@ -35,7 +35,7 @@ const ServiceFilters = ({
             <button
               type="button"
               onClick={() => setSearch("")}
-              className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
+              className="button-action button-action--icon absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700"
               aria-label="Clear search"
             >
               <X size={15} />
@@ -66,7 +66,7 @@ const ServiceFilters = ({
                 type="button"
                 onClick={() => setCategory(item)}
                 className={[
-                  "shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-200",
+                  "button-action shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-200",
                   active
                     ? "bg-zinc-950 text-white shadow-sm"
                     : "border border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:text-zinc-950",
@@ -86,7 +86,7 @@ const ServiceFilters = ({
             setSearch("");
             setCategory("All");
           }}
-          className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-zinc-500 transition hover:text-zinc-950"
+          className="button-action button-action--ghost mt-4 inline-flex items-center gap-2 text-xs font-semibold text-zinc-500 transition hover:text-zinc-950"
         >
           <X size={14} />
           Clear filters

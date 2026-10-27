@@ -1,7 +1,6 @@
 import { Children } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import HeadingCursor from "./HeadingCursor";
-import Magnetic from "./Magnetic";
 import usePointerParallax from "./usePointerParallax";
 
 const PublicDarkCTA = ({ eyebrow, title, highlight, description, children }) => {
@@ -68,7 +67,7 @@ const PublicDarkCTA = ({ eyebrow, title, highlight, description, children }) => 
                 }}
                 transition={{ duration: reduceMotion ? 0 : 0.35 }}
               >
-                <Magnetic>{child}</Magnetic>
+                {child}
               </motion.div>
             ))}
           </motion.div>

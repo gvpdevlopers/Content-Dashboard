@@ -1,3 +1,4 @@
+import PaymentStatusBadge from "../../components/PaymentStatusBadge";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -334,7 +335,7 @@ const CodManagement = () => {
                 transition-transform
                 duration-500
                 ${
-                  refreshing ? "animate-spin" : "group-hover/refresh:rotate-180"
+                  refreshing ? "animate-spin" : ""
                 }
               `}
             />
@@ -1186,7 +1187,7 @@ const PinDisplay = ({ pin, copied, onCopy, paymentMethod }) => {
         <button
           type="button"
           onClick={onCopy}
-          className="
+          className="button-action button-action--icon
             flex h-11 w-11
             items-center justify-center
             rounded-xl
@@ -1286,43 +1287,7 @@ const StatCard = ({ icon: Icon, label, value }) => {
    PAYMENT BADGE
 ========================================================= */
 
-const PaymentBadge = ({ status }) => {
-  const collected = status === "collected";
-
-  return (
-    <span
-      className={`
-        inline-flex
-        items-center
-        gap-1.5
-        rounded-full
-        border
-        px-2.5
-        py-1
-        text-[10px]
-        font-medium
-        ${
-          collected
-            ? `
-              border-emerald-200
-              bg-emerald-50
-              text-emerald-700
-            `
-            : `
-              border-amber-200
-              bg-amber-50
-              text-amber-700
-            `
-        }
-      `}
-    >
-      {collected ? <CheckCircle2 className="icon-accent-green" size={11} /> : <Clock3 className="icon-accent-amber" size={11} />}
-
-      {collected ? "Payment Done" : "Payment Pending"}
-    </span>
-  );
-};
-
+const PaymentBadge = ({ status }) => <PaymentStatusBadge status={status} />;
 /* =========================================================
    PIN STATUS BADGE
 ========================================================= */

@@ -220,7 +220,6 @@ const EmployeeDashboard = () => {
                   hover:border-zinc-300
                   hover:bg-zinc-50
                   hover:text-zinc-900
-                  active:scale-[0.98]
                 "
               >
                 <ClipboardList size={16} className="text-zinc-500" />

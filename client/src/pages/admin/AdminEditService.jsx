@@ -1,3 +1,4 @@
+import FormFeedback from "../../components/FormFeedback";
 import CustomSelect from "../../components/CustomSelect";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -2154,23 +2155,7 @@ const AdminEditService = () => {
           ALERTS
       ====================================================== */}
 
-      {error && (
-        <div className="mt-5 rounded-[22px] border border-red-200 bg-red-50 p-4">
-          <div className="flex items-start gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-red-500">
-              <X size={16} />
-            </div>
-
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-red-800">
-                Unable to update service
-              </p>
-
-              <p className="mt-1 text-sm leading-6 text-red-700">{error}</p>
-            </div>
-          </div>
-        </div>
-      )}
+      <FormFeedback message={error} />
 
       {/* =====================================================
           FORM
@@ -2178,6 +2163,7 @@ const AdminEditService = () => {
 
       <form
         id="edit-service-form"
+        aria-busy={saving}
         onSubmit={handleSubmit}
         className="mt-5 space-y-5"
       >

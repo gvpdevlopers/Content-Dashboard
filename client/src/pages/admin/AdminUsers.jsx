@@ -1,3 +1,4 @@
+import ActiveFilters from "../../components/ActiveFilters";
 import RoleBadge from "../../components/RoleBadge";
 import { useEffect, useMemo, useState } from "react";
 
@@ -6,6 +7,7 @@ import {
   ChevronRight,
   Loader2,
   Plus,
+  Power,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -181,7 +183,7 @@ const AdminUsers = () => {
   const adminUsers = users.filter((user) => user.role === "admin").length;
 
   const hasFilters =
-    Boolean(search) || statusFilter !== "all" || roleFilter !== "all";
+    Boolean(search.trim()) || statusFilter !== "all" || roleFilter !== "all";
 
   return (
     <div
@@ -410,7 +412,7 @@ const AdminUsers = () => {
                 className={`
                   transition-transform
                   duration-500
-                  ${loading ? "animate-spin" : "group-hover/refresh:rotate-180"}
+                  ${loading ? "animate-spin" : ""}
                 `}
               />
               Refresh
@@ -451,7 +453,7 @@ const AdminUsers = () => {
       ====================================================== */}
 
       {error && (
-        <div
+        <div role="alert"
           className="
             mb-6
             flex
@@ -646,26 +648,9 @@ const AdminUsers = () => {
             matching users
           </p>
 
-          {hasFilters && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearch("");
-                setStatusFilter("all");
-                setRoleFilter("all");
-              }}
-              className="
-                text-xs
-                font-medium
-                text-zinc-400
-                transition
-                hover:text-zinc-900
-              "
-            >
-              Clear filters
-            </button>
-          )}
+
         </div>
+        <ActiveFilters filters={[{ label: "Search", value: search.trim() }, { label: "Status", value: statusFilter === "all" ? "" : statusFilter }, { label: "Role", value: roleFilter === "all" ? "" : roleFilter }]} onClear={() => { setSearch(""); setStatusFilter("all"); setRoleFilter("all"); }} />
       </section>
 
       {/* =====================================================
@@ -673,7 +658,7 @@ const AdminUsers = () => {
       ====================================================== */}
 
       {loading ? (
-        <div
+        <div role="status" aria-label="Loading users"
           className="
             flex
             min-h-[350px]
@@ -715,8 +700,8 @@ const AdminUsers = () => {
             </div>
           </div>
         </div>
-      ) : filteredUsers.length === 0 ? (
-        <EmptyUsers hasFilters={hasFilters} />
+      ) : error && filteredUsers.length === 0 ? null : filteredUsers.length === 0 ? (
+        <EmptyUsers hasFilters={hasFilters} onClear={() => { setSearch(""); setStatusFilter("all"); setRoleFilter("all"); }} />
       ) : (
         <>
           {/* =================================================
@@ -726,7 +711,7 @@ const AdminUsers = () => {
           <div
             className="
               hidden
-              overflow-hidden
+              overflow-x-auto
               rounded-[24px]
               border border-zinc-200
               bg-white
@@ -734,10 +719,12 @@ const AdminUsers = () => {
               lg:block
             "
           >
+            <div className="min-w-[760px]">
             <div
               className="
                 grid
-                grid-cols-[minmax(0,1.5fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_92px]
+                grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_96px_104px_88px_152px]
+                gap-3
                 border-b
                 border-zinc-200
                 bg-zinc-50
@@ -751,11 +738,11 @@ const AdminUsers = () => {
               "
             >
               <span>User</span>
-              <span>Email</span>
+              <span>Username</span>
               <span>Role</span>
-              <span>Status</span>
               <span>Joined</span>
-              <span />
+              <span>Account</span>
+              <span className="text-right">Actions</span>
             </div>
 
             <div>
@@ -768,6 +755,7 @@ const AdminUsers = () => {
                   deleting={deletingUserId === user._id}
                 />
               ))}
+            </div>
             </div>
           </div>
 
@@ -920,13 +908,42 @@ const StatCard = ({ icon: Icon, label, value, secondary }) => {
    DESKTOP USER ROW
 ========================================================= */
 
-const UserTableRow = ({ user, onDelete, deleting }) => {
+const UserStatusAction = ({ user, onStatusChange, iconOnly = false, disabled = false }) => {
+  const [updating, setUpdating] = useState(false);
+  const action = user.isActive ? "Disable" : "Enable";
+  const toggleStatus = async () => {
+    if (updating || disabled) return;
+    try {
+      setUpdating(true);
+      await adminUserService.updateUserStatus(user._id, !user.isActive);
+      await onStatusChange();
+      toast.success(`Account ${user.isActive ? "disabled" : "enabled"} successfully.`);
+    } catch (error) {
+      console.error("Update user status error:", error);
+      toast.error(error.response?.data?.message || "Unable to update account status.");
+    } finally {
+      setUpdating(false);
+    }
+  };
+  if (user.role === "admin") return null;
+  return (
+    <button type="button" onClick={toggleStatus} disabled={updating || disabled}
+      aria-label={`${action} ${user.name || user.username || "user"}`} title={`${action} account`}
+      className={`dashboard-action dashboard-action--secondary ${iconOnly ? "dashboard-action--icon" : ""}`}>
+      {updating ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> :
+        iconOnly ? <Power size={16} aria-hidden="true" /> : action}
+    </button>
+  );
+};
+
+const UserTableRow = ({ user, onStatusChange, onDelete, deleting }) => {
   return (
     <div
       className="
         group
         grid
-        grid-cols-[minmax(0,1.5fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_92px]
+        grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_96px_104px_88px_152px]
+        gap-3
         items-center
         border-b
         border-zinc-100
@@ -951,7 +968,7 @@ const UserTableRow = ({ user, onDelete, deleting }) => {
         <UserAvatar user={user} />
 
         <div className="min-w-0">
-          <p
+          <p title={user.name || "Unnamed User"}
             className="
               truncate
               text-sm
@@ -962,7 +979,7 @@ const UserTableRow = ({ user, onDelete, deleting }) => {
             {user.name || "Unnamed User"}
           </p>
 
-          <p
+          <p title={user.email || ""}
             className="
               mt-1
               truncate
@@ -970,14 +987,14 @@ const UserTableRow = ({ user, onDelete, deleting }) => {
               text-zinc-400
             "
           >
-            @{user.username || "—"}
+            {user.email || "—"}
           </p>
         </div>
       </div>
 
-      {/* Email */}
+      {/* Username */}
 
-      <p
+      <p title={user.username || ""}
         className="
           truncate
           pr-4
@@ -985,7 +1002,7 @@ const UserTableRow = ({ user, onDelete, deleting }) => {
           text-zinc-500
         "
       >
-        {user.email || "—"}
+        @{user.username || "—"}
       </p>
 
       {/* Role */}
@@ -994,37 +1011,35 @@ const UserTableRow = ({ user, onDelete, deleting }) => {
         <RoleBadge role={user.role} />
       </div>
 
-      {/* Status */}
-
-      <div>
-        <StatusBadge isActive={user.isActive} />
-      </div>
-
       {/* Joined */}
-
-      <p className="text-sm text-zinc-500">{formatDate(user.createdAt)}</p>
+      <p className="whitespace-nowrap text-xs text-zinc-500">{formatDate(user.createdAt)}</p>
+      {/* Account */}
+      <div><StatusBadge isActive={user.isActive} /></div>
 
       {/* Action */}
 
-      <div className="flex items-center justify-end gap-2">
+      <div className="table-actions">
         <Link
           to={`/admin/users/${user._id}`}
-          className="group/view flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-400 shadow-sm transition-all duration-200 hover:border-zinc-900 hover:bg-zinc-900"
+          className="dashboard-action dashboard-action--secondary dashboard-action--icon group/view"
+          title="View user"
           aria-label={`View ${user.name || "user"}`}
         >
           <ChevronRight
             size={16}
             strokeWidth={1.8}
-            className="text-zinc-400 transition-colors duration-200 group-hover/view:text-white"
+            aria-hidden="true"
           />
         </Link>
+        <UserStatusAction user={user} onStatusChange={onStatusChange} iconOnly disabled={deleting} />
         {user.role !== "admin" && (
           <button
             type="button"
             onClick={() => onDelete(user)}
             disabled={deleting}
             aria-label={`Delete ${user.name || "user"}`}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-400 shadow-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+            title="Delete user"
+            className="dashboard-action dashboard-action--destructive dashboard-action--icon"
           >
             {deleting ? (
               <Loader2 size={15} className="animate-spin" />
@@ -1043,22 +1058,6 @@ const UserTableRow = ({ user, onDelete, deleting }) => {
 ========================================================= */
 
 const UserMobileCard = ({ user, onStatusChange, onDelete, deleting }) => {
-  const [updating, setUpdating] = useState(false);
-
-  const toggleStatus = async () => {
-    try {
-      setUpdating(true);
-
-      await adminUserService.updateUserStatus(user._id, !user.isActive);
-
-      await onStatusChange();
-    } catch (error) {
-      console.error("Update user status error:", error);
-    } finally {
-      setUpdating(false);
-    }
-  };
-
   return (
     <div
       className="
@@ -1247,51 +1246,20 @@ const UserMobileCard = ({ user, onStatusChange, onDelete, deleting }) => {
           />
         </Link>
 
-        {user.role !== "admin" && (
-          <button
-            type="button"
-            onClick={toggleStatus}
-            disabled={updating}
-            className="dashboard-action dashboard-action--secondary
-              flex
-              items-center
-              justify-center
-              rounded-xl
-              border border-zinc-200
-              bg-white
-              px-4
-              text-sm
-              text-zinc-500
-              shadow-sm
-              transition
-              hover:border-zinc-300
-              hover:bg-zinc-50
-              hover:text-zinc-900
-              disabled:cursor-not-allowed
-              disabled:opacity-50
-            "
-          >
-            {updating ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : user.isActive ? (
-              "Disable"
-            ) : (
-              "Enable"
-            )}
-          </button>
-        )}
+        <UserStatusAction user={user} onStatusChange={onStatusChange} disabled={deleting} />
+
         {user.role !== "admin" && (
           <button
             type="button"
             onClick={() => onDelete(user)}
             disabled={deleting}
             className="dashboard-action dashboard-action--destructive flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-3 text-sm text-red-600 transition hover:bg-red-50 disabled:opacity-50"
-            aria-label={`Delete ${user.name || "user"}`}
+            title="Delete user" aria-label={`Delete ${user.name || "user"}`}
           >
             {deleting ? (
               <Loader2 size={15} className="animate-spin" />
             ) : (
-              <Trash2 size={15} />
+              <Trash2 size={16} aria-hidden="true" />
             )}
             Delete
           </button>
@@ -1384,7 +1352,7 @@ const StatusBadge = ({ isActive }) => {
    EMPTY STATE
 ========================================================= */
 
-const EmptyUsers = ({ hasFilters }) => {
+const EmptyUsers = ({ hasFilters, onClear }) => {
   return (
     <div
       className="
@@ -1455,6 +1423,7 @@ const EmptyUsers = ({ hasFilters }) => {
             ? "Try adjusting your search or filters."
             : "Registered users will appear here."}
         </p>
+        {hasFilters && <button type="button" onClick={onClear} className="dashboard-action dashboard-action--secondary mt-4">Clear filters</button>}
       </div>
     </div>
   );

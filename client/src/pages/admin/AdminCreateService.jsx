@@ -1,3 +1,4 @@
+import FormFeedback from "../../components/FormFeedback";
 import CustomSelect from "../../components/CustomSelect";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -23,7 +24,6 @@ import {
   TextCursorInput,
   Trash2,
   Type,
-  X,
   Plus,
 } from "lucide-react";
 
@@ -2065,7 +2065,7 @@ const AdminCreateService = () => {
 
   return (
     <div className="mx-auto w-full max-w-[1500px] animate-fade-up">
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form aria-busy={submitting} onSubmit={handleSubmit} className="space-y-5">
         {/* ====================================================
             HEADER
         ===================================================== */}
@@ -2183,66 +2183,35 @@ const AdminCreateService = () => {
             API ERROR
         ===================================================== */}
 
-        {error && (
-          <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3.5 text-sm text-red-700">
-            <AlertCircle size={19} className="mt-0.5 shrink-0" />
-
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="font-semibold">Unable to create service</p>
-
-                  <p className="mt-0.5 leading-5 text-red-600">{error}</p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setError("")}
-                  className="
-                    flex
-                    h-7
-                    w-7
-                    shrink-0
-                    items-center
-                    justify-center
-                    rounded-lg
-                    text-red-500
-                    transition
-                    hover:bg-red-100
-                  "
-                  aria-label="Dismiss error"
-                >
-                  <X size={15} />
-                </button>
-              </div>
-
+        {error && <FormFeedback message={error}>
+          <div className="mt-2 flex items-center gap-3">
+            <button type="button" onClick={() => setError("")} className="dashboard-action dashboard-action--tertiary dashboard-action--compact" aria-label="Dismiss error">Dismiss</button>
+          </div>
               {error.toLowerCase().includes("already exists") && (
                 <p className="mt-2 text-xs text-red-600">
                   Please use a different slug and try again.
                 </p>
               )}
-            </div>
-          </div>
-        )}
+        </FormFeedback>}
 
         {/* ====================================================
             CLIENT VALIDATION SUMMARY
         ===================================================== */}
 
         {validationSummary.length > 0 && (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
+          <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-4">
             <div className="flex items-start gap-3">
               <AlertCircle
                 size={19}
-                className="mt-0.5 shrink-0 text-amber-600"
+                className="mt-0.5 shrink-0 text-red-600"
               />
 
               <div className="min-w-0">
-                <p className="text-sm font-bold text-amber-900">
+                <p className="text-sm font-bold text-red-900">
                   Please fix the following errors
                 </p>
 
-                <ul className="mt-2 space-y-1.5 text-xs leading-5 text-amber-800">
+                <ul className="mt-2 space-y-1.5 text-xs leading-5 text-red-800">
                   {validationSummary.slice(0, 12).map((message, index) => (
                     <li key={`${message}-${index}`} className="flex gap-2">
                       <span>•</span>
@@ -2252,7 +2221,7 @@ const AdminCreateService = () => {
                 </ul>
 
                 {validationSummary.length > 12 && (
-                  <p className="mt-2 text-xs font-semibold text-amber-700">
+                  <p className="mt-2 text-xs font-semibold text-red-700">
                     +{validationSummary.length - 12} more validation errors.
                   </p>
                 )}
