@@ -1,3 +1,4 @@
+const { validateServiceAccess } = require("../utils/validateServiceAccess");
 const User = require("../models/User");
 const Order = require("../models/Order");
 const bcrypt = require("bcryptjs");
@@ -299,6 +300,11 @@ const createAdminUser = async (req, res) => {
       });
     }
 
+    if (req.body.serviceAccess !== undefined && role !== "client") {
+      return res.status(400).json({ success: false, message: "Service access applies only to clients." });
+    }
+    const serviceAccess = role === "client" ? await validateServiceAccess(req.body.serviceAccess === undefined ? { mode: "groups", groups: ["content"], serviceIds: [] } : req.body.serviceAccess) : undefined;
+
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -310,6 +316,7 @@ const createAdminUser = async (req, res) => {
       password: hashedPassword,
       role,
       allowMonthEndPayment,
+      ...(serviceAccess ? { serviceAccess } : {}),
       isActive: true,
     });
 
@@ -324,10 +331,12 @@ const createAdminUser = async (req, res) => {
         role: user.role,
         isActive: user.isActive,
         allowMonthEndPayment: user.allowMonthEndPayment === true,
+        ...(user.role === "client" ? { serviceAccess: user.serviceAccess } : {}),
         createdAt: user.createdAt,
       },
     });
   } catch (error) {
+    if (error.statusCode) return res.status(error.statusCode).json({ success: false, message: error.message });
     console.error("Create admin user error:", error);
 
     return res.status(500).json({
@@ -361,7 +370,25 @@ const updateMonthEndPermission = async (req, res) => {
   }
 };
 
+const updateServiceAccess = async (req, res) => {
+  try {
+    if (req.user?.role !== "admin") return res.status(403).json({ success: false, message: "Admin access required." });
+    const serviceAccess = await validateServiceAccess(req.body?.serviceAccess);
+    const user = await User.findOneAndUpdate(
+      { _id: req.params.id, role: "client" },
+      { $set: { serviceAccess } },
+      { new: true, runValidators: true },
+    ).select("-password");
+    if (!user) return res.status(404).json({ success: false, message: "Client not found." });
+    return res.json({ success: true, message: "Service access updated.", user });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ success: false,
+      message: error.statusCode ? error.message : "Unable to update service access." });
+  }
+};
+
 module.exports = {
+  updateServiceAccess,
   updateMonthEndPermission,
   getAdminUsers,
   getAdminUserById,

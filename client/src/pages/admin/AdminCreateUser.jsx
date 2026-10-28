@@ -1,3 +1,5 @@
+import ServiceAccessEditor from "../../components/ServiceAccessEditor";
+import { defaultServiceAccess } from "../../utils/serviceAccess";
 import FormFeedback from "../../components/FormFeedback";
 import { useState } from "react";
 
@@ -27,6 +29,7 @@ const AdminCreateUser = () => {
     allowMonthEndPayment: false,
   });
 
+  const [serviceAccess, setServiceAccess] = useState(defaultServiceAccess);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -48,7 +51,7 @@ const AdminCreateUser = () => {
       setLoading(true);
       setError("");
 
-      await adminUserService.createUser(formData);
+      await adminUserService.createUser({ ...formData, ...(formData.role === "client" ? { serviceAccess } : {}) });
 
       toast.success("User created successfully.");
 
@@ -491,6 +494,8 @@ const AdminCreateUser = () => {
               </p>
             </div>
           </div>
+
+          {formData.role === "client" && <div className="mt-6"><ServiceAccessEditor value={serviceAccess} onChange={setServiceAccess} disabled={loading} /></div>}
 
           {formData.role === "client" && (
             <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4">

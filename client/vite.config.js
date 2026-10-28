@@ -4,6 +4,8 @@ import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  // Keep the interactive dev server separate from test/QA optimizers.
+  cacheDir: "node_modules/.vite/dev",
   plugins: [
     react(),
     tailwindcss(),

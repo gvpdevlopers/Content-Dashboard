@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { SERVICE_GROUPS } = require("../utils/serviceAccess");
 
 /*
 |--------------------------------------------------------------------------
@@ -434,6 +435,11 @@ const servicePricingOptionSchema = new mongoose.Schema(
 
 const serviceSchema = new mongoose.Schema(
   {
+    serviceGroup: { type: String, enum: SERVICE_GROUPS, default: "content" },
+    isPublic: {
+      type: Boolean,
+      default: function () { return this.isActive !== false; },
+    },
     name: {
       type: String,
       required: true,

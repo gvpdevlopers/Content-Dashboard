@@ -1,0 +1,660 @@
+[
+  {
+    "name": "Complete SEO Package",
+    "slug": "complete-seo-package",
+    "serviceGroup": "seo",
+    "category": "SEO",
+    "description": "Starter configuration: sample scope and pricing. SEO audit, keyword planning, on-page improvements, technical recommendations and monthly reporting. Each quantity represents one month; no automatic renewal.",
+    "pricingType": "per_unit",
+    "basePrice": 15000,
+    "unit": "month",
+    "minQuantity": 1,
+    "maxQuantity": 12,
+    "pricingOptions": [],
+    "fields": [
+      {
+        "name": "websiteUrl",
+        "label": "Website URL",
+        "type": "url",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 0
+      },
+      {
+        "name": "projectBrief",
+        "label": "Business, audience and SEO goals",
+        "type": "textarea",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 1
+      },
+      {
+        "name": "targetLocations",
+        "label": "Target locations",
+        "type": "text",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 2
+      },
+      {
+        "name": "competitors",
+        "label": "Competitor websites",
+        "type": "textarea",
+        "required": false,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 3
+      }
+    ],
+    "repeatableGroups": [],
+    "isActive": false,
+    "isPublic": false,
+    "displayOrder": 100
+  },
+  {
+    "name": "SEO Audit",
+    "slug": "seo-audit",
+    "serviceGroup": "seo",
+    "category": "SEO",
+    "description": "Starter configuration: sample scope and pricing. A website review covering indexing, on-page structure, technical issues and prioritized recommendations.",
+    "pricingType": "fixed",
+    "basePrice": 5000,
+    "unit": "audit",
+    "minQuantity": 1,
+    "maxQuantity": 1,
+    "pricingOptions": [],
+    "fields": [
+      {
+        "name": "websiteUrl",
+        "label": "Website URL",
+        "type": "url",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 0
+      },
+      {
+        "name": "projectBrief",
+        "label": "Primary concerns and goals",
+        "type": "textarea",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 1
+      },
+      {
+        "name": "targetLocations",
+        "label": "Target market / locations",
+        "type": "text",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 2
+      }
+    ],
+    "repeatableGroups": [],
+    "isActive": false,
+    "isPublic": false,
+    "displayOrder": 101
+  },
+  {
+    "name": "Keyword Research",
+    "slug": "keyword-research",
+    "serviceGroup": "seo",
+    "category": "SEO",
+    "description": "Starter configuration: sample scope and pricing. Keyword discovery, intent grouping and a starter keyword map for one business.",
+    "pricingType": "fixed",
+    "basePrice": 3000,
+    "unit": "research package",
+    "minQuantity": 1,
+    "maxQuantity": 1,
+    "pricingOptions": [],
+    "fields": [
+      {
+        "name": "websiteUrl",
+        "label": "Website URL",
+        "type": "url",
+        "required": false,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 0
+      },
+      {
+        "name": "projectBrief",
+        "label": "Products, services and target audience",
+        "type": "textarea",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 1
+      },
+      {
+        "name": "targetLocations",
+        "label": "Target locations and languages",
+        "type": "text",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 2
+      },
+      {
+        "name": "seedKeywords",
+        "label": "Existing keywords or competitors",
+        "type": "textarea",
+        "required": false,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 3
+      }
+    ],
+    "repeatableGroups": [],
+    "isActive": false,
+    "isPublic": false,
+    "displayOrder": 102
+  },
+  {
+    "name": "On-page SEO",
+    "slug": "on-page-seo",
+    "serviceGroup": "seo",
+    "category": "SEO",
+    "description": "Starter configuration: sample scope and pricing. Review page titles, descriptions, headings and internal linking for the supplied pages. Quantity is the number of pages.",
+    "pricingType": "per_unit",
+    "basePrice": 1000,
+    "unit": "page",
+    "minQuantity": 1,
+    "maxQuantity": 100,
+    "pricingOptions": [],
+    "fields": [
+      {
+        "name": "websiteUrl",
+        "label": "Website URL",
+        "type": "url",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 0
+      },
+      {
+        "name": "pageUrls",
+        "label": "Page URLs to optimize",
+        "type": "textarea",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 1
+      },
+      {
+        "name": "targetKeywords",
+        "label": "Target keywords",
+        "type": "textarea",
+        "required": false,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 2
+      }
+    ],
+    "repeatableGroups": [],
+    "isActive": false,
+    "isPublic": false,
+    "displayOrder": 103
+  },
+  {
+    "name": "Technical SEO",
+    "slug": "technical-seo",
+    "serviceGroup": "seo",
+    "category": "SEO",
+    "description": "Starter configuration: sample scope and pricing. Review and address an agreed scope of crawling, indexing, sitemap and technical SEO issues.",
+    "pricingType": "fixed",
+    "basePrice": 6000,
+    "unit": "project",
+    "minQuantity": 1,
+    "maxQuantity": 1,
+    "pricingOptions": [],
+    "fields": [
+      {
+        "name": "websiteUrl",
+        "label": "Website URL",
+        "type": "url",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 0
+      },
+      {
+        "name": "websitePlatform",
+        "label": "Website platform",
+        "type": "select",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [
+          {
+            "label": "WordPress",
+            "value": "wordpress",
+            "price": 0
+          },
+          {
+            "label": "Shopify",
+            "value": "shopify",
+            "price": 0
+          },
+          {
+            "label": "Custom",
+            "value": "custom",
+            "price": 0
+          },
+          {
+            "label": "Other",
+            "value": "other",
+            "price": 0
+          }
+        ],
+        "order": 1
+      },
+      {
+        "name": "projectBrief",
+        "label": "Known issues and requested improvements",
+        "type": "textarea",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 2
+      }
+    ],
+    "repeatableGroups": [],
+    "isActive": false,
+    "isPublic": false,
+    "displayOrder": 104
+  },
+  {
+    "name": "Website Speed & Performance",
+    "slug": "website-speed-performance",
+    "serviceGroup": "seo",
+    "category": "SEO",
+    "description": "Starter configuration: sample scope and pricing. Review and improve an agreed set of website performance issues. Results depend on hosting, themes and third-party integrations.",
+    "pricingType": "fixed",
+    "basePrice": 5000,
+    "unit": "project",
+    "minQuantity": 1,
+    "maxQuantity": 1,
+    "pricingOptions": [],
+    "fields": [
+      {
+        "name": "websiteUrl",
+        "label": "Website URL",
+        "type": "url",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 0
+      },
+      {
+        "name": "websitePlatform",
+        "label": "Website platform",
+        "type": "select",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [
+          {
+            "label": "WordPress",
+            "value": "wordpress",
+            "price": 0
+          },
+          {
+            "label": "Shopify",
+            "value": "shopify",
+            "price": 0
+          },
+          {
+            "label": "Custom",
+            "value": "custom",
+            "price": 0
+          },
+          {
+            "label": "Other",
+            "value": "other",
+            "price": 0
+          }
+        ],
+        "order": 1
+      },
+      {
+        "name": "projectBrief",
+        "label": "Performance concerns and priority pages",
+        "type": "textarea",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 2
+      }
+    ],
+    "repeatableGroups": [],
+    "isActive": false,
+    "isPublic": false,
+    "displayOrder": 105
+  },
+  {
+    "name": "WordPress Website",
+    "slug": "wordpress-website",
+    "serviceGroup": "development",
+    "category": "Development",
+    "description": "Starter configuration: sample scope and pricing. A starter WordPress website build. Agree final pages, content, hosting and integrations before activation.",
+    "pricingType": "fixed",
+    "basePrice": 20000,
+    "unit": "website",
+    "minQuantity": 1,
+    "maxQuantity": 1,
+    "pricingOptions": [],
+    "fields": [
+      {
+        "name": "projectBrief",
+        "label": "Business, pages and website requirements",
+        "type": "textarea",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 0
+      },
+      {
+        "name": "pageCount",
+        "label": "Expected number of pages",
+        "type": "number",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 1,
+        "min": 1,
+        "max": 100,
+        "step": 1
+      },
+      {
+        "name": "websiteUrl",
+        "label": "Website URL",
+        "type": "url",
+        "required": false,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 2
+      },
+      {
+        "name": "referenceWebsites",
+        "label": "Reference websites",
+        "type": "textarea",
+        "required": false,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 3
+      }
+    ],
+    "repeatableGroups": [],
+    "isActive": false,
+    "isPublic": false,
+    "displayOrder": 106
+  },
+  {
+    "name": "Shopify Store",
+    "slug": "shopify-store",
+    "serviceGroup": "development",
+    "category": "Development",
+    "description": "Starter configuration: sample scope and pricing. A starter Shopify storefront build with an agreed catalogue and store setup scope.",
+    "pricingType": "fixed",
+    "basePrice": 35000,
+    "unit": "store",
+    "minQuantity": 1,
+    "maxQuantity": 1,
+    "pricingOptions": [],
+    "fields": [
+      {
+        "name": "projectBrief",
+        "label": "Business, store features and requirements",
+        "type": "textarea",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 0
+      },
+      {
+        "name": "productCount",
+        "label": "Expected number of products",
+        "type": "number",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 1,
+        "min": 1,
+        "max": 10000,
+        "step": 1
+      },
+      {
+        "name": "websiteUrl",
+        "label": "Website URL",
+        "type": "url",
+        "required": false,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 2
+      },
+      {
+        "name": "integrations",
+        "label": "Payments, shipping and integrations",
+        "type": "textarea",
+        "required": false,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 3
+      }
+    ],
+    "repeatableGroups": [],
+    "isActive": false,
+    "isPublic": false,
+    "displayOrder": 107
+  },
+  {
+    "name": "Custom Website",
+    "slug": "custom-website",
+    "serviceGroup": "development",
+    "category": "Development",
+    "description": "Starter configuration: sample scope and pricing. A custom website starter scope. Final architecture, deliverables, integrations and pricing require review.",
+    "pricingType": "fixed",
+    "basePrice": 60000,
+    "unit": "website",
+    "minQuantity": 1,
+    "maxQuantity": 1,
+    "pricingOptions": [],
+    "fields": [
+      {
+        "name": "projectBrief",
+        "label": "Project scope, pages and features",
+        "type": "textarea",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 0
+      },
+      {
+        "name": "technologyPreferences",
+        "label": "Technology preferences",
+        "type": "text",
+        "required": false,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 1
+      },
+      {
+        "name": "integrations",
+        "label": "Required integrations",
+        "type": "textarea",
+        "required": false,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 2
+      },
+      {
+        "name": "websiteUrl",
+        "label": "Website URL",
+        "type": "url",
+        "required": false,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 3
+      }
+    ],
+    "repeatableGroups": [],
+    "isActive": false,
+    "isPublic": false,
+    "displayOrder": 108
+  },
+  {
+    "name": "Website Changes",
+    "slug": "website-changes",
+    "serviceGroup": "development",
+    "category": "Development",
+    "description": "Starter configuration: sample scope and pricing. Changes to an existing website, priced per requested hour. Agree scope and estimated hours before ordering.",
+    "pricingType": "per_unit",
+    "basePrice": 1500,
+    "unit": "hour",
+    "minQuantity": 1,
+    "maxQuantity": 160,
+    "pricingOptions": [],
+    "fields": [
+      {
+        "name": "websiteUrl",
+        "label": "Website URL",
+        "type": "url",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 0
+      },
+      {
+        "name": "websitePlatform",
+        "label": "Website platform",
+        "type": "select",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [
+          {
+            "label": "WordPress",
+            "value": "wordpress",
+            "price": 0
+          },
+          {
+            "label": "Shopify",
+            "value": "shopify",
+            "price": 0
+          },
+          {
+            "label": "Custom",
+            "value": "custom",
+            "price": 0
+          },
+          {
+            "label": "Other",
+            "value": "other",
+            "price": 0
+          }
+        ],
+        "order": 1
+      },
+      {
+        "name": "projectBrief",
+        "label": "Changes, affected pages and acceptance criteria",
+        "type": "textarea",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 2
+      }
+    ],
+    "repeatableGroups": [],
+    "isActive": false,
+    "isPublic": false,
+    "displayOrder": 109
+  },
+  {
+    "name": "Development Hours",
+    "slug": "development-hours",
+    "serviceGroup": "development",
+    "category": "Development",
+    "description": "Starter configuration: sample scope and pricing. A block of development hours for agreed tasks. Quantity is purchased hours; tracking and recurring billing are not included.",
+    "pricingType": "per_unit",
+    "basePrice": 1200,
+    "unit": "hour",
+    "minQuantity": 1,
+    "maxQuantity": 160,
+    "pricingOptions": [],
+    "fields": [
+      {
+        "name": "projectBrief",
+        "label": "Tasks and expected outcomes",
+        "type": "textarea",
+        "required": true,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 0
+      },
+      {
+        "name": "websiteUrl",
+        "label": "Website URL",
+        "type": "url",
+        "required": false,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 1
+      },
+      {
+        "name": "technologyPreferences",
+        "label": "Platform / technology",
+        "type": "text",
+        "required": false,
+        "placeholder": "",
+        "helpText": "",
+        "options": [],
+        "order": 2
+      }
+    ],
+    "repeatableGroups": [],
+    "isActive": false,
+    "isPublic": false,
+    "displayOrder": 110
+  }
+]

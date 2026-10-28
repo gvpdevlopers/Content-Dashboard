@@ -28,8 +28,37 @@ const baseOrder = () => ({ _id: orderId, client: clientId, amount: 118,
   paymentStatus: "processing", orderStatus: "pending", razorpayOrderId: "order_test" });
 const payment = () => ({ id: "pay_test", order_id: "order_test", amount: 11800,
   currency: "INR", status: "captured" });
-const request = (body) => ({ body, user: { _id: clientId, userId: clientId }, get: () => undefined });
+const request = (body) => ({ body, user: { _id: clientId, userId: clientId, role: "client" }, get: () => undefined });
 const sign = (body, secret) => crypto.createHmac("sha256", secret).update(body).digest("hex");
+
+test("accepted legacy ID-only tokens receive a canonical userId for session/profile handlers", async () => {
+  const protect = load("middleware/auth.js", {
+    jsonwebtoken: { verify: () => ({ _id: clientId, role: "admin" }) },
+    "../models/User": { findById: () => ({ select: async () => ({ _id: clientId, role: "client", isActive: true }) }) },
+  });
+  const req = { headers: { authorization: "Bearer synthetic" }, method: "GET" };
+  let next = false; await protect(req, response(), () => { next = true; });
+  assert.equal(next, true); assert.equal(req.user.userId, clientId); assert.equal(req.user.role, "client");
+});
+
+test("admins and employees cannot verify PINs or query verification records", async () => {
+  const controller = load("controllers/codController.js", { "../models/Order": {
+    findById: async () => assert.fail("Staff must be rejected before querying the order"),
+  } });
+  for (const role of ["admin", "employee"]) {
+    const res = response();
+    await controller.verifyCodPin({ ...request({ orderId, pin: "123456" }), user: { _id: clientId, role } }, res);
+    assert.equal(res.statusCode, 403); assert.equal(res.body.success, false);
+  }
+});
+
+test("malformed PIN bodies and array PINs are rejected before database operations", async () => {
+  const controller = load("controllers/codController.js", { "../models/Order": { findById: async () => assert.fail("No query for invalid input") } });
+  for (const body of [undefined, {}, { orderId, pin: ["123456"] }, { orderId, pin: { value: "123456" } }]) {
+    const res = response(); await controller.verifyCodPin(request(body), res); assert.equal(res.statusCode, 400);
+  }
+  const generate = response(); await controller.generateCodPin({ user: { role: "admin" } }, generate); assert.equal(generate.statusCode, 400);
+});
 
 test("password reset and account deactivation atomically revoke sessions", async () => {
   const writes = [];
@@ -79,9 +108,10 @@ test("checkout replay returns the original order without reserving another coupo
   assert.equal(conflict.statusCode, 409);
 });
 
-test("expired and locked PINs cannot collect payment", async () => {
+test("explicitly expired, disabled and attempt-locked PINs cannot collect payment", async () => {
   for (const overrides of [
-    { codPinGeneratedAt: new Date(Date.now() - 16 * 60 * 1000) },
+    { codPinStatus: "expired" },
+    { codPinStatus: "disabled" },
     { codPinAttempts: 5 },
   ]) {
     let writes = 0;
@@ -115,7 +145,7 @@ test("wrong PIN consumes an atomic attempt; correct PIN uses an atomic state tra
   assert.equal(attempts, 1);
   const right = response();
   await controller.verifyCodPin(request({ orderId, pin: "123456" }), right);
-  assert.equal(right.body.order.paymentStatus, "collected");
+  assert.equal(right.body.order.paymentStatus, "paid");
 });
 
 test("payment initialization reuses the provider order", async () => {
@@ -204,7 +234,7 @@ test("login throttling stops repeated account attempts", async () => {
 test("collection PIN generation can replace a locked PIN", async () => {
   const order = { ...baseOrder(), paymentMethod: "cod", codPinStatus: "active",
     codPinGeneratedAt: new Date(), codPinAttempts: 5 };
-  const controller = load("controllers/codController.js", { "../models/Order": {
+  const controller = load("controllers/codController.js", { "../models/User": { findOne: () => ({ select: async () => ({ _id: clientId }) }) }, "../models/Order": {
     findById: async () => order,
     findOneAndUpdate: async (filter, update) => {
       assert.equal(filter.codPinStatus, "active");
@@ -214,7 +244,7 @@ test("collection PIN generation can replace a locked PIN", async () => {
     },
   } });
   const res = response();
-  await controller.generateCodPin(request({ orderId }), res);
+  await controller.generateCodPin({ ...request({ orderId, employeeId: clientId }), user: { _id: clientId, role: "admin" } }, res);
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.order.codPinStatus, "active");
 });
@@ -253,21 +283,21 @@ test("payment initialization recovers a captured payment after an interrupted ca
   assert.equal(res.body.order.paymentStatus, "paid");
 });
 
-test("cheque PIN verification preserves payment status", async () => {
+test("cheque PIN verification atomically completes payment", async () => {
   const order = { ...baseOrder(), paymentMethod: "cheque", paymentStatus: "pending",
     codPinStatus: "active", codPin: "123456", codPinGeneratedAt: new Date() };
   const controller = load("controllers/codController.js", { "../models/Order": {
     findById: async () => order,
     findOneAndUpdate: async (filter, update) => {
-      assert.equal(Object.hasOwn(update.$set, "paymentStatus"), false);
+      assert.equal(update.$set.paymentStatus, "paid");
       return { ...order, ...update.$set };
     },
   } });
   const res = response();
   await controller.verifyCodPin(request({ orderId, pin: "123456" }), res);
   assert.equal(res.statusCode, 200);
-  assert.equal(res.body.order.codPinStatus, "verified");
-  assert.equal(res.body.order.paymentStatus, "pending");
+  assert.equal(res.body.order.codPinStatus, "used");
+  assert.equal(res.body.order.paymentStatus, "paid");
 });
 
 test("frontend checkout retries reuse their key, survive reload and reset after success", async () => {

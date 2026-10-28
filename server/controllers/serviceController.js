@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const Service = require("../models/Service");
+const { publicServiceFilter, canClientOrderService, SERVICE_GROUPS } = require("../utils/serviceAccess");
 const normalizeAdsService = require("../utils/normalizeAdsService");
 const { getGridPostPricingModes } = require("../utils/gridPostPricing");
 
@@ -1197,7 +1198,7 @@ const validateServiceConfiguration = (
 };
 
 /* =========================================================
-   Public - Get Active Services
+   Public - Get Marketing-Visible Services
 ========================================================= */
 
 const getPublicServices = async (
@@ -1207,13 +1208,12 @@ const getPublicServices = async (
   try {
     const services =
       await Service.find(
-        {
-          isActive: true,
-        },
+        publicServiceFilter(),
         {
           name: 1,
           slug: 1,
           category: 1,
+          serviceGroup: 1,
           description: 1,
           pricingType: 1,
           basePrice: 1,
@@ -1262,7 +1262,7 @@ const getActiveServices = async (
 
     return res.status(200).json({
       success: true,
-      services: services.map(normalizeServiceForClient),
+      services: services.filter((service) => req.user?.role !== "client" || canClientOrderService(req.user, service)).map(normalizeServiceForClient),
     });
   } catch (error) {
     console.error(
@@ -1293,7 +1293,7 @@ const getServiceById = async (
         isActive: true,
       });
 
-    if (!service) {
+    if (!service || (req.user?.role === "client" && !canClientOrderService(req.user, service))) {
       return res.status(404).json({
         success: false,
         message:
@@ -1418,7 +1418,13 @@ const createService = async (
       displayOrder,
     } = req.body;
 
+    if ((req.body.serviceGroup !== undefined && !SERVICE_GROUPS.includes(req.body.serviceGroup)) ||
+        (req.body.isPublic !== undefined && typeof req.body.isPublic !== "boolean")) {
+      return res.status(400).json({ success: false, message: "Select a valid service group and public visibility." });
+    }
     const normalizedService = {
+      serviceGroup: req.body.serviceGroup ?? "content",
+      isPublic: req.body.isPublic ?? (isActive !== false),
       name:
         cleanString(name),
 
@@ -1622,6 +1628,10 @@ const updateService = async (
     |--------------------------------------------------------------------------
     */
 
+    if ((req.body.serviceGroup !== undefined && !SERVICE_GROUPS.includes(req.body.serviceGroup)) ||
+        (req.body.isPublic !== undefined && typeof req.body.isPublic !== "boolean")) {
+      return res.status(400).json({ success: false, message: "Select a valid service group and public visibility." });
+    }
     const updatedConfiguration = {
       name:
         name !== undefined
@@ -1765,6 +1775,8 @@ const updateService = async (
     |--------------------------------------------------------------------------
     */
 
+    if (req.body.serviceGroup !== undefined) service.serviceGroup = req.body.serviceGroup;
+    if (req.body.isPublic !== undefined) service.isPublic = req.body.isPublic;
     service.name =
       updatedConfiguration.name;
 
@@ -1901,7 +1913,12 @@ const toggleServiceStatus = async (
    Exports
 ========================================================= */
 
+const getServiceTemplates = (_req, res) => res.status(200).json({
+  success: true, templates: require("../data/serviceTemplates.json"),
+});
+
 module.exports = {
+  getServiceTemplates,
   getPublicServices,
   getActiveServices,
   getServiceById,

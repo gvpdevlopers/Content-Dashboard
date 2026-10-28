@@ -1,3 +1,4 @@
+import ServiceTemplatePicker from "../../components/ServiceTemplatePicker";
 import FormFeedback from "../../components/FormFeedback";
 import CustomSelect from "../../components/CustomSelect";
 import { useMemo, useState } from "react";
@@ -1543,6 +1544,8 @@ const AdminCreateService = () => {
     maxQuantity: "",
     pricingOptions: [],
     fields: [],
+    serviceGroup: "content",
+    isPublic: true,
     isActive: true,
     displayOrder: 0,
   });
@@ -2005,6 +2008,8 @@ const AdminCreateService = () => {
 
       fields: formData.fields.map(cleanField),
 
+      serviceGroup: formData.serviceGroup,
+      isPublic: formData.isPublic,
       isActive: Boolean(formData.isActive),
 
       displayOrder: Number(formData.displayOrder || 0),
@@ -2194,6 +2199,19 @@ const AdminCreateService = () => {
               )}
         </FormFeedback>}
 
+        <ServiceTemplatePicker disabled={submitting}
+          hasChanges={Boolean(formData.name || formData.slug || formData.category || formData.description || formData.basePrice || formData.fields.length || formData.pricingOptions.length || formData.unit || formData.pricingType !== "fixed" || formData.minQuantity !== 1 || formData.maxQuantity !== "" || formData.serviceGroup !== "content" || !formData.isActive || !formData.isPublic || formData.displayOrder !== 0)}
+          onApply={(template) => {
+            setFormData({ ...template,
+              fields: template.fields.map((field, index) => ({ ...createField(index), ...field,
+                options: (field.options || []).map((option) => ({ ...createFieldOption(), ...option })),
+              })),
+            });
+            setErrors({});
+            setError("");
+            toast.success("Starter loaded. Review the sample pricing and scope before saving.");
+          }} />
+
         {/* ====================================================
             CLIENT VALIDATION SUMMARY
         ===================================================== */}
@@ -2325,12 +2343,22 @@ const AdminCreateService = () => {
             </div>
           </div>
 
+          <div className="mt-5 space-y-4">
+            <label className="block text-sm font-medium">Service group
+              <select className="mt-2 w-full rounded-lg border border-zinc-200 bg-white p-3" value={formData.serviceGroup} onChange={(event) => updateForm("serviceGroup", event.target.value)}>
+                <option value="content">Content</option><option value="seo">SEO</option><option value="development">Development</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={formData.isPublic} onChange={(event) => updateForm("isPublic", event.target.checked)} />Visible on public website</label>
+            <p className="text-xs text-zinc-500">Public visibility is for marketing. Ordering also requires an active service and client permission.</p>
+          </div>
+
           <div className="mt-5">
             <Toggle
               checked={formData.isActive}
               onChange={(value) => updateForm("isActive", value)}
               label="Service is active"
-              description="Active services are available to customers."
+              description="Active services can be ordered by authorized clients."
             />
           </div>
         </div>

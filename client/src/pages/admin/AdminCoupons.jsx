@@ -1,8 +1,9 @@
+import useAsyncResource from "../../hooks/useAsyncResource";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import ActiveFilters from "../../components/ActiveFilters";
 import FormFeedback from "../../components/FormFeedback";
 import CustomSelect from "../../components/CustomSelect";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Check,
   ChevronDown,
@@ -56,13 +57,9 @@ const toDateInputValue = (value) => {
 };
 
 const AdminCoupons = () => {
-  const [services, setServices] = useState([]);
-  const [coupons, setCoupons] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [loadError, setLoadError] = useState("");
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
   const [couponToDelete, setCouponToDelete] = useState(null);
@@ -75,40 +72,21 @@ const AdminCoupons = () => {
   const [loadingUsageId, setLoadingUsageId] = useState("");
   const [form, setForm] = useState(emptyForm);
 
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setLoadError("");
-      const [couponResponse, serviceResponse] = await Promise.all([
-        couponService.listCoupons(),
-        serviceService.getAdminServices(),
-      ]);
-      const loadedServices = serviceResponse.services || [];
-      setCoupons(couponResponse.coupons || []);
-      setServices(loadedServices);
-      setForm((current) => ({
-        ...current,
-        serviceDiscounts: loadedServices.map((service) => {
-          const existing = current.serviceDiscounts.find(
-            (entry) => String(entry.serviceId) === String(service._id),
-          );
-          return {
-            serviceId: String(service._id),
-            discountPercent: existing?.discountPercent ?? "0",
-          };
-        }),
-      }));
-    } catch (error) {
-      setLoadError(errorMessage(error));
-      toast.error(errorMessage(error));
-    } finally {
-      setLoading(false);
-    }
+  const readData = useCallback(async () => {
+    const [couponResponse, serviceResponse] = await Promise.all([
+      couponService.listCoupons(), serviceService.getAdminServices(),
+    ]);
+    return { coupons: couponResponse.coupons || [], services: serviceResponse.services || [] };
   }, []);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  const configureDiscounts = useCallback(({ services }) => {
+    setForm((current) => ({ ...current, serviceDiscounts: services.map((service) => ({
+      serviceId: String(service._id),
+      discountPercent: current.serviceDiscounts.find((entry) => String(entry.serviceId) === String(service._id))?.discountPercent ?? "0",
+    })) }));
+  }, []);
+  const notifyLoadError = useCallback((error) => toast.error(errorMessage(error)), []);
+  const { data: { coupons, services }, loading, error: loadError, reload: loadData } = useAsyncResource(readData,
+    { initialData: { coupons: [], services: [] }, errorMessage: "Unable to load coupons and services.", onSuccess: configureDiscounts, onError: notifyLoadError });
 
   const sortedServices = useMemo(
     () =>

@@ -1,7 +1,7 @@
 # Security and payment setup
 
 Existing client, employee and admin routes remain available. These changes add
-session revocation, database-backed login throttling, expiring collection PINs,
+session revocation, database-backed login throttling, admin-managed collection PINs,
 checkout retry protection and captured-payment reconciliation.
 
 ## Razorpay webhook
@@ -40,9 +40,11 @@ The server uses Express's source IP, not an untrusted forwarded header. If you
 deploy behind a proxy, configure Express `trust proxy` for your actual trusted
 proxy topology to avoid grouping all users under the proxy's IP.
 
-COD/cheque PINs expire after 15 minutes or five incorrect attempts. Admins can
-replace expired or locked PINs. Existing active PINs follow the same expiry
-using their stored generation timestamp. Password resets and deactivation
+COD/cheque PINs have no automatic time expiry. They remain active until an admin
+disables them, a client successfully uses them, or five incorrect attempts lock them.
+Admins can generate a replacement after disabling a PIN or when it is locked.
+Previously persisted expired/cancelled PINs are not reactivated. Existing active PINs
+also have no time limit. Password resets and deactivation
 invalidate all prior sessions; users must sign in again.
 
 Coupon usage remains attached to the created order, including unpaid orders.
@@ -50,9 +52,15 @@ Retrying that order does not reserve another coupon use. Automatic expiry or
 release of an abandoned order's coupon is deliberately not introduced: payment
 may still complete, and releasing it requires a coordinated cancellation policy.
 
+Only the owning client can verify a COD/cheque PIN. Admins manage PINs and
+assigned employees view them; neither role can verify. Successful verification
+atomically records Paid, consumes the PIN and records the client/time. Manual
+COD/cheque completion cannot bypass this transition. See
+[the current PIN workflow](../docs/CLIENT_ONLY_PAYMENT_PIN_WORKFLOW.md).
+
 ## Checks
 
 Run `npm test` in `server` and `npm run build` in `client`. The regression tests
-mock MongoDB and Razorpay; they never modify live accounts or charge money.
+use mocks and a disposable loopback-only MongoDB fixture; they never modify live accounts or charge money.
 Before deployment, exercise checkout, payment retry and signed webhook delivery
 against a staging database and Razorpay test mode.

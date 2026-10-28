@@ -1081,6 +1081,8 @@ const orderSchema = new mongoose.Schema(
       default: null,
     },
 
+    codPinEmployee: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+
     codPinStatus: {
       type: String,
       enum: [
@@ -1089,6 +1091,8 @@ const orderSchema = new mongoose.Schema(
         "verified",
         "used",
         "expired",
+        "disabled",
+        "locked",
       ],
       default: "not_generated",
     },
@@ -1116,6 +1120,7 @@ const orderSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    codPinVerifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
 
     /*
     |--------------------------------------------------------------------------

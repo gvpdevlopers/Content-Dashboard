@@ -1,17 +1,21 @@
 import { getModalViewport, getSelectPortalTarget, lockBodyScroll } from "../src/utils/modal.js";
-import { canEnterCashPaymentPin, getVerifiedPaymentUpdate } from "../src/utils/paymentPin.js";
+import { canEnterPaymentPin, getVerifiedPaymentUpdate } from "../src/utils/paymentPin.js";
 import test, { before, after } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "vite";
 import react from "@vitejs/plugin-react";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { validResourceUrl, hasProjectDetails } from "../src/utils/orderResources.js";
 import { getSelectPlacement, findEnabledOption, findTypeaheadOption } from "../src/utils/selectNavigation.js";
 import { getDraftLabel, formatDraftDate } from "../src/utils/draftLabels.js";
-let server, Progress, Delivery, Resource, Badge, PaymentBadge, Select, Filters, Feedback, Modal, Confirm;
+let server, cacheDirectory, Progress, Delivery, Resource, Badge, PaymentBadge, Select, Filters, Feedback, Modal, Confirm, PinEmployee, AccessEditor, Role, PinActions, ClientPin;
 before(async () => {
-  server = await createServer({ configFile: false, plugins: [react()], optimizeDeps: { noDiscovery: true, entries: [] }, resolve: { preserveSymlinks: true }, server: { middlewareMode: true }, appType: "custom" });
+  cacheDirectory = await mkdtemp(join(tmpdir(), "glow-ui-vite-"));
+  server = await createServer({ configFile: false, cacheDir: cacheDirectory, plugins: [react()], optimizeDeps: { noDiscovery: true, entries: [] }, resolve: { preserveSymlinks: true }, server: { middlewareMode: true }, appType: "custom" });
   Filters = (await server.ssrLoadModule("/src/components/ActiveFilters.jsx")).default;
   Feedback = (await server.ssrLoadModule("/src/components/FormFeedback.jsx")).default;
   Modal = (await server.ssrLoadModule("/src/components/Modal.jsx")).default;
@@ -22,9 +26,54 @@ before(async () => {
   Resource = (await server.ssrLoadModule("/src/components/OrderResourceAction.jsx")).default;
   Badge = (await server.ssrLoadModule("/src/components/OrderStatusBadge.jsx")).default;
   PaymentBadge = (await server.ssrLoadModule("/src/components/PaymentStatusBadge.jsx")).default;
+  PinEmployee = (await server.ssrLoadModule("/src/components/PinEmployeeSelect.jsx")).default;
+  AccessEditor = (await server.ssrLoadModule("/src/components/ServiceAccessEditor.jsx")).default;
+  Role = (await server.ssrLoadModule("/src/components/RoleBadge.jsx")).default;
+  ClientPin = (await server.ssrLoadModule("/src/components/ClientPaymentPinSection.jsx")).default;
+  PinActions = (await server.ssrLoadModule("/src/components/OrderPaymentPinActions.jsx")).default;
 });
-after(async () => { await server?.close(); });
+after(async () => {
+  try { await server?.close(); }
+  finally { if (cacheDirectory) await rm(cacheDirectory, { recursive: true, force: true }); }
+});
 const render = (Component, props) => renderToStaticMarkup(React.createElement(Component, props));
+
+test("order PIN actions visibly offer entry and authorized PIN display without exposing a secret in row markup", () => {
+  const order = { _id: "order-one", paymentMethod: "cod", paymentStatus: "pending", codPinStatus: "active", codPinEmployee: "assigned", codPin: "secret-must-not-render" };
+  for (const user of [{ role: "admin" }, { role: "employee", _id: "assigned" }]) {
+    const html = render(PinActions, { order, user });
+    assert.match(html, /View PIN/); assert.doesNotMatch(html, /Enter PIN|Verify PIN|<input/); assert.doesNotMatch(html, /secret-must-not-render/);
+  }
+  const client = render(PinActions, { order, user: { role: "client" } });
+  assert.match(client, /Enter PIN/); assert.doesNotMatch(client, /View PIN/);
+  assert.equal(render(PinActions, { order, user: { role: "employee", _id: "other" } }), "");
+  assert.equal(render(PinActions, { order: { ...order, paymentStatus: "collected", codPinStatus: "used" }, user: { role: "admin" } }), "");
+});
+
+test("employee picker shows the actual selected identity and accessible loading, empty and failure states", () => {
+  const assignment = { data: [{ _id: "employee-a", name: "Krish", username: "krish" }, { _id: "employee-b", name: "Other", username: "other" }], employeeId: "employee-b", setEmployeeId() {}, reload() {} };
+  const selected = render(PinEmployee, { assignment });
+  assert.match(selected, /Other \(@other\)/); assert.match(selected, /role="combobox"/); assert.doesNotMatch(selected, /<select/);
+  assert.match(render(PinEmployee, { assignment: { ...assignment, loading: true } }), /Loading employees/);
+  assert.match(render(PinEmployee, { assignment: { ...assignment, data: [], employeeId: "" } }), /Create or activate an employee/);
+  const failed = render(PinEmployee, { assignment: { ...assignment, error: "Offline" } });
+  assert.match(failed, /role="alert"/); assert.match(failed, /Retry/);
+});
+
+test("service access uses custom dropdowns while retaining group grants and explicit service selection", () => {
+  const groups = render(AccessEditor, { value: { mode: "groups", groups: ["seo", "development"], serviceIds: [] }, onChange() {} });
+  assert.match(groups, /Service groups/); assert.doesNotMatch(groups, /<select/);
+  assert.equal((groups.match(/checked=""/g) || []).length, 2);
+  const custom = render(AccessEditor, { value: { mode: "selected", groups: [], serviceIds: ["existing"] }, onChange() {}, disabled: true });
+  assert.match(custom, /Find a service/); assert.match(custom, /Add a service/); assert.match(custom, /Loading services/);
+  assert.equal((custom.match(/role="combobox"/g) || []).length, 2);
+});
+
+test("ordinary role badges use neutral colors while retaining the admin shield", () => {
+  const admin = render(Role, { role: "admin" });
+  assert.match(admin, /<svg/); assert.match(admin, /Admin/);
+  assert.doesNotMatch(admin, /purple|blue|gradient/);
+});
 test("resource actions hide missing or unsafe URLs and invoice action uses the authorized link", () => {
   for (const url of [null, "", "  ", "javascript:alert(1)", "data:text/html,x", "https://user:secret@example.com", "/relative"]) {
     assert.equal(validResourceUrl(url), ""); assert.equal(render(Resource, { url }), "");
@@ -158,40 +207,37 @@ test("custom validation can announce required selects without adding browser val
 });
 
 
-test("cash PIN entry is available only for generated active unpaid cash orders", () => {
+test("PIN entry is available only for generated active unpaid collection orders", () => {
   const order = { paymentMethod: "cod", codPinStatus: "active", paymentStatus: "pending", orderStatus: "processing" };
-  assert.equal(canEnterCashPaymentPin(order), true);
-  for (const codPinStatus of [undefined, "not_generated", "expired", "verified", "used"]) {
-    assert.equal(canEnterCashPaymentPin({ ...order, codPinStatus }), false);
+  assert.equal(canEnterPaymentPin(order), true);
+  assert.equal(canEnterPaymentPin({ ...order, paymentMethod: "cheque" }), true);
+  for (const codPinStatus of [undefined, "not_generated", "disabled", "locked", "expired", "verified", "used"]) {
+    assert.equal(canEnterPaymentPin({ ...order, codPinStatus }), false);
   }
-  for (const paymentMethod of ["online", "cheque", "month_end"]) {
-    assert.equal(canEnterCashPaymentPin({ ...order, paymentMethod }), false);
+  for (const paymentMethod of ["online", "month_end"]) {
+    assert.equal(canEnterPaymentPin({ ...order, paymentMethod }), false);
   }
   for (const paymentStatus of ["paid", "collected"]) {
-    assert.equal(canEnterCashPaymentPin({ ...order, paymentStatus }), false);
+    assert.equal(canEnterPaymentPin({ ...order, paymentStatus }), false);
   }
   for (const orderStatus of ["cancelled", "rejected"]) {
-    assert.equal(canEnterCashPaymentPin({ ...order, orderStatus }), false);
+    assert.equal(canEnterPaymentPin({ ...order, orderStatus }), false);
   }
-  assert.equal(canEnterCashPaymentPin(null), false);
+  assert.equal(canEnterPaymentPin(null), false);
 });
 
-test("PIN verification preserves server payment results and the existing cash success fallback", () => {
+test("PIN verification requires saved payment confirmation and never invents a success fallback", () => {
   const order = { paymentStatus: "pending", codPinStatus: "active" };
   const update = getVerifiedPaymentUpdate(order, { order: {
-    paymentStatus: "collected", codPinStatus: "used", codCollectedAt: "2026-10-27T10:00:00Z",
+    paymentStatus: "paid", codPinStatus: "used", codCollectedAt: "2026-10-27T10:00:00Z",
     codPinVerifiedAt: "2026-10-27T10:00:00Z",
   } });
-  assert.equal(update.paymentStatus, "collected");
+  assert.equal(update.paymentStatus, "paid");
   assert.equal(update.codPinStatus, "used");
   assert.equal(update.codCollectedAt, "2026-10-27T10:00:00Z");
-  assert.equal(canEnterCashPaymentPin({ ...order, ...update, paymentMethod: "cod" }), false);
-  const partial = getVerifiedPaymentUpdate(order, { order: { codPinStatus: "used" } });
-  assert.equal(partial.paymentStatus, "pending");
-  assert.equal(partial.codPinStatus, "used");
-  const fallback = getVerifiedPaymentUpdate(order, {});
-  assert.equal(fallback.paymentStatus, "collected");
-  assert.equal(fallback.codPinStatus, "used");
+  assert.equal(canEnterPaymentPin({ ...order, ...update, paymentMethod: "cod" }), false);
+  assert.throws(() => getVerifiedPaymentUpdate(order, { order: { codPinStatus: "used" } }), /confirmation was incomplete/);
+  assert.throws(() => getVerifiedPaymentUpdate(order, {}), /confirmation was incomplete/);
   assert.equal(order.paymentStatus, "pending");
 });
 
@@ -247,4 +293,20 @@ test("select menus inside native dialogs stay in the interactive top layer", () 
   assert.equal(getSelectPortalTarget({ closest(selector) { assert.equal(selector, "dialog[open]"); return dialog; } }, body), dialog);
   assert.equal(getSelectPortalTarget({ closest() { return null; } }, body), body);
   assert.equal(getSelectPortalTarget(null, body), body);
+});
+
+
+test("client details offer inline entry only for active collection PINs and confirm Paid", () => {
+  const user = { role: "client", _id: "owner" };
+  for (const paymentMethod of ["cod", "cheque"]) {
+    const order = { _id: "order", client: "owner", paymentMethod, paymentStatus: "pending", codPinStatus: "active" };
+    const html = render(ClientPin, { order, user, onVerified() {} });
+    assert.match(html, /type="password"/); assert.match(html, /Verify PIN/);
+    for (const codPinStatus of ["not_generated", "disabled", "expired", "locked", "used"]) {
+      assert.doesNotMatch(render(ClientPin, { order: { ...order, codPinStatus }, user }), /<input|Verify PIN/);
+    }
+    const paid = render(ClientPin, { order: { ...order, paymentStatus: "paid", codPinStatus: "used" }, user });
+    assert.match(paid, /Paid/); assert.doesNotMatch(paid, /<input|Verify PIN/);
+    for (const role of ["admin", "employee"]) assert.equal(render(ClientPin, { order, user: { role } }), "");
+  }
 });

@@ -1,5 +1,6 @@
+import useAsyncResource from "../../hooks/useAsyncResource";
 import ActiveFilters from "../../components/ActiveFilters";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
@@ -126,15 +127,12 @@ const StatCard = ({
 const AdminServices = () => {
   const navigate = useNavigate();
 
-  const [services, setServices] = useState([]);
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
-  const [error, setError] = useState("");
   const [serviceToToggle, setServiceToToggle] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [groupFilter, setGroupFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
 
   const [togglingServiceId, setTogglingServiceId] = useState(null);
@@ -143,39 +141,13 @@ const AdminServices = () => {
   // FETCH SERVICES
   // ==========================================================
 
-  const fetchServices = useCallback(async (showRefreshLoader = false) => {
-    try {
-      setError("");
-
-      if (showRefreshLoader) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-
-      const response = await serviceService.getAdminServices();
-
-      setServices(Array.isArray(response?.services) ? response.services : []);
-    } catch (err) {
-      console.error("Failed to fetch admin services:", err);
-
-      setError(
-        getErrorMessage(err, "Unable to load services. Please try again."),
-      );
-      if (showRefreshLoader) {
-        toast.error(
-          getErrorMessage(err, "Unable to refresh services. Please try again."),
-        );
-      }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+  const readServices = useCallback(async () => {
+    const response = await serviceService.getAdminServices();
+    return Array.isArray(response?.services) ? response.services : [];
   }, []);
-
-  useEffect(() => {
-    fetchServices();
-  }, [fetchServices]);
+  const notifyLoadError = useCallback((error) => toast.error(getErrorMessage(error, "Unable to load services.")), []);
+  const { data: services, setData: setServices, loading, refreshing, error, setError, reload: fetchServices } = useAsyncResource(readServices,
+    { initialData: [], errorMessage: "Unable to load services. Please try again.", onError: notifyLoadError });
 
   // ==========================================================
   // FILTERED SERVICES
@@ -196,9 +168,10 @@ const AdminServices = () => {
         (statusFilter === "active" && service.isActive) ||
         (statusFilter === "inactive" && !service.isActive);
 
-      return matchesSearch && matchesStatus;
+      const matchesGroup = groupFilter === "all" || (service.serviceGroup ?? "content") === groupFilter;
+      return matchesSearch && matchesStatus && matchesGroup;
     });
-  }, [services, searchTerm, statusFilter]);
+  }, [services, searchTerm, statusFilter, groupFilter]);
 
   // ==========================================================
   // STATISTICS
@@ -445,6 +418,10 @@ const AdminServices = () => {
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="w-full sm:min-w-[170px] sm:max-w-[190px]">
+              <CustomSelect aria-label="Filter services by group" value={groupFilter} onChange={setGroupFilter}
+                options={[{ value: "all", label: "All groups" }, { value: "content", label: "Content" }, { value: "seo", label: "SEO" }, { value: "development", label: "Development" }]} />
+            </div>
             {/* Status Filter */}
             <div className="w-full sm:min-w-[170px] sm:max-w-[190px]">
               <CustomSelect aria-label="Filter services by status"
@@ -498,7 +475,7 @@ const AdminServices = () => {
 
 
         </div>
-        <ActiveFilters filters={[{ label: "Search", value: searchTerm.trim() }, { label: "Status", value: statusFilter === "all" ? "" : statusFilter }]} onClear={() => { setSearchTerm(""); setStatusFilter("all"); }} />
+        <ActiveFilters filters={[{ label: "Group", value: groupFilter === "all" ? "" : groupFilter === "seo" ? "SEO" : groupFilter === "development" ? "Development" : "Content" }, { label: "Search", value: searchTerm.trim() }, { label: "Status", value: statusFilter === "all" ? "" : statusFilter }]} onClear={() => { setSearchTerm(""); setStatusFilter("all"); setGroupFilter("all"); }} />
       </div>
 
       {/* ======================================================
@@ -520,7 +497,7 @@ const AdminServices = () => {
           <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-500">
             {services.length === 0
               ? "Create your first service to start managing pricing and dynamic fields."
-              : "Try changing your search or status filter."}
+              : "Try changing your search, group or status filter."}
           </p>
 
           {services.length === 0 ? (
@@ -653,6 +630,7 @@ const AdminServices = () => {
                         <span className="inline-flex rounded-lg bg-zinc-100 px-2.5 py-1.5 text-xs font-semibold text-zinc-600">
                           {service.category || "—"}
                         </span>
+                        <p className="mt-1 text-xs text-zinc-400">{service.serviceGroup === "seo" ? "SEO" : service.serviceGroup === "development" ? "Development" : "Content"} | {(service.isPublic === undefined ? service.isActive : service.isPublic) ? "Public" : "Private"}</p>
                       </td>
 
                       {/* Pricing */}
@@ -778,6 +756,7 @@ const AdminServices = () => {
                     <p className="mt-1 truncate text-sm font-semibold text-zinc-800">
                       {service.category || "—"}
                     </p>
+                    <p className="mt-1 text-xs text-zinc-400">{service.serviceGroup === "seo" ? "SEO" : service.serviceGroup === "development" ? "Development" : "Content"} | {(service.isPublic === undefined ? service.isActive : service.isPublic) ? "Public" : "Private"}</p>
                   </div>
 
                   <div className="rounded-xl bg-zinc-50 p-3">

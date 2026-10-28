@@ -1,36 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 
 import { ArrowRight, ClipboardList, Loader2, Package } from "lucide-react";
 
 import { Link } from "react-router-dom";
 
 import adminOrderService from "../services/adminOrderService";
+import AssignedPaymentPins from "../components/AssignedPaymentPins";
+import PaymentStatusBadge from "../components/PaymentStatusBadge";
+import useAsyncResource from "../hooks/useAsyncResource";
+import useCollectionPaymentRefresh from "../hooks/useCollectionPaymentRefresh";
 
 const EmployeeDashboard = () => {
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    const loadOrders = async () => {
-      try {
-        const data = await adminOrderService.getAdminOrders(true);
-
-        setOrders(Array.isArray(data?.orders) ? data.orders : []);
-      } catch (loadError) {
-        console.error("Load employee dashboard error:", loadError);
-
-        setError(
-          loadError.response?.data?.message ||
-            "Unable to load order dashboard.",
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadOrders();
+  const readOrders = useCallback(async () => {
+    const data = await adminOrderService.getAdminOrders(true);
+    return Array.isArray(data?.orders) ? data.orders : [];
   }, []);
+  const { data: orders, loading, error, reload } = useAsyncResource(readOrders, { initialData: [], errorMessage: "Unable to load order dashboard." });
+  useCollectionPaymentRefresh(orders, reload);
 
   const counts = useMemo(
     () => ({
@@ -93,6 +79,7 @@ const EmployeeDashboard = () => {
           Review and process customer orders.
         </p>
       </header>
+      <AssignedPaymentPins />
 
       {/* =====================================================
           ERROR
@@ -359,6 +346,7 @@ const EmployeeDashboard = () => {
                             " ",
                           )}
                         </span>
+                        <div className="mt-2"><PaymentStatusBadge status={order.paymentStatus} /></div>
                       </div>
 
                       <ArrowRight

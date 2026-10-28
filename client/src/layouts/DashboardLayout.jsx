@@ -11,7 +11,7 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/authSessionContext";
 import { toast } from "sonner";
 
 const DashboardLayout = () => {

@@ -1,7 +1,12 @@
 import PaymentStatusBadge from "../components/PaymentStatusBadge";
+import ClientPaymentPinSection from "../components/ClientPaymentPinSection";
+import { useAuth } from "../context/authSessionContext";
 import StatusBadge from "../components/OrderStatusBadge";
 import { hasProjectDetails } from "../utils/orderResources";
-import { useEffect, useState } from "react";
+import { useCallback } from "react";
+
+import useAsyncResource from "../hooks/useAsyncResource";
+import useCollectionPaymentRefresh from "../hooks/useCollectionPaymentRefresh";
 
 import {
   ArrowLeft,
@@ -9,16 +14,14 @@ import {
   CreditCard,
   ExternalLink,
   FileText,
-  KeyRound,
   Loader2,
   Package,
-  ShieldCheck,
 } from "lucide-react";
 
 import { Link, useParams } from "react-router-dom";
 
 import orderService from "../services/orderService";
-import codService from "../services/codService";
+
 import OrderItemsOverview from "../components/OrderItemsOverview";
 import RetryOnlinePayment from "../components/RetryOnlinePayment";
 import AdCreditBreakdown from "../components/AdCreditBreakdown";
@@ -26,103 +29,17 @@ import { toast } from "sonner";
 
 const OrderDetails = () => {
   const { id } = useParams();
+  return <OrderDetailsContent key={id} id={id} />;
+};
 
-  const [order, setOrder] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+const OrderDetailsContent = ({ id }) => {
+  const { user } = useAuth();
 
-  // COD
-  const [codPin, setCodPin] = useState("");
-  const [codLoading, setCodLoading] = useState(false);
-  const [codError, setCodError] = useState("");
 
-  useEffect(() => {
-    const loadOrder = async () => {
-      try {
-        setLoading(true);
-        setError("");
 
-        const data = await orderService.getOrderById(id);
-
-        setOrder(data.order);
-      } catch (error) {
-        console.error("Get order details error:", error);
-
-        setError(
-          error.response?.data?.message || "Unable to load order details.",
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (id) {
-      loadOrder();
-    }
-  }, [id]);
-
-  // ---------------------------------------------------------
-  // COD Verification
-  // ---------------------------------------------------------
-
-  const handleCodVerification = async () => {
-    if (codPin.length !== 6) {
-      setCodError(`Please enter the 6-digit ${order.paymentMethod === "cheque" ? "cheque" : "COD"} PIN.`);
-      return;
-    }
-
-    try {
-      setCodLoading(true);
-      setCodError("");
-
-      const response = await codService.verifyCodPin(id, codPin);
-
-      setCodPin("");
-
-      if (response.order) {
-        setOrder((currentOrder) => ({
-          ...currentOrder,
-
-          paymentStatus: response.order.paymentStatus || currentOrder.paymentStatus,
-          codPinStatus: response.order.codPinStatus || currentOrder.codPinStatus,
-
-          codCollectedAt: response.order.codCollectedAt || null,
-
-          codPinVerifiedAt:
-            response.order.codPinVerifiedAt || new Date().toISOString(),
-        }));
-      } else {
-        setOrder((currentOrder) => ({
-          ...currentOrder,
-          paymentStatus:
-            currentOrder.paymentMethod === "cod"
-              ? "collected"
-              : currentOrder.paymentStatus,
-          codPinStatus:
-            currentOrder.paymentMethod === "cheque" ? "verified" : "used",
-          codCollectedAt:
-            currentOrder.paymentMethod === "cod"
-              ? new Date().toISOString()
-              : currentOrder.codCollectedAt,
-        }));
-      }
-
-      toast.success(
-        order.paymentMethod === "cheque"
-          ? "Cheque PIN verified. Payment remains pending until confirmed."
-          : "COD payment verified.",
-      );
-    } catch (error) {
-      console.error("COD verification error:", error);
-
-      const message =
-        error.response?.data?.message || "Unable to verify COD PIN.";
-      setCodError(message);
-      toast.error(message);
-    } finally {
-      setCodLoading(false);
-    }
-  };
+  const readOrder = useCallback(async () => (await orderService.getOrderById(id)).order || null, [id]);
+  const { data: order, setData: setOrder, loading, error, reload } = useAsyncResource(readOrder, { errorMessage: "Unable to load order details." });
+  useCollectionPaymentRefresh(order ? [order] : [], reload);
 
   // ---------------------------------------------------------
   // Loading
@@ -286,21 +203,6 @@ const OrderDetails = () => {
   const isCodOrder = order.paymentMethod === "cod";
   const isChequeOrder = order.paymentMethod === "cheque";
   const hasPinVerification = isCodOrder || isChequeOrder;
-
-  const isPinVerificationComplete =
-    order.codPinStatus === "used" ||
-    order.codPinStatus === "verified" ||
-    (isCodOrder && order.paymentStatus === "collected") ||
-    (isChequeOrder &&
-      ["paid", "collected"].includes(order.paymentStatus));
-
-  const isCodPinActive = order.codPinStatus === "active";
-
-  const isCodPinPending =
-    order.codPinStatus === "not_generated" || !order.codPinStatus;
-
-  const showCodVerification =
-    hasPinVerification && !isPinVerificationComplete;
 
   return (
     <div className="mx-auto max-w-[1100px] animate-fade-up">
@@ -573,306 +475,10 @@ const OrderDetails = () => {
         </div>
       )}
 
+      <ClientPaymentPinSection order={order} user={user} onVerified={(update) => { setOrder((current) => ({ ...current, ...update })); toast.success("Payment marked as Paid."); }} />
       {(order.items?.length > 0 || order.serviceProgress) && (
         <div className="mt-6">
           <OrderItemsOverview order={order} />
-        </div>
-      )}
-
-      {/* =====================================================
-          COD VERIFICATION
-      ====================================================== */}
-
-      {showCodVerification && (
-        <div
-          className="
-            group
-            relative
-            mt-6
-            overflow-hidden
-            rounded-[24px]
-            border border-amber-200
-            bg-white
-            p-6
-            shadow-[0_12px_45px_rgba(0,0,0,0.04)]
-            transition
-            duration-300
-            hover:border-amber-300
-            sm:p-7
-          "
-        >
-          <div
-            className="
-              pointer-events-none
-              absolute
-              -right-16
-              -top-16
-              h-44
-              w-44
-              rounded-full
-              bg-amber-200/[0.25]
-              blur-3xl
-              transition
-              duration-700
-              group-hover:bg-amber-200/[0.4]
-            "
-          />
-
-          <div className="relative">
-            <div className="flex items-start gap-3">
-              <div
-                className="
-                  flex h-10 w-10
-                  shrink-0
-                  items-center justify-center
-                  rounded-xl
-                  border border-amber-200
-                  bg-amber-50
-                "
-              >
-                <KeyRound
-                  size={19}
-                  className="text-amber-600"
-                  strokeWidth={1.7}
-                />
-              </div>
-
-              <div>
-                <p
-                  className="
-                    text-[10px]
-                    font-medium
-                    uppercase
-                    tracking-[0.2em]
-                    text-amber-600/70
-                  "
-                >
-                  {isChequeOrder ? "Cheque" : "Cash on Delivery"}
-                </p>
-
-                <h2 className="mt-1 text-lg font-medium text-zinc-900">
-                  {isChequeOrder ? "Verify Cheque PIN" : "Verify COD Payment"}
-                </h2>
-
-                <p className="mt-1 max-w-xl text-xs leading-5 text-zinc-500">
-                  Enter the 6-digit PIN provided by the payment collector to
-                  verify {isChequeOrder ? "cheque collection" : "your COD payment"}.
-                </p>
-              </div>
-            </div>
-
-            {/* PIN not generated */}
-
-            {isCodPinPending && (
-              <div
-                className="
-                  mt-6
-                  rounded-2xl
-                  border border-zinc-200
-                  bg-zinc-50
-                  p-4
-                "
-              >
-                <div className="flex items-start gap-3">
-                  <div
-                    className="
-                      mt-0.5
-                      flex h-8 w-8
-                      shrink-0
-                      items-center justify-center
-                      rounded-lg
-                      border border-zinc-200
-                      bg-white
-                    "
-                  >
-                    <KeyRound size={16} className="text-zinc-400" />
-                  </div>
-
-                  <div>
-                    <p className="text-sm font-medium text-zinc-700">
-                      PIN not available yet
-                    </p>
-
-                    <p className="mt-1 text-xs leading-5 text-zinc-500">
-                      The payment collector will provide you with a COD PIN once
-                      it has been generated.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Active PIN */}
-
-            {isCodPinActive && (
-              <div className="mt-6">
-                <div
-                  className="
-                    rounded-2xl
-                    border border-zinc-200
-                    bg-zinc-50
-                    p-4
-                    sm:p-5
-                  "
-                >
-                  <div
-                    className="
-                      flex
-                      flex-col
-                      gap-5
-                      sm:flex-row
-                      sm:items-end
-                    "
-                  >
-                    <div className="flex-1">
-                      <label
-                        htmlFor="cod-pin"
-                        className="
-                          mb-2
-                          block
-                          text-[10px]
-                          font-medium
-                          uppercase
-                          tracking-[0.18em]
-                          text-zinc-400
-                        "
-                      >
-                        {isChequeOrder ? "Cheque PIN" : "COD PIN"}
-                      </label>
-
-                      <div className="relative">
-                        <input
-                          id="cod-pin"
-                          type="password"
-                          inputMode="numeric"
-                          autoComplete="one-time-code"
-                          maxLength={6}
-                          value={codPin}
-                          onChange={(event) => {
-                            setCodError("");
-
-                            setCodPin(
-                              event.target.value.replace(/\D/g, "").slice(0, 6),
-                            );
-                          }}
-                          onKeyDown={(event) => {
-                            if (
-                              event.key === "Enter" &&
-                              codPin.length === 6 &&
-                              !codLoading
-                            ) {
-                              handleCodVerification();
-                            }
-                          }}
-                          placeholder="Enter 6-digit PIN"
-                          className="
-                            h-12
-                            w-full
-                            rounded-xl
-                            border border-zinc-200
-                            bg-white
-                            px-4
-                            pr-12
-                            font-mono
-                            text-base
-                            tracking-[0.2em]
-                            text-zinc-900
-                            outline-none
-                            transition
-                            duration-200
-                            placeholder:font-sans
-                            placeholder:tracking-normal
-                            placeholder:text-zinc-400
-                            hover:border-zinc-300
-                            focus:border-zinc-400
-                            focus:shadow-[0_0_0_4px_rgba(24,24,27,0.04)]
-                          "
-                        />
-
-                        <KeyRound
-                          size={17}
-                          className="
-                            pointer-events-none
-                            absolute
-                            right-4
-                            top-1/2
-                            -translate-y-1/2
-                            text-zinc-300
-                          "
-                        />
-                      </div>
-
-                      <p className="mt-2 text-[11px] text-zinc-400">
-                        Enter the PIN provided by the payment collector.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleCodVerification}
-                      disabled={codLoading || codPin.length !== 6}
-                      className="dashboard-action dashboard-action--primary
-                        group
-                        inline-flex
-                        h-12
-                        shrink-0
-                        items-center
-                        justify-center
-                        gap-2
-                        rounded-xl
-                        bg-zinc-900
-                        px-5
-                        text-sm
-                        font-medium
-                        text-white
-                        shadow-sm
-                        transition
-                        duration-200
-                        hover:bg-zinc-800
-                        hover:shadow-md
-                        disabled:cursor-not-allowed
-                        disabled:opacity-40
-                      "
-                    >
-                      {codLoading ? (
-                        <>
-                          <Loader2 size={16} className="animate-spin" />
-                          Verifying...
-                        </>
-                      ) : (
-                        <>
-                          <ShieldCheck
-                            size={16}
-                            className="
-                              transition-transform
-                              duration-200
-                              group-hover:scale-105
-                            "
-                          />
-                          Verify PIN
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {codError && (
-                  <div
-                    className="
-                      mt-4
-                      rounded-xl
-                      border border-red-200
-                      bg-red-50
-                      px-4
-                      py-3.5
-                    "
-                  >
-                    <p className="text-sm leading-5 text-red-600">{codError}</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
         </div>
       )}
 
@@ -983,7 +589,7 @@ const OrderDetails = () => {
             />
           )}
 
-          {isCodOrder && order.codCollectedAt && (
+          {hasPinVerification && order.codCollectedAt && (
             <InfoRow
               label="Collected On"
               value={formatDateTime(order.codCollectedAt)}
@@ -1553,15 +1159,13 @@ const DetailField = ({ label, value, fullWidth = false }) => {
    PAYMENT STATUS
 ========================================================= */
 
-const PaymentStatus = ({ status, codPinStatus, paymentMethod }) => {
+const PaymentStatus = ({ status }) => {
   const normalizedStatus = status || "unknown";
 
   const successful =
     ["paid", "collected", "completed", "success", "successful"].includes(
       normalizedStatus,
-    ) ||
-    (paymentMethod === "cod" &&
-      (codPinStatus === "verified" || codPinStatus === "used"));
+    );
 
   return <PaymentStatusBadge status={successful ? "paid" : normalizedStatus} />;
 };

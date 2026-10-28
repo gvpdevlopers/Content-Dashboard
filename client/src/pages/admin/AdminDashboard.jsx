@@ -1,5 +1,7 @@
+import useAsyncResource from "../../hooks/useAsyncResource";
+import useCollectionPaymentRefresh from "../../hooks/useCollectionPaymentRefresh";
 import StatusBadge from "../../components/OrderStatusBadge";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 
 import {
   ArrowUpRight,
@@ -18,44 +20,19 @@ import adminOrderService from "../../services/adminOrderService";
 import adminUserService from "../../services/adminUserService";
 
 const AdminDashboard = () => {
-  const [orders, setOrders] = useState([]);
-  const [users, setUsers] = useState([]);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
-  const loadDashboard = async () => {
-    try {
-      setLoading(true);
-      setError("");
-
-      const [ordersResponse, usersResponse] = await Promise.all([
-        adminOrderService.getAdminOrders(),
-        adminUserService.getUsers(),
-      ]);
-
-      const ordersData =
-        ordersResponse?.orders || ordersResponse?.data?.orders || [];
-
-      const usersData =
-        usersResponse?.users || usersResponse?.data?.users || [];
-
-      setOrders(Array.isArray(ordersData) ? ordersData : []);
-      setUsers(Array.isArray(usersData) ? usersData : []);
-    } catch (error) {
-      console.error("Load admin dashboard error:", error);
-
-      setError(
-        error.response?.data?.message || "Unable to load dashboard data.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadDashboard();
+  const readDashboard = useCallback(async () => {
+    const [orderResponse, userResponse] = await Promise.all([
+      adminOrderService.getAdminOrders(), adminUserService.getUsers(),
+    ]);
+    const orders = orderResponse?.orders || orderResponse?.data?.orders || [];
+    const users = userResponse?.users || userResponse?.data?.users || [];
+    return { orders: Array.isArray(orders) ? orders : [], users: Array.isArray(users) ? users : [] };
   }, []);
+  const { data: { orders, users }, loading, error, reload: loadDashboard } = useAsyncResource(readDashboard,
+    { initialData: { orders: [], users: [] }, errorMessage: "Unable to load dashboard data." });
+  useCollectionPaymentRefresh(orders, loadDashboard);
 
   /* =========================================================
      NORMALIZED ORDERS
@@ -106,9 +83,7 @@ const AdminDashboard = () => {
 
       const paymentCompleted =
         order.normalizedPaymentStatus === "paid" ||
-        order.normalizedPaymentStatus === "collected" ||
-        order.normalizedCodPinStatus === "verified" ||
-        order.normalizedCodPinStatus === "used";
+        order.normalizedPaymentStatus === "collected";
 
       return !paymentCompleted;
     }).length;

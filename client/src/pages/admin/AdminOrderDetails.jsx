@@ -1,6 +1,7 @@
+import useAsyncResource from "../../hooks/useAsyncResource";
 import PaymentStatusBadge from "../../components/PaymentStatusBadge";
 import StatusBadge from "../../components/OrderStatusBadge";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   ArrowLeft,
@@ -23,7 +24,11 @@ import { Link, useParams } from "react-router-dom";
 import adminOrderService from "../../services/adminOrderService";
 import codService from "../../services/codService";
 import CustomSelect from "../../components/CustomSelect";
-import { useAuth } from "../../context/AuthContext";
+import usePinAssignment from "../../hooks/usePinAssignment";
+import PinEmployeeSelect from "../../components/PinEmployeeSelect";
+import OrderPaymentPinActions from "../../components/OrderPaymentPinActions";
+import { canViewOrderPaymentPin, mergeOrderPaymentRefresh } from "../../utils/paymentPin";
+import { useAuth } from "../../context/authSessionContext";
 import OrderItemsOverview from "../../components/OrderItemsOverview";
 import OrderAdCredit from "../../components/OrderAdCredit";
 import { toast } from "sonner";
@@ -32,12 +37,14 @@ const AdminOrderDetails = () => {
   const { id } = useParams();
   const { user } = useAuth();
   const staffMode = user?.role === "employee";
+  return <AdminOrderDetailsContent key={`${id}:${staffMode}`} id={id} staffMode={staffMode} user={user} />;
+};
+
+const AdminOrderDetailsContent = ({ id, staffMode, user }) => {
   const orderBasePath = staffMode ? "/staff/orders" : "/admin/orders";
+  const pinAssignment = usePinAssignment(!staffMode);
 
-  const [order, setOrder] = useState(null);
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
   const [statusLoading, setStatusLoading] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
@@ -45,7 +52,6 @@ const AdminOrderDetails = () => {
   const [codLoading, setCodLoading] = useState(false);
   const [progressUpdatingKey, setProgressUpdatingKey] = useState("");
 
-  const [error, setError] = useState("");
 
   const [copied, setCopied] = useState(false);
   const [adminNotes, setAdminNotes] = useState("");
@@ -61,34 +67,33 @@ const AdminOrderDetails = () => {
   |----------------------------------------------------------------------
   */
 
-  const loadOrder = async (isRefresh = false) => {
-    try {
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+  const readOrder = useCallback(async () => {
+    const response = await adminOrderService.getAdminOrderById(id, staffMode);
+    return response.order || null;
+  }, [id, staffMode]);
+  const populateOrderForm = useCallback((order) => {
+    setAdminNotes(order?.notes || "");
+    setDeliveryLink(order?.deliveryLink || "");
+    setInvoiceUrl(order?.invoice?.url || "");
+    setInvoiceName(order?.invoice?.name || "");
+  }, []);
+  const { data: order, setData: setOrder, loading, refreshing, error, setError, reload: loadOrder } = useAsyncResource(readOrder,
+    { errorMessage: "Unable to load order details.", onSuccess: populateOrderForm });
 
-      setError("");
-
-      const data = await adminOrderService.getAdminOrderById(id, staffMode);
-
-      setOrder(data.order || null);
-      setAdminNotes(data.order?.notes || "");
-      setDeliveryLink(data.order?.deliveryLink || "");
-      setInvoiceUrl(data.order?.invoice?.url || "");
-      setInvoiceName(data.order?.invoice?.name || "");
-    } catch (error) {
-      console.error("Get admin order details error:", error);
-
-      setError(
-        error.response?.data?.message || "Unable to load order details.",
-      );
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  useEffect(() => {
+    if (order?.codPinStatus !== "active") return;
+    let cancelled = false;
+    const refreshPayment = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const response = await adminOrderService.getAdminOrderById(id, staffMode);
+        if (!cancelled && response.order) setOrder((current) => mergeOrderPaymentRefresh(current, response.order));
+      } catch { /* The visible refresh action retains the existing API error feedback. */ }
+    };
+    const interval = setInterval(refreshPayment, 15000);
+    window.addEventListener("focus", refreshPayment);
+    return () => { cancelled = true; clearInterval(interval); window.removeEventListener("focus", refreshPayment); };
+  }, [id, staffMode, order?.codPinStatus, setOrder]);
 
   const handleSaveDelivery = async () => {
     if (!order) return;
@@ -134,11 +139,6 @@ const AdminOrderDetails = () => {
     }
   };
 
-  useEffect(() => {
-    if (id) {
-      loadOrder();
-    }
-  }, [id]);
 
   /*
   |----------------------------------------------------------------------
@@ -234,9 +234,9 @@ const AdminOrderDetails = () => {
      * the COD PIN verification flow.
      */
 
-    if (order.paymentMethod === "cod" && value === "collected") {
+    if (["cod", "cheque"].includes(order.paymentMethod) && ["paid", "collected"].includes(value)) {
       toast.error(
-        "COD payment must be completed through COD PIN verification.",
+        "Only the owning client can complete cash or cheque payment through PIN verification.",
       );
 
       return;
@@ -318,7 +318,7 @@ const AdminOrderDetails = () => {
   */
 
   const handleGenerateCodPin = async () => {
-    if (!order) {
+    if (!order || codLoading || !pinAssignment.employeeId) {
       return;
     }
 
@@ -327,7 +327,7 @@ const AdminOrderDetails = () => {
       setError("");
       setCopied(false);
 
-      const data = await codService.generateCodPin(order._id);
+      const data = await codService.generateCodPin(order._id, pinAssignment.employeeId);
 
       setOrder((currentOrder) => ({
         ...currentOrder,
@@ -339,6 +339,8 @@ const AdminOrderDetails = () => {
         codPin: data.codPin,
 
         codPinStatus: data.order?.codPinStatus || "active",
+        codPinEmployee: data.order?.codPinEmployee,
+        codPinGeneratedAt: data.order?.codPinGeneratedAt,
       }));
 
       toast.success(
@@ -374,6 +376,19 @@ const AdminOrderDetails = () => {
     } catch (error) {
       console.error("Copy PIN error:", error);
     }
+  };
+
+  const handleDisableCodPin = async () => {
+    if (!order || codLoading) return;
+    setCodLoading(true);
+    try {
+      const data = await codService.disableCodPin(order._id);
+      setOrder((current) => ({ ...current, ...data.order, codPin: null }));
+      setCopied(false);
+      toast.success(data.message);
+    } catch (failure) {
+      toast.error(failure.response?.data?.message || "Unable to disable payment PIN.");
+    } finally { setCodLoading(false); }
   };
 
   /*
@@ -944,11 +959,11 @@ const AdminOrderDetails = () => {
               <p className="mb-4 text-xs leading-5 text-zinc-400">
                 {order?.paymentMethod === "month_end"
                   ? "Payment is due at the end of the month. Select Paid only after payment has been received and verified. Status changes record your account and the time."
-                  : "Payment status can be confirmed here. COD PIN verification completes collection; cheque PIN verification does not mark payment as paid."}
+                  : ["cod", "cheque"].includes(order?.paymentMethod) ? "Only the owning client can verify the PIN. Successful verification marks the payment as Paid." : "Update the saved payment status here."}
               </p>
 
               <div className="min-w-0">
-                <CustomSelect aria-label="Payment status" disabled={paymentLoading}
+                <CustomSelect aria-label="Payment status" disabled={paymentLoading || (["cod", "cheque"].includes(order?.paymentMethod) && ["paid", "collected"].includes(order.paymentStatus))}
                   value={order?.paymentStatus || "pending"}
                   onChange={handlePaymentStatusChange}
                   options={[
@@ -972,7 +987,9 @@ const AdminOrderDetails = () => {
                       value: "collected",
                       label: "Collected",
                     },
-                  ].filter((option) => order?.paymentMethod !== "month_end" || option.value !== "collected")}
+                  ].filter((option) => order?.paymentMethod !== "month_end" || option.value !== "collected").map((option) => ({ ...option,
+                    disabled: ["cod", "cheque"].includes(order?.paymentMethod) && ["paid", "collected"].includes(option.value),
+                  }))}
                 />
               </div>
 
@@ -989,232 +1006,6 @@ const AdminOrderDetails = () => {
       ====================================================== */}
 
       <div className="mt-6 min-w-0 space-y-6">
-        {/* =================================================
-            ORDER CONFIGURATION
-        ================================================== */}
-
-        {!order?.items?.length && (
-          <InfoCard
-            icon={Package}
-            eyebrow="Service"
-            title="Order Configuration"
-          >
-            <div
-              className="
-                grid
-                min-w-0
-                gap-x-8
-                gap-y-5
-                sm:grid-cols-2
-                lg:grid-cols-3
-              "
-            >
-              <DetailItem
-                label="Service"
-                value={serviceSnapshot.name || order?.service?.name}
-              />
-
-              <DetailItem
-                label="Category"
-                value={serviceSnapshot.category || order?.service?.category}
-              />
-
-              <DetailItem
-                label="Pricing Type"
-                value={formatStatus(serviceSnapshot.pricingType)}
-              />
-
-              <DetailItem label="Quantity" value={order?.quantity} />
-
-              <DetailItem label="Unit" value={serviceSnapshot.unit} />
-
-              <DetailItem
-                label="Base Price"
-                value={
-                  serviceSnapshot.basePrice !== undefined
-                    ? formatCurrency(serviceSnapshot.basePrice)
-                    : "—"
-                }
-              />
-            </div>
-
-
-            {serviceSnapshot.selectedOption && (
-              <div
-                className="
-                  mt-6
-                  min-w-0
-                  rounded-2xl
-                  border
-                  border-zinc-200
-                  bg-zinc-50
-                  p-5
-                "
-              >
-                <div
-                  className="
-                    flex
-                    min-w-0
-                    flex-col
-                    gap-3
-                    sm:flex-row
-                    sm:items-start
-                    sm:justify-between
-                  "
-                >
-                  <div className="min-w-0">
-                    <p
-                      className="
-                        text-[10px]
-                        font-medium
-                        uppercase
-                        tracking-[0.15em]
-                        text-zinc-400
-                      "
-                    >
-                      Selected Service Option
-                    </p>
-
-                    <p
-                      className="
-                        mt-1
-                        break-words
-                        text-sm
-                        font-medium
-                        text-zinc-900
-                      "
-                    >
-                      {serviceSnapshot.selectedOption.name}
-                    </p>
-                  </div>
-
-                  <p
-                    className="
-                      shrink-0
-                      text-sm
-                      font-semibold
-                      text-zinc-900
-                    "
-                  >
-                    {formatCurrency(serviceSnapshot.selectedOption.price)}
-                  </p>
-                </div>
-
-                {serviceSnapshot.selectedOption.description && (
-                  <p
-                    className="
-                      mt-3
-                      break-words
-                      text-xs
-                      leading-5
-                      text-zinc-500
-                    "
-                  >
-                    {serviceSnapshot.selectedOption.description}
-                  </p>
-                )}
-              </div>
-            )}
-            <OrderAdCredit order={order} staffMode={staffMode} />
-          </InfoCard>
-        )}
-
-        {/* =================================================
-            ORDER ITEMS
-        ================================================== */}
-
-        {(order?.items?.length > 0 || order?.serviceProgress) && (
-          <OrderItemsOverview
-            order={order}
-            canManageProgress
-            onDeliverySave={handleServiceDeliverySave}
-            updatingProgressKey={progressUpdatingKey}
-            onProgressUpdate={handleServiceProgressUpdate}
-            renderServiceExtras={(item) => order.items?.length > 0 && item.serviceSnapshot?.slug === "ads"
-              ? <OrderAdCredit order={order} staffMode={staffMode} /> : null}
-          />
-        )}
-
-        {/* =================================================
-            CLIENT SUBMISSION
-        ================================================== */}
-
-        {!order?.items?.length && (
-          <InfoCard
-            icon={Clipboard}
-            eyebrow="Client Submission"
-            title="Submitted Information"
-          >
-            <p
-              className="
-                mb-6
-                text-xs
-                leading-5
-                text-zinc-400
-              "
-            >
-              This is the information submitted by the client when placing the
-              order.
-            </p>
-
-            {formDataEntries.length > 0 ? (
-              <div
-                className="
-                  min-w-0
-                  divide-y
-                  divide-zinc-100
-                  overflow-hidden
-                  rounded-2xl
-                  border
-                  border-zinc-200
-                  bg-zinc-50
-                "
-              >
-                {formDataEntries.map(([key, value]) => (
-                  <SubmittedField key={key} name={key} value={value} />
-                ))}
-              </div>
-            ) : (
-              <EmptySubmittedData />
-            )}
-          </InfoCard>
-        )}
-
-        {/* =================================================
-            ADDITIONAL REQUIREMENTS
-        ================================================== */}
-
-        {hasAdditionalRequirements && (
-          <InfoCard
-            icon={FileText}
-            eyebrow="Client Submission"
-            title="Additional Requirements"
-          >
-            <div
-              className="
-                min-w-0
-                rounded-2xl
-                border
-                border-zinc-200
-                bg-zinc-50
-                p-5
-              "
-            >
-              <p
-                className="
-                  whitespace-pre-wrap
-                  break-words
-                  text-sm
-                  leading-7
-                  text-zinc-600
-                "
-              >
-                {order.additionalRequirements}
-              </p>
-            </div>
-          </InfoCard>
-        )}
-
         {/* =================================================
             DELIVERY + COD
         ================================================== */}
@@ -1463,6 +1254,10 @@ const AdminOrderDetails = () => {
               COD PAYMENT
           ================================================== */}
 
+          {staffMode && canViewOrderPaymentPin(order, user) && <InfoCard icon={KeyRound} eyebrow="Payment collection" title="Payment PIN">
+            <p className="text-sm text-zinc-500">View your assigned PIN and share it with the client after collecting payment. Only the client can verify it.</p>
+            <OrderPaymentPinActions order={order} user={user} onUpdated={(update) => setOrder((current) => ({ ...current, ...update, codPin: null }))} />
+          </InfoCard>}
           {!staffMode &&
             ["cod", "cheque"].includes(order?.paymentMethod) && (
             <InfoCard
@@ -1470,12 +1265,12 @@ const AdminOrderDetails = () => {
               eyebrow={
                 order?.paymentMethod === "cheque"
                   ? "Cheque"
-                  : "Cash on Delivery"
+                  : "Cash payment"
               }
               title={
                 order?.paymentMethod === "cheque"
                   ? "Cheque PIN"
-                  : "COD Payment"
+                  : "Payment PIN"
               }
             >
               <div
@@ -1519,6 +1314,13 @@ const AdminOrderDetails = () => {
                 </div>
               </div>
 
+              <OrderPaymentPinActions order={order} user={user} onUpdated={(update) => setOrder((current) => ({ ...current, ...update, codPin: null }))} />
+              {!["active", "used", "verified"].includes(order?.codPinStatus) && !["paid", "collected"].includes(order?.paymentStatus) && <PinEmployeeSelect assignment={pinAssignment} disabled={codLoading} />}
+              {order?.codPinEmployee && <p className="mt-3 text-xs text-zinc-500">Assigned employee: {pinAssignment.data.find((employee) => String(employee._id) === String(order.codPinEmployee))?.name || "Previously assigned employee"}</p>}
+              {["active", "locked"].includes(order?.codPinStatus) && !["paid", "collected"].includes(order?.paymentStatus) && <div className="mt-4 space-y-2">
+                <p className="text-xs text-zinc-500">No automatic expiry. This PIN remains available until used or disabled; the wrong-attempt limit still applies.</p>
+                <button type="button" className="dashboard-action dashboard-action--destructive" disabled={codLoading} onClick={handleDisableCodPin}><XCircle size={16} />Disable PIN</button>
+              </div>}
               {hasCodPin ? (
                 <div className="mt-5 min-w-0">
                   <p
@@ -1602,7 +1404,7 @@ const AdminOrderDetails = () => {
                       text-zinc-400
                     "
                   >
-                    Share this PIN with the payment collector. The client uses
+                    The assigned employee can view this PIN in their workspace. The client uses
                     the PIN to verify{" "}
                     {order?.paymentMethod === "cheque"
                       ? "the cheque collection."
@@ -1616,8 +1418,11 @@ const AdminOrderDetails = () => {
                     onClick={handleGenerateCodPin}
                     disabled={
                       codLoading ||
+                      pinAssignment.loading || Boolean(pinAssignment.error) || !pinAssignment.employeeId ||
+                      order?.orderStatus === "cancelled" ||
                       order?.paymentStatus === "collected" ||
                       order?.paymentStatus === "paid" ||
+                      order?.codPinStatus === "active" ||
                       ["verified", "used"].includes(order?.codPinStatus)
                     }
                     className="dashboard-action dashboard-action--primary
@@ -1676,7 +1481,7 @@ const AdminOrderDetails = () => {
                 </div>
               )}
 
-              {order?.paymentStatus === "collected" && (
+              {["paid", "collected"].includes(order?.paymentStatus) && (
                 <div
                   className="
                     mt-4
@@ -1706,6 +1511,232 @@ const AdminOrderDetails = () => {
             </InfoCard>
           )}
         </div>
+
+        {/* =================================================
+            ORDER CONFIGURATION
+        ================================================== */}
+
+        {!order?.items?.length && (
+          <InfoCard
+            icon={Package}
+            eyebrow="Service"
+            title="Order Configuration"
+          >
+            <div
+              className="
+                grid
+                min-w-0
+                gap-x-8
+                gap-y-5
+                sm:grid-cols-2
+                lg:grid-cols-3
+              "
+            >
+              <DetailItem
+                label="Service"
+                value={serviceSnapshot.name || order?.service?.name}
+              />
+
+              <DetailItem
+                label="Category"
+                value={serviceSnapshot.category || order?.service?.category}
+              />
+
+              <DetailItem
+                label="Pricing Type"
+                value={formatStatus(serviceSnapshot.pricingType)}
+              />
+
+              <DetailItem label="Quantity" value={order?.quantity} />
+
+              <DetailItem label="Unit" value={serviceSnapshot.unit} />
+
+              <DetailItem
+                label="Base Price"
+                value={
+                  serviceSnapshot.basePrice !== undefined
+                    ? formatCurrency(serviceSnapshot.basePrice)
+                    : "—"
+                }
+              />
+            </div>
+
+
+            {serviceSnapshot.selectedOption && (
+              <div
+                className="
+                  mt-6
+                  min-w-0
+                  rounded-2xl
+                  border
+                  border-zinc-200
+                  bg-zinc-50
+                  p-5
+                "
+              >
+                <div
+                  className="
+                    flex
+                    min-w-0
+                    flex-col
+                    gap-3
+                    sm:flex-row
+                    sm:items-start
+                    sm:justify-between
+                  "
+                >
+                  <div className="min-w-0">
+                    <p
+                      className="
+                        text-[10px]
+                        font-medium
+                        uppercase
+                        tracking-[0.15em]
+                        text-zinc-400
+                      "
+                    >
+                      Selected Service Option
+                    </p>
+
+                    <p
+                      className="
+                        mt-1
+                        break-words
+                        text-sm
+                        font-medium
+                        text-zinc-900
+                      "
+                    >
+                      {serviceSnapshot.selectedOption.name}
+                    </p>
+                  </div>
+
+                  <p
+                    className="
+                      shrink-0
+                      text-sm
+                      font-semibold
+                      text-zinc-900
+                    "
+                  >
+                    {formatCurrency(serviceSnapshot.selectedOption.price)}
+                  </p>
+                </div>
+
+                {serviceSnapshot.selectedOption.description && (
+                  <p
+                    className="
+                      mt-3
+                      break-words
+                      text-xs
+                      leading-5
+                      text-zinc-500
+                    "
+                  >
+                    {serviceSnapshot.selectedOption.description}
+                  </p>
+                )}
+              </div>
+            )}
+            <OrderAdCredit order={order} staffMode={staffMode} />
+          </InfoCard>
+        )}
+
+        {/* =================================================
+            ORDER ITEMS
+        ================================================== */}
+
+        {(order?.items?.length > 0 || order?.serviceProgress) && (
+          <OrderItemsOverview
+            order={order}
+            canManageProgress
+            onDeliverySave={handleServiceDeliverySave}
+            updatingProgressKey={progressUpdatingKey}
+            onProgressUpdate={handleServiceProgressUpdate}
+            renderServiceExtras={(item) => order.items?.length > 0 && item.serviceSnapshot?.slug === "ads"
+              ? <OrderAdCredit order={order} staffMode={staffMode} /> : null}
+          />
+        )}
+
+        {/* =================================================
+            CLIENT SUBMISSION
+        ================================================== */}
+
+        {!order?.items?.length && (
+          <InfoCard
+            icon={Clipboard}
+            eyebrow="Client Submission"
+            title="Submitted Information"
+          >
+            <p
+              className="
+                mb-6
+                text-xs
+                leading-5
+                text-zinc-400
+              "
+            >
+              This is the information submitted by the client when placing the
+              order.
+            </p>
+
+            {formDataEntries.length > 0 ? (
+              <div
+                className="
+                  min-w-0
+                  divide-y
+                  divide-zinc-100
+                  overflow-hidden
+                  rounded-2xl
+                  border
+                  border-zinc-200
+                  bg-zinc-50
+                "
+              >
+                {formDataEntries.map(([key, value]) => (
+                  <SubmittedField key={key} name={key} value={value} />
+                ))}
+              </div>
+            ) : (
+              <EmptySubmittedData />
+            )}
+          </InfoCard>
+        )}
+
+        {/* =================================================
+            ADDITIONAL REQUIREMENTS
+        ================================================== */}
+
+        {hasAdditionalRequirements && (
+          <InfoCard
+            icon={FileText}
+            eyebrow="Client Submission"
+            title="Additional Requirements"
+          >
+            <div
+              className="
+                min-w-0
+                rounded-2xl
+                border
+                border-zinc-200
+                bg-zinc-50
+                p-5
+              "
+            >
+              <p
+                className="
+                  whitespace-pre-wrap
+                  break-words
+                  text-sm
+                  leading-7
+                  text-zinc-600
+                "
+              >
+                {order.additionalRequirements}
+              </p>
+            </div>
+          </InfoCard>
+        )}
 
         {/* =================================================
             ADMIN NOTES
@@ -2245,6 +2276,8 @@ const CodPinStatusBadge = ({ status }) => {
       className: "border-emerald-200 bg-emerald-50 text-emerald-700",
     },
 
+    disabled: { label: "PIN Disabled", className: "border-zinc-200 bg-zinc-50 text-zinc-600", icon: XCircle },
+    locked: { label: "PIN Locked", className: "border-red-200 bg-red-50 text-red-600", icon: XCircle },
     expired: {
       label: "Expired",
       className: "border-red-200 bg-red-50 text-red-700",
@@ -2368,6 +2401,8 @@ const formatCodPinStatus = (status) => {
     used: "Used",
 
     expired: "Expired",
+    disabled: "Disabled",
+    locked: "Locked",
   };
 
   return labels[status] || formatStatus(status);

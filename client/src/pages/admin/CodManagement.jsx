@@ -1,5 +1,6 @@
+import useAsyncResource from "../../hooks/useAsyncResource";
 import PaymentStatusBadge from "../../components/PaymentStatusBadge";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   Check,
@@ -17,44 +18,33 @@ import {
 
 import codService from "../../services/codService";
 import CustomSelect from "../../components/CustomSelect";
+import usePinAssignment from "../../hooks/usePinAssignment";
+import PinEmployeeSelect from "../../components/PinEmployeeSelect";
+import OrderPaymentPinActions from "../../components/OrderPaymentPinActions";
+import { getCurrentGeneratedPin } from "../../utils/paymentPin";
+import { useAuth } from "../../context/authSessionContext";
 
 const CodManagement = () => {
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
+  const { user } = useAuth();
+  const pinAssignment = usePinAssignment();
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
 
-  const loadOrders = async (isRefresh = false) => {
-    try {
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-
-      setError("");
-
-      const response = await codService.getAdminCodOrders();
-
-      setOrders(response.orders || []);
-    } catch (error) {
-      console.error("Load COD and cheque orders error:", error);
-
-      setError(
-        error.response?.data?.message || "Unable to load COD and cheque orders.",
-      );
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    loadOrders();
+  const readOrders = useCallback(async () => {
+    const response = await codService.getAdminCodOrders();
+    return response.orders || [];
   }, []);
+  const { data: orders, loading, refreshing, error, reload: loadOrders } = useAsyncResource(readOrders,
+    { initialData: [], errorMessage: "Unable to load COD and cheque orders." });
+  const hasActivePins = orders.some((order) => order.codPinStatus === "active");
+  useEffect(() => {
+    if (!hasActivePins) return;
+    const refresh = () => { if (document.visibilityState === "visible") loadOrders(true); };
+    const interval = setInterval(refresh, 15000);
+    window.addEventListener("focus", refresh);
+    return () => { clearInterval(interval); window.removeEventListener("focus", refresh); };
+  }, [hasActivePins, loadOrders]);
 
   const filteredOrders = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -412,7 +402,7 @@ const CodManagement = () => {
 
         <StatCard
           icon={CheckCircle2}
-          label="Payment Confirmed"
+          label="Paid"
           value={stats.collected}
         />
       </div>
@@ -514,7 +504,7 @@ const CodManagement = () => {
                 },
                 {
                   value: "collected",
-                  label: "Payment Confirmed",
+                  label: "Paid",
                 },
               ]}
             />
@@ -639,7 +629,7 @@ const CodManagement = () => {
       ) : (
         <div className="space-y-4">
           {filteredOrders.map((order) => (
-            <CodOrderCard key={order._id || order.id} order={order} />
+            <CodOrderCard key={order._id || order.id} order={order} pinAssignment={pinAssignment} onGenerated={loadOrders} user={user} />
           ))}
         </div>
       )}
@@ -651,8 +641,9 @@ const CodManagement = () => {
    COD / CHEQUE ORDER CARD
 ========================================================= */
 
-const CodOrderCard = ({ order }) => {
-  const [pin, setPin] = useState(order.codPin || "");
+const CodOrderCard = ({ order, pinAssignment, onGenerated, user }) => {
+  const [generatedPin, setGeneratedPin] = useState(() => ({ value: order.codPin || "", generatedAt: order.codPinGeneratedAt }));
+  const pin = getCurrentGeneratedPin(generatedPin, order);
 
   const [loading, setLoading] = useState(false);
 
@@ -673,21 +664,23 @@ const CodOrderCard = ({ order }) => {
   const canGenerate = !isPaymentDone && !isPinActive && !isPinVerified;
 
   const generatePin = async () => {
+    if (loading || !pinAssignment.employeeId) return;
     try {
       setLoading(true);
       setError("");
       setMessage("");
 
-      const response = await codService.generateCodPin(order._id || order.id);
+      const response = await codService.generateCodPin(order._id || order.id, pinAssignment.employeeId);
 
       if (!response?.codPin) {
         throw new Error("PIN was not returned by the server.");
       }
 
-      setPin(String(response.codPin));
+      setGeneratedPin({ value: String(response.codPin), generatedAt: response.order?.codPinGeneratedAt });
+      await onGenerated(true);
 
       setMessage(
-        `${isChequeOrder ? "Cheque" : "COD"} PIN generated successfully. Share this PIN with the payment collector.`,
+        `${isChequeOrder ? "Cheque" : "Cash payment"} PIN generated successfully. The assigned employee can view it in their workspace.`,
       );
     } catch (error) {
       console.error("Generate payment PIN error:", error);
@@ -718,6 +711,18 @@ const CodOrderCard = ({ order }) => {
     } catch (error) {
       console.error("Copy PIN error:", error);
     }
+  };
+
+  const disablePin = async () => {
+    if (loading) return;
+    setLoading(true); setError(""); setMessage("");
+    try {
+      const response = await codService.disableCodPin(order._id || order.id);
+      setGeneratedPin(null); setMessage(response.message);
+      await onGenerated(true);
+    } catch (failure) {
+      setError(failure.response?.data?.message || "Unable to disable payment PIN.");
+    } finally { setLoading(false); }
   };
 
   return (
@@ -849,6 +854,9 @@ const CodOrderCard = ({ order }) => {
         {/* Generate / PIN */}
 
         <div className="w-full xl:w-auto">
+          <OrderPaymentPinActions order={order} user={user} onUpdated={() => onGenerated(true)} />
+          {["active", "locked"].includes(order.codPinStatus) && !isPaymentDone && <button type="button" className="dashboard-action dashboard-action--destructive mb-3" disabled={loading} onClick={disablePin}><XCircle size={16} />Disable PIN</button>}
+          {canGenerate && <PinEmployeeSelect assignment={pinAssignment} disabled={loading} />}
           {isPaymentDone ? (
             <div
               className="
@@ -866,9 +874,9 @@ const CodOrderCard = ({ order }) => {
               "
             >
               <CheckCircle2 className="icon-accent-green" size={17} />
-              Payment Confirmed
+              Payment Paid
             </div>
-          ) : pin ? (
+          ) : pin && isPinActive ? (
             <PinDisplay
               pin={pin}
               copied={copied}
@@ -898,7 +906,7 @@ const CodOrderCard = ({ order }) => {
             <button
               type="button"
               onClick={generatePin}
-              disabled={loading}
+              disabled={loading || pinAssignment.loading || Boolean(pinAssignment.error) || !pinAssignment.employeeId || order.orderStatus === "cancelled"}
               className="dashboard-action dashboard-action--primary
                 inline-flex
                 w-full
@@ -1037,7 +1045,7 @@ const CodOrderCard = ({ order }) => {
           value={
             isChequeOrder
               ? isPaymentDone
-                ? "Confirmed"
+                ? "Paid"
                 : "Pending"
               : order.codCollectedAt
                 ? formatDateTime(order.codCollectedAt)
@@ -1083,7 +1091,7 @@ const CodOrderCard = ({ order }) => {
                 text-zinc-800
               "
             >
-              {isPaymentDone ? "Payment Confirmed" : "Payment Pending"}
+              {isPaymentDone ? "Payment Paid" : "Payment Pending"}
             </p>
           </div>
 
@@ -1318,6 +1326,8 @@ const PinStatusBadge = ({ status }) => {
       icon: CheckCircle2,
     },
 
+    disabled: { label: "PIN Disabled", className: "border-zinc-200 bg-zinc-50 text-zinc-600", icon: XCircle },
+    locked: { label: "PIN Locked", className: "border-red-200 bg-red-50 text-red-600", icon: XCircle },
     expired: {
       label: "PIN Expired",
       className: "border-red-200 bg-red-50 text-red-600",
@@ -1414,6 +1424,10 @@ const formatPinStatus = (status) => {
 
     case "expired":
       return "Expired";
+    case "disabled":
+      return "Disabled";
+    case "locked":
+      return "Locked";
 
     default:
       return "Unknown";

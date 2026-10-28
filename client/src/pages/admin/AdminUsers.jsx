@@ -1,6 +1,8 @@
+import { initialUserListState, userListReducer } from "../../utils/userListState";
+import useAsyncResource from "../../hooks/useAsyncResource";
 import ActiveFilters from "../../components/ActiveFilters";
 import RoleBadge from "../../components/RoleBadge";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 
 import {
   CheckCircle2,
@@ -26,40 +28,24 @@ import { toast } from "sonner";
 const USERS_PER_BATCH = 20;
 
 const AdminUsers = () => {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [deletingUserId, setDeletingUserId] = useState("");
   const [userToDelete, setUserToDelete] = useState(null);
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [roleFilter, setRoleFilter] = useState("all");
-
+  const [listState, updateList] = useReducer(userListReducer, initialUserListState);
+  const { search, statusFilter, roleFilter, visibleCount } = listState;
+  const setSearch = useCallback((value) => updateList({ field: "search", value }), []);
+  const setStatusFilter = useCallback((value) => updateList({ field: "statusFilter", value }), []);
+  const setRoleFilter = useCallback((value) => updateList({ field: "roleFilter", value }), []);
+  const setVisibleCount = useCallback((value) => updateList({ field: "visibleCount", value }), []);
   const navigate = useNavigate();
 
-  // Progressive loading
-  const [visibleCount, setVisibleCount] = useState(USERS_PER_BATCH);
-
-  const loadUsers = async () => {
-    try {
-      setLoading(true);
-      setError("");
-
-      const data = await adminUserService.getUsers();
-
-      setUsers(data.users || []);
-
-      // Reset visible users after refresh
-      setVisibleCount(USERS_PER_BATCH);
-    } catch (error) {
-      console.error("Get admin users error:", error);
-
-      setError(error.response?.data?.message || "Unable to load users.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const readUsers = useCallback(async () => {
+    const response = await adminUserService.getUsers();
+    return response.users || [];
+  }, []);
+  const resetPagination = useCallback(() => setVisibleCount(USERS_PER_BATCH), [setVisibleCount]);
+  const { data: users, setData: setUsers, loading, error, setError, reload: loadUsers } = useAsyncResource(readUsers,
+    { initialData: [], errorMessage: "Unable to load users.", onSuccess: resetPagination });
 
   const handleDeleteUser = (user) => {
     if (user.role === "admin") {
@@ -94,9 +80,6 @@ const AdminUsers = () => {
     }
   };
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
 
   /*
    * Search + filters
@@ -137,9 +120,6 @@ const AdminUsers = () => {
   /*
    * Reset visible count whenever search/filter changes.
    */
-  useEffect(() => {
-    setVisibleCount(USERS_PER_BATCH);
-  }, [search, statusFilter, roleFilter]);
 
   /*
    * Infinite / scroll-based loading.
@@ -172,7 +152,7 @@ const AdminUsers = () => {
     return () => {
       window.removeEventListener("scroll", handleScroll);
     };
-  }, [hasMoreUsers, loading, filteredUsers.length]);
+  }, [hasMoreUsers, loading, filteredUsers.length, setVisibleCount]);
 
   const activeUsers = users.filter((user) => user.isActive).length;
 
@@ -243,7 +223,7 @@ const AdminUsers = () => {
             h-56
             w-56
             rounded-full
-            bg-blue-400/[0.025]
+            bg-zinc-400/[0.025]
             blur-3xl
           "
         />

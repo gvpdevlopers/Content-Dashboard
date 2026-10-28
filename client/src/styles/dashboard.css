@@ -83,7 +83,7 @@
 .dashboard-ui .dashboard-action > svg { flex-shrink: 0; }
 .dashboard-ui .dashboard-action--primary > svg { color: currentColor; }
 /* Semantic accents are opt-in on informational icons, never inherited by action buttons. */
-.dashboard-ui .icon-accent-blue { color: #2563eb; }
+.dashboard-ui .icon-accent-blue { color: #64748b; }
 .dashboard-ui .icon-accent-green { color: #059669; }
 .dashboard-ui .icon-accent-amber { color: #b45309; }
 .dashboard-ui .icon-accent-red { color: #b91c1c; }
@@ -134,7 +134,7 @@
   color: #18181b;
   border-radius: 0.5rem;
 }
-.dashboard-ui .order-action-icon { display: inline-flex; flex-shrink: 0; color: #3b82b6; }
+.dashboard-ui .order-action-icon { display: inline-flex; flex-shrink: 0; color: #64748b; }
 .dashboard-ui .order-action-chevron { margin-left: auto; flex-shrink: 0; transition: transform 175ms ease; }
 .dashboard-ui .order-action-body {
   display: grid;

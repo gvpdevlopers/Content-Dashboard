@@ -1,3 +1,6 @@
+const { normalizeServiceId } = require("../utils/serviceIdentity");
+const Service = require("../models/Service");
+const { canClientOrderService } = require("../utils/serviceAccess");
 const mongoose = require("mongoose");
 const OrderDraft = require("../models/OrderDraft");
 
@@ -23,7 +26,7 @@ const normalizeDraftInput = (body = {}) => {
   const services = body.services.map((service) => {
     if (
       !service ||
-      !mongoose.Types.ObjectId.isValid(service.serviceId) ||
+      !normalizeServiceId(service.serviceId) ||
       !Number.isInteger(Number(service.quantity)) ||
       Number(service.quantity) < 1 ||
       !isPlainObject(service.formData || {})
@@ -31,7 +34,7 @@ const normalizeDraftInput = (body = {}) => {
       throw requestError("A draft contains invalid service configuration.");
     }
 
-    const serviceId = String(service.serviceId);
+    const serviceId = normalizeServiceId(service.serviceId);
     if (seenServices.has(serviceId)) {
       throw requestError("A service can only be included once in a draft.");
     }
@@ -73,6 +76,22 @@ const normalizeDraftInput = (body = {}) => {
     additionalRequirements,
     couponCode,
   };
+};
+
+const getDraftAccessIssues = async (services, user) => {
+  const records = await Service.find({ _id: { $in: services.map((item) => item.serviceId) } });
+  return services.flatMap((item) => {
+    const service = records.find((record) => String(record._id) === String(item.serviceId));
+    return canClientOrderService(user, service) ? [] : [{
+      serviceId: String(item.serviceId), name: service?.name || String(item.serviceId),
+      message: `${service?.name || item.serviceId} is unavailable for ordering. Review this draft before submitting.`,
+    }];
+  });
+};
+const validateDraftAccess = async (input, user) => {
+  const issues = await getDraftAccessIssues(input.services, user);
+  if (issues.length) throw requestError(issues.map((issue) => issue.message).join(" "));
+  return input;
 };
 
 const handleDraftError = (res, error, logMessage) => {
@@ -118,7 +137,7 @@ const getDraft = async (req, res) => {
       });
     }
 
-    return res.status(200).json({ success: true, draft });
+    return res.status(200).json({ success: true, draft, accessIssues: await getDraftAccessIssues(draft.services, req.user) });
   } catch (error) {
     return handleDraftError(res, error, "Get draft error:");
   }
@@ -128,7 +147,7 @@ const createDraft = async (req, res) => {
   try {
     const draft = await OrderDraft.create({
       client: req.user._id,
-      ...normalizeDraftInput(req.body),
+      ...await validateDraftAccess(normalizeDraftInput(req.body), req.user),
     });
 
     return res.status(201).json({
@@ -149,7 +168,7 @@ const updateDraft = async (req, res) => {
         client: req.user._id,
         status: "active",
       },
-      { $set: normalizeDraftInput(req.body) },
+      { $set: await validateDraftAccess(normalizeDraftInput(req.body), req.user) },
       { new: true, runValidators: true },
     );
     if (!draft) {

@@ -2,6 +2,7 @@ const express = require("express");
 
 const {
   getPublicServices,
+  getServiceTemplates,
   getActiveServices,
   getServiceById,
   getAdminServices,
@@ -41,6 +42,8 @@ router.get(
   "/public",
   getPublicServices
 );
+
+router.get("/admin/templates", protect, adminOnly, getServiceTemplates);
 
 router.get(
   "/admin/:id",

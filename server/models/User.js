@@ -1,4 +1,11 @@
 const mongoose = require("mongoose");
+const { SERVICE_GROUPS } = require("../utils/serviceAccess");
+
+const serviceAccessSchema = new mongoose.Schema({
+  mode: { type: String, enum: ["groups", "selected"], required: true },
+  groups: { type: [{ type: String, enum: SERVICE_GROUPS }], default: [] },
+  serviceIds: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Service" }], default: [] },
+}, { _id: false });
 
 const userSchema = new mongoose.Schema(
   {
@@ -39,6 +46,11 @@ const userSchema = new mongoose.Schema(
     allowMonthEndPayment: {
       type: Boolean,
       default: false,
+    },
+
+    serviceAccess: {
+      type: serviceAccessSchema,
+      default: () => ({ mode: "groups", groups: ["content"], serviceIds: [] }),
     },
 
     tokenVersion: {

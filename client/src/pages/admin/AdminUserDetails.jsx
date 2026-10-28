@@ -1,6 +1,8 @@
+import useAsyncResource from "../../hooks/useAsyncResource";
+import ClientServiceAccessPanel from "../../components/ClientServiceAccessPanel";
 import OrderStatusBadge from "../../components/OrderStatusBadge";
 import RoleBadge from "../../components/RoleBadge";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import {
   ArrowLeft,
@@ -27,91 +29,38 @@ import { toast } from "sonner";
 
 const AdminUserDetails = () => {
   const { id } = useParams();
+  return <AdminUserDetailsContent key={id} id={id} />;
+};
 
-  const [user, setUser] = useState(null);
-  const [orders, setOrders] = useState([]);
+const AdminUserDetailsContent = ({ id }) => {
 
-  const [loading, setLoading] = useState(true);
-  const [ordersLoading, setOrdersLoading] = useState(true);
 
-  const [error, setError] = useState("");
-  const [ordersError, setOrdersError] = useState("");
+
 
   const [updatingStatus, setUpdatingStatus] =
     useState(false);
-  const [monthEndAllowed, setMonthEndAllowed] = useState(false);
+  const [monthEndOverride, setMonthEndAllowed] = useState(null);
   const [savingPaymentPermission, setSavingPaymentPermission] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
 
-  const loadUser = async () => {
-    try {
-      setLoading(true);
-      setError("");
-
-      const response =
-        await adminUserService.getUserById(id);
-
-      setUser(response.user);
-      setMonthEndAllowed(response.user?.allowMonthEndPayment === true);
-      return response.user;
-    } catch (error) {
-      console.error(
-        "Get admin user details error:",
-        error
-      );
-
-      setError(
-        error.response?.data?.message ||
-          "Unable to load user details."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadOrders = async () => {
-    try {
-      setOrdersLoading(true);
-      setOrdersError("");
-
-      const response =
-        await adminUserService.getUserOrders(id);
-
-      setOrders(response.orders || []);
-    } catch (error) {
-      console.error(
-        "Get user orders error:",
-        error
-      );
-
-      setOrdersError(
-        error.response?.data?.message ||
-          "Unable to load user orders."
-      );
-    } finally {
-      setOrdersLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!id) {
-      return;
-    }
-
-    const loadDetails = async () => {
-      const loadedUser = await loadUser();
-      if (loadedUser?.role === "client") {
-        await loadOrders();
-      } else {
-        setOrders([]);
-        setOrdersError("");
-        setOrdersLoading(false);
-      }
-    };
-    loadDetails();
+  const readUser = useCallback(async () => {
+    const response = await adminUserService.getUserById(id);
+    return response.user;
   }, [id]);
+  const resetPaymentOverride = useCallback(() => setMonthEndAllowed(null), []);
+  const { data: user, setData: setUser, loading, error, setError, reload: loadUser } = useAsyncResource(readUser,
+    { errorMessage: "Unable to load user details.", onSuccess: resetPaymentOverride });
+  const monthEndAllowed = monthEndOverride ?? (user?.allowMonthEndPayment === true);
+  const client = user?.role === "client";
+  const readOrders = useCallback(async () => {
+    if (!client) return [];
+    const response = await adminUserService.getUserOrders(id);
+    return response.orders || [];
+  }, [id, client]);
+  const { data: orders, loading: ordersLoading, error: ordersError, reload: loadOrders } = useAsyncResource(readOrders,
+    { initialData: [], errorMessage: "Unable to load user orders." });
 
   /* =====================================================
      USER STATUS
@@ -741,6 +690,8 @@ const AdminUserDetails = () => {
 
         </div>
       </section>
+
+      {user.role === "client" && <ClientServiceAccessPanel key={user._id} user={user} onSaved={setUser} />}
 
       {user.role === "client" && (
         <form onSubmit={handlePaymentPermissionSave} className="mt-6 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">

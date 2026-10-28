@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "database": "EXAMPLE_ONLY_NOT_A_REAL_DATABASE",
+  "counts": {
+    "servicesScanned": 3,
+    "clientsScanned": 3,
+    "servicesAffected": 2,
+    "clientsAffected": 1,
+    "groupDefaults": 2,
+    "publicVisibilityDefaults": 2,
+    "issues": 0
+  },
+  "changes": [
+    {
+      "collection": "services",
+      "id": "000000000000000000000001",
+      "set": {
+        "serviceGroup": "content",
+        "isPublic": true
+      },
+      "sourceGuards": {
+        "isActive": {
+          "exists": true,
+          "value": true
+        }
+      },
+      "requireMissing": [
+        "serviceGroup",
+        "isPublic"
+      ],
+      "rollbackUnset": [
+        "serviceGroup",
+        "isPublic"
+      ]
+    },
+    {
+      "collection": "services",
+      "id": "000000000000000000000002",
+      "set": {
+        "serviceGroup": "content",
+        "isPublic": false
+      },
+      "sourceGuards": {
+        "isActive": {
+          "exists": true,
+          "value": false
+        }
+      },
+      "requireMissing": [
+        "serviceGroup",
+        "isPublic"
+      ],
+      "rollbackUnset": [
+        "serviceGroup",
+        "isPublic"
+      ]
+    },
+    {
+      "collection": "users",
+      "id": "000000000000000000000011",
+      "set": {
+        "serviceAccess": {
+          "mode": "groups",
+          "groups": [
+            "content"
+          ],
+          "serviceIds": []
+        }
+      },
+      "sourceGuards": {},
+      "requireMissing": [
+        "serviceAccess"
+      ],
+      "rollbackUnset": [
+        "serviceAccess"
+      ]
+    }
+  ],
+  "issues": [],
+  "sha256": "6a9d9d9e4d6d86add06417d5276b2ff91212fc6df8d86ccf88631cc5d5d5002c"
+}

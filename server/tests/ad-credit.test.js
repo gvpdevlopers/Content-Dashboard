@@ -374,3 +374,65 @@ test("fully credit-covered month-end orders remain pending at creation", async (
   assert.equal(created.body.order.amount, 0);
   assert.equal(created.body.order.paymentStatus, "pending");
 });
+
+
+test("access changes reject pricing, coupon quotes and checkout before any payment or order write", async () => {
+  for (const access of [
+    { mode: "groups", groups: ["seo"], serviceIds: [] },
+    { mode: "selected", groups: [], serviceIds: [] },
+  ]) {
+    for (const method of ["getOrderQuote", "getCouponQuote", "createOrder"]) {
+      const f = checkoutFixture({ coupon: true });
+      f.req.user.serviceAccess = access;
+      f.req.body.code = "SAVE";
+      const res = response(); await f.controller[method](f.req, res);
+      assert.equal(res.statusCode, 400, method);
+      assert.match(res.body.message, /Ads.*not available/);
+      assert.equal(f.saved(), undefined);
+      assert.equal(f.state.writes, 0);
+    }
+  }
+});
+
+test("selected services work independently of marketing visibility and inactive assignments stay blocked", async () => {
+  const f = checkoutFixture();
+  f.req.user.serviceAccess = { mode: "selected", groups: [], serviceIds: [serviceId] };
+  f.service.serviceGroup = "development";
+  f.service.isPublic = false;
+  const quote = response(); await f.controller.getOrderQuote(f.req, quote);
+  assert.equal(quote.statusCode, 200);
+  f.service.isActive = false;
+  const rejected = response(); await f.controller.createOrder(f.req, rejected);
+  assert.equal(rejected.statusCode, 400);
+  assert.match(rejected.body.message, /Ads.*not available/);
+  assert.deepEqual(f.req.user.serviceAccess.serviceIds, [serviceId]);
+  assert.equal(f.saved(), undefined);
+});
+
+test("mixed-case duplicate service IDs are rejected across quote, coupon and checkout", async () => {
+  const serviceIdWithLetters = "abcdef123456789012345678";
+  for (const method of ["getOrderQuote", "getCouponQuote", "createOrder"]) {
+    const f = checkoutFixture();
+    f.service._id = serviceIdWithLetters;
+    const service = f.req.body.services[0];
+    f.req.body.services = [
+      { ...service, serviceId: serviceIdWithLetters },
+      { ...service, serviceId: serviceIdWithLetters.toUpperCase() },
+    ];
+    f.req.body.code = "SAVE";
+    const res = response(); await f.controller[method](f.req, res);
+    assert.equal(res.statusCode, 400, method); assert.match(res.body.message, /same service/);
+    assert.equal(f.saved(), undefined); assert.equal(f.state.writes, 0);
+  }
+});
+
+test("malformed service references return validation errors before database lookup", async () => {
+  for (const serviceId of ["not-an-object-id", { $ne: null }, ["abcdef123456789012345678"], 123]) {
+    for (const method of ["getOrderQuote", "getCouponQuote", "createOrder"]) {
+      const f = checkoutFixture(); f.req.body.services[0].serviceId = serviceId; f.req.body.code = "SAVE";
+      const res = response(); await f.controller[method](f.req, res);
+      assert.equal(res.statusCode, 400, method); assert.match(res.body.message, /valid serviceId/);
+      assert.equal(f.saved(), undefined); assert.equal(f.state.writes, 0);
+    }
+  }
+});

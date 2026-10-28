@@ -94,7 +94,13 @@ const toggleServiceStatus = async (serviceId) => {
 // SERVICE
 // ============================================
 
+const getServiceTemplates = async () => {
+  const response = await api.get("/services/admin/templates");
+  return response.data;
+};
+
 const serviceService = {
+  getServiceTemplates,
   // Existing client/public methods
   getServices,
   getPublicServices,

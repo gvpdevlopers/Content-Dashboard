@@ -151,7 +151,7 @@ test("month-end orders reject PIN and Razorpay initialization and verification",
   const Order = { findById: async () => order, findOne: async () => order };
   const cod = load("controllers/codController.js", { "../models/Order": Order });
   for (const method of ["generateCodPin", "verifyCodPin"]) {
-    const res = response(); await cod[method]({ user: { _id: clientId, userId: clientId }, body: { orderId, pin: "123456" } }, res);
+    const res = response(); await cod[method]({ user: { _id: clientId, userId: clientId, role: method === "generateCodPin" ? "admin" : "client" }, body: { orderId, pin: "123456" } }, res);
     assert.equal(res.statusCode, 400, method);
   }
   const payment = load("controllers/paymentController.js", { "../models/Order": Order,
@@ -164,12 +164,12 @@ test("month-end orders reject PIN and Razorpay initialization and verification",
 });
 
 test("draft saving ignores payment permissions for both eligible and ineligible clients", async () => {
-  const controller = load("controllers/draftController.js", { "../models/OrderDraft": {
+  const controller = load("controllers/draftController.js", { "../models/Service": { find: async () => [{ _id: orderId, isActive: true }] }, "../models/OrderDraft": {
     create: async (data) => { assert.equal(data.paymentMethod, undefined); assert.equal(data.allowMonthEndPayment, undefined); return data; },
   } });
   for (const allowMonthEndPayment of [true, false]) {
     const res = response();
-    await controller.createDraft({ user: { _id: clientId, allowMonthEndPayment }, body: {
+    await controller.createDraft({ user: { _id: clientId, role: "client", allowMonthEndPayment }, body: {
       services: [{ serviceId: orderId, quantity: 1, formData: {} }], paymentMethod: "month_end", allowMonthEndPayment: true,
     } }, res);
     assert.equal(res.statusCode, 201);

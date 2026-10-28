@@ -1,6 +1,8 @@
+import useAsyncResource from "../hooks/useAsyncResource";
+import useCollectionPaymentRefresh from "../hooks/useCollectionPaymentRefresh";
 import SharedOrderStatusBadge from "../components/OrderStatusBadge";
 import PaymentStatusBadge from "../components/PaymentStatusBadge";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 
 import {
   ArrowRight,
@@ -13,45 +15,26 @@ import {
   IndianRupee,
 } from "lucide-react";
 
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/authSessionContext";
 import { Link } from "react-router-dom";
 import orderService from "../services/orderService";
 
 const Dashboard = () => {
   const { user } = useAuth();
 
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   /* =========================================================
      LOAD ORDERS
   ========================================================= */
 
-  const loadOrders = async () => {
-    try {
-      setLoading(true);
-      setError("");
-
-      const response = await orderService.getMyOrders();
-
-      const data = response?.orders || response?.data?.orders || [];
-
-      setOrders(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error("Load dashboard orders error:", error);
-
-      setError(
-        error.response?.data?.message || "Unable to load dashboard data.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadOrders();
+  const readOrders = useCallback(async () => {
+    const response = await orderService.getMyOrders();
+    const data = response?.orders || response?.data?.orders || [];
+    return Array.isArray(data) ? data : [];
   }, []);
+  const { data: orders, loading, error, reload: loadOrders } = useAsyncResource(readOrders,
+    { initialData: [], errorMessage: "Unable to load dashboard data." });
+  useCollectionPaymentRefresh(orders, loadOrders);
 
   /* =========================================================
      ORDER STATISTICS
@@ -77,14 +60,7 @@ const Dashboard = () => {
         order.paymentStatus || "pending",
       ).toLowerCase();
 
-      const codPinStatus = String(order.codPinStatus || "").toLowerCase();
-
-      const isCodPaymentDone =
-        codPinStatus === "verified" ||
-        codPinStatus === "used" ||
-        paymentStatus === "collected";
-
-      return paymentStatus === "pending" && !isCodPaymentDone;
+      return paymentStatus === "pending";
     }).length;
 
     const totalAmount = orders.reduce(
@@ -963,21 +939,7 @@ const RecentOrder = ({ order }) => {
 
   const paymentStatus = String(order.paymentStatus || "pending").toLowerCase();
 
-  const codPinStatus = String(order.codPinStatus || "").toLowerCase();
-
-  /*
-   * COD PIN verification is considered Payment Done.
-   *
-   * Supports:
-   * - verified
-   * - used
-   * - collected
-   */
-
-  const isCodPaymentDone =
-    codPinStatus === "verified" ||
-    codPinStatus === "used" ||
-    paymentStatus === "collected";
+  const isCodPaymentDone = ["paid", "collected"].includes(paymentStatus);
 
   const statusLabel = formatStatus(status);
 

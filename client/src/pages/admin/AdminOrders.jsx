@@ -1,7 +1,8 @@
+import useAsyncResource from "../../hooks/useAsyncResource";
 import ActiveFilters from "../../components/ActiveFilters";
 import PaymentStatusBadge from "../../components/PaymentStatusBadge";
 import StatusBadge from "../../components/OrderStatusBadge";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   ArrowRight,
@@ -16,16 +17,13 @@ import { Link } from "react-router-dom";
 
 import adminOrderService from "../../services/adminOrderService";
 import CustomSelect from "../../components/CustomSelect";
-import { useAuth } from "../../context/AuthContext";
+import OrderPaymentPinActions from "../../components/OrderPaymentPinActions";
+import { useAuth } from "../../context/authSessionContext";
 
 const AdminOrders = () => {
   const { user } = useAuth();
   const staffMode = user?.role === "employee";
   const orderPath = staffMode ? "/staff/orders" : "/admin/orders";
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -35,48 +33,21 @@ const AdminOrders = () => {
      LOAD ORDERS
   ====================================================== */
 
-  const loadOrders = async (isRefresh = false) => {
-    try {
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-
-      setError("");
-
-      const data = await adminOrderService.getAdminOrders(staffMode);
-
-      const receivedOrders = Array.isArray(data?.orders) ? data.orders : [];
-
-      /*
-       * Newest orders first.
-       *
-       * This keeps the admin list useful even if the API
-       * does not explicitly sort the response.
-       */
-      const sortedOrders = [...receivedOrders].sort((a, b) => {
-        const dateA = new Date(a?.createdAt || 0).getTime();
-
-        const dateB = new Date(b?.createdAt || 0).getTime();
-
-        return dateB - dateA;
-      });
-
-      setOrders(sortedOrders);
-    } catch (error) {
-      console.error("Get admin orders error:", error);
-
-      setError(error.response?.data?.message || "Unable to load orders.");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
+  const readOrders = useCallback(async () => {
+    const response = await adminOrderService.getAdminOrders(staffMode);
+    return [...(Array.isArray(response?.orders) ? response.orders : [])].sort((a, b) =>
+      new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime());
+  }, [staffMode]);
+  const { data: orders, setData: setOrders, loading, refreshing, error, reload: loadOrders } = useAsyncResource(readOrders,
+    { initialData: [], errorMessage: "Unable to load orders." });
+  const hasActivePins = orders.some((order) => order.codPinStatus === "active");
   useEffect(() => {
-    loadOrders();
-  }, []);
+    if (!hasActivePins) return;
+    const refresh = () => { if (document.visibilityState === "visible") loadOrders(true); };
+    const interval = setInterval(refresh, 15000);
+    window.addEventListener("focus", refresh);
+    return () => { clearInterval(interval); window.removeEventListener("focus", refresh); };
+  }, [hasActivePins, loadOrders]);
 
   /* =====================================================
      FILTER ORDERS
@@ -688,6 +659,8 @@ const AdminOrders = () => {
                   key={order._id}
                   order={order}
                   orderPath={orderPath}
+                  user={user}
+                  onUpdated={(update) => setOrders((current) => current.map((item) => item._id === order._id ? { ...item, ...update } : item))}
                 />
               ))}
             </div>
@@ -703,6 +676,8 @@ const AdminOrders = () => {
                 key={order._id}
                 order={order}
                 orderPath={orderPath}
+                user={user}
+                onUpdated={(update) => setOrders((current) => current.map((item) => item._id === order._id ? { ...item, ...update } : item))}
               />
             ))}
           </div>
@@ -716,7 +691,7 @@ const AdminOrders = () => {
    DESKTOP ORDER ROW
 ========================================================= */
 
-const AdminOrderRow = ({ order, orderPath }) => {
+const AdminOrderRow = ({ order, orderPath, user, onUpdated }) => {
   const serviceName =
     order?.serviceSnapshot?.name || order?.service?.name || "Service";
 
@@ -731,10 +706,8 @@ const AdminOrderRow = ({ order, orderPath }) => {
     order?.amount ?? order?.totalAmount ?? order?.pricing?.total ?? 0;
 
   return (
-    <Link
-      to={`${orderPath}/${order._id}`}
-      title="View order details"
-      className="
+    <div
+      className="relative isolate
         group
         grid
         grid-cols-[minmax(0,1.25fr)_minmax(0,1.25fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_56px]
@@ -749,6 +722,7 @@ const AdminOrderRow = ({ order, orderPath }) => {
         hover:bg-zinc-50
       "
     >
+      <Link to={`${orderPath}/${order._id}`} title="View order details" aria-label={`View order ${order.orderNumber || order._id}`} className="absolute inset-0 z-[1] rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500" />
       {/* Order */}
 
       <div className="min-w-0">
@@ -796,6 +770,7 @@ const AdminOrderRow = ({ order, orderPath }) => {
             {order.chequeType === "with_gst" ? "With GST" : "Direct Collection"}
           </p>
         )}
+        <OrderPaymentPinActions order={order} user={user} onUpdated={onUpdated} />
       </div>
 
       {/* Status */}
@@ -821,7 +796,7 @@ const AdminOrderRow = ({ order, orderPath }) => {
           />
         </span>
       </div>
-    </Link>
+    </div>
   );
 };
 
@@ -846,7 +821,7 @@ const OrderArtifactBadges = ({ order }) => {
    MOBILE ORDER CARD
 ========================================================= */
 
-const AdminOrderMobileCard = ({ order, orderPath }) => {
+const AdminOrderMobileCard = ({ order, orderPath, user, onUpdated }) => {
   const serviceName =
     order?.serviceSnapshot?.name || order?.service?.name || "Service";
 
@@ -861,10 +836,8 @@ const AdminOrderMobileCard = ({ order, orderPath }) => {
     order?.amount ?? order?.totalAmount ?? order?.pricing?.total ?? 0;
 
   return (
-    <Link
-      to={`${orderPath}/${order._id}`}
-      title="View order details"
-      className="
+    <div
+      className="relative isolate
         group
         block
         w-full
@@ -885,6 +858,7 @@ const AdminOrderMobileCard = ({ order, orderPath }) => {
         hover:shadow-[0_12px_40px_rgba(0,0,0,0.06)]
       "
     >
+      <Link to={`${orderPath}/${order._id}`} title="View order details" aria-label={`View order ${order.orderNumber || order._id}`} className="absolute inset-0 z-[1] rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500" />
       {/* Header */}
 
       <div
@@ -1013,6 +987,7 @@ const AdminOrderMobileCard = ({ order, orderPath }) => {
         </div>
       </div>
 
+      <OrderPaymentPinActions order={order} user={user} onUpdated={onUpdated} />
       {/* View Details */}
 
       <div
@@ -1064,7 +1039,7 @@ const AdminOrderMobileCard = ({ order, orderPath }) => {
           />
         </span>
       </div>
-    </Link>
+    </div>
   );
 };
 

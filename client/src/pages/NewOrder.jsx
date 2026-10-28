@@ -1,3 +1,4 @@
+import { cleanInactiveOrderFields } from "../utils/orderItemState";
 import { formatDraftDate, getDraftLabel } from "../utils/draftLabels";
 import {
   ArrowRight,
@@ -27,7 +28,7 @@ import serviceService from "../services/serviceService";
 import paymentService from "../services/paymentService";
 import CustomSelect from "../components/CustomSelect";
 import OrderActionSection from "../components/OrderActionSection";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useReducer, useRef, useState } from "react";
 import { toast } from "sonner";
 
 /*
@@ -703,6 +704,7 @@ const restoreOrderItems = (order, activeServices) => {
       savedService?._id || savedService || snapshot.serviceId || snapshot.id;
     const savedSlug = snapshot.slug || savedService?.slug;
 
+    if (savedId) return activeServices.find((service) => String(service._id) === String(savedId));
     return (
       activeServices.find(
         (service) => savedId && String(service._id) === String(savedId),
@@ -725,7 +727,7 @@ const restoreOrderItems = (order, activeServices) => {
 
     if (!service) {
       issues.push(
-        `Service ${itemIndex + 1} from the previous order is no longer available and was skipped.`,
+        `${savedItem.serviceSnapshot?.name || savedItem.service?.name || `Service ${itemIndex + 1}`} is no longer available for your account and was skipped. Review the remaining configuration.`,
       );
       continue;
     }
@@ -2034,6 +2036,166 @@ const RepeatableGroup = ({
 |--------------------------------------------------------------------------
 */
 
+const buildCleanFormData = (item) => {
+  const cleanFormData = {};
+  const fields = getActiveFieldsForItem(item);
+
+  if (isGridPostsService(item.service)) {
+    cleanFormData.pricingMode = item.formData?.pricingMode || "line";
+  }
+
+  for (const field of fields) {
+    const value = item.formData?.[field.name];
+
+    if (value !== undefined && value !== null) {
+      cleanFormData[field.name] = value;
+    }
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Repeatable Groups
+  |--------------------------------------------------------------------------
+  */
+
+  const repeatableGroups = getRepeatableGroups(item.service);
+
+  for (const group of repeatableGroups) {
+    const entries = Array.isArray(item.formData?.[group.name])
+      ? item.formData[group.name]
+      : [];
+
+    if (entries.length > 0) {
+      const repeatablePricingGroups = getRepeatableGroupPricingGroups(
+        item.service,
+        group,
+      );
+
+      cleanFormData[group.name] = entries.map((entry) => {
+        const cleanEntry = {
+          pricingOptions: {},
+          pricingQuantities: {},
+          fields: {},
+        };
+
+        /*
+         * Repeatable fields
+         */
+        const activeFields = getActiveFieldsForRepeatableEntry(
+          item.service,
+          group,
+          entry,
+        );
+
+        for (const field of activeFields) {
+          const fieldName = String(field?.name || "").trim();
+
+          if (!fieldName) {
+            continue;
+          }
+
+          const value = entry?.fields?.[fieldName];
+
+          if (value !== undefined && value !== null) {
+            cleanEntry.fields[fieldName] = value;
+          }
+        }
+
+        /*
+         * Repeatable pricing selections + quantities
+         */
+        for (const pricingGroup of repeatablePricingGroups) {
+          const selectedOptionId = entry?.pricingOptions?.[pricingGroup.name];
+
+          if (!selectedOptionId) {
+            continue;
+          }
+
+          cleanEntry.pricingOptions[pricingGroup.name] =
+            String(selectedOptionId);
+
+          const option = pricingGroup.options.find(
+            (candidate) => String(candidate._id) === String(selectedOptionId),
+          );
+
+          const rules = getQuantityRules(item.service, option);
+
+          const rawQuantity = entry?.pricingQuantities?.[pricingGroup.name];
+
+          cleanEntry.pricingQuantities[pricingGroup.name] =
+            rawQuantity !== undefined && rawQuantity !== null
+              ? Number(rawQuantity)
+              : rules.minQuantity;
+        }
+
+        return cleanEntry;
+      });
+    }
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Grouped Pricing
+  |--------------------------------------------------------------------------
+  */
+
+  if (item.isGroupedPricing && !isRepeatableOnlyService(item.service)) {
+    for (const [group, option] of Object.entries(
+      item.selectedPricingOptions || {},
+    )) {
+      if (option) {
+        cleanFormData[group] = String(option._id);
+      }
+    }
+
+    const selectedQuantities = {};
+
+    for (const [group, option] of Object.entries(
+      item.selectedPricingOptions || {},
+    )) {
+      if (!option) {
+        continue;
+      }
+
+      const rules = getQuantityRules(item.service, option);
+
+      const rawQuantity = item.pricingQuantities?.[group];
+
+      selectedQuantities[group] =
+        rawQuantity !== undefined && rawQuantity !== null
+          ? Number(rawQuantity)
+          : rules.minQuantity;
+    }
+
+    cleanFormData.pricingQuantities = selectedQuantities;
+  }
+
+  return cleanFormData;
+};
+
+function buildServicesPayload(orderItems) {
+  return orderItems.map((item) => ({
+    serviceId: item.service._id,
+    ...(item.isGroupedPricing
+      ? {}
+      : {
+          pricingOptionId: item.selectedPricingOption?._id || undefined,
+        }),
+    quantity: item.isGroupedPricing
+      ? 1
+      : item.selectedPricingOption ||
+          item.service?.pricingType === "per_unit" ||
+          item.service?.pricingType === "starting_from"
+        ? getItemQuantity(item)
+        : 1,
+    formData: buildCleanFormData(item),
+  }));
+}
+
+const reduceOrderItems = (current, update) => cleanInactiveOrderFields(
+  typeof update === "function" ? update(current) : update, getPricingOptions, getActiveFieldsForItem,
+);
+
 const NewOrder = () => {
   const [services, setServices] = useState([]);
   const [adCreditData, setAdCreditData] = useState(null);
@@ -2063,7 +2225,7 @@ const NewOrder = () => {
       active = false;
     };
   }, [adCreditRefresh]);
-  const [orderItems, setOrderItems] = useState([]);
+  const [orderItems, setOrderItems] = useReducer(reduceOrderItems, []);
 
   const [activeServiceIndex, setActiveServiceIndex] = useState(0);
   const [expandedSummaryServices, setExpandedSummaryServices] = useState(
@@ -2264,7 +2426,7 @@ const NewOrder = () => {
         }
         const response = await orderService.validateCoupon({
           code: appliedCouponCode,
-          services: buildServicesPayload(),
+          services: buildServicesPayload(orderItems),
           paymentMethod,
           ...(paymentMethod === "cheque" ? { chequeType } : {}),
         });
@@ -2444,33 +2606,55 @@ const NewOrder = () => {
     setActiveServiceIndex(existingIndex);
   };
 
-  const handleRepeatPreviousOrder = (previousOrder) => {
-    const restored = restoreOrderItems(previousOrder, services);
+  const handleRepeatPreviousOrder = async (previousOrder) => {
+    if (draftOperationRef.current || submitting || loadingServices) return;
+    draftOperationRef.current = true;
+    setDraftBusy(true);
+    let currentServices;
+    try {
+      const response = await serviceService.getServices();
+      currentServices = response.services || [];
+      setServices(currentServices);
+      const restored = restoreOrderItems(previousOrder, currentServices);
 
-    if (restored.items.length === 0) {
-      setRepeatOrderIssues(
-        restored.issues.length > 0
-          ? restored.issues
-          : ["No active services from this order could be restored."],
+      setEditingDraftId("");
+      setDraftQuote(null);
+      setDraftQuoteError("");
+      setCouponInput("");
+      setAppliedCouponCode("");
+      setDraftNotice("");
+      setAdditionalRequirements(previousOrder.additionalRequirements || "");
+      setActiveServiceIndex(0);
+      setOpenServiceIds({});
+      setError("");
+
+      if (restored.items.length === 0) {
+        setOrderItems([]);
+        setRepeatOrderIssues(
+          restored.issues.length > 0
+            ? restored.issues
+            : ["No active services from this order could be restored."],
+        );
+        return;
+      }
+
+      setOrderItems(restored.items);
+      setActiveServiceIndex(0);
+      setOpenServiceIds(
+        Object.fromEntries(
+          restored.items.map((item) => [String(item.service._id), true]),
+        ),
       );
-      return;
+      setRepeatOrderIssues(restored.issues);
+    } catch (failure) {
+      setError(failure.response?.data?.message || "Unable to check current service access. Please try again.");
+    } finally {
+      draftOperationRef.current = false;
+      setDraftBusy(false);
     }
-
-    setOrderItems(restored.items);
-    setActiveServiceIndex(0);
-    setOpenServiceIds(
-      Object.fromEntries(
-        restored.items.map((item) => [String(item.service._id), true]),
-      ),
-    );
-    setAdditionalRequirements(previousOrder.additionalRequirements || "");
-    setRepeatOrderIssues(restored.issues);
-    setEditingDraftId("");
-    setDraftQuote(null);
-    setError("");
   };
 
-  const restoreDraft = (draft) => {
+  const restoreDraft = (draft, services, accessIssues = []) => {
     const draftItems = (draft.services || []).map((savedItem) => {
       const service = services.find(
         (candidate) => String(candidate._id) === String(savedItem.serviceId),
@@ -2497,7 +2681,7 @@ const NewOrder = () => {
         serviceSnapshot: {
           serviceId: savedItem.serviceId,
           slug: service?.slug || "",
-          name: service?.name || "",
+          name: service?.name || savedItem.serviceId,
           selectedOption: selectedOptionSnapshot,
           selectedOptions: selectedOptionSnapshot
             ? [selectedOptionSnapshot]
@@ -2509,7 +2693,22 @@ const NewOrder = () => {
     });
 
     const restored = restoreOrderItems({ items: draftItems }, services);
+    restored.issues.push(...accessIssues.map((issue) => issue.message));
+    setAdditionalRequirements(draft.additionalRequirements || "");
+    setCouponInput(draft.couponCode || "");
+    setAppliedCouponCode(draft.couponCode || "");
+    setPaymentMethod("cod");
+    setChequeType("");
+    setEditingDraftId(String(draft._id));
+    setDraftQuote(null);
+    setDraftQuoteError("");
+    setRepeatOrderIssues(restored.issues);
+    setDraftNotice("");
+    setError("");
+    setActiveServiceIndex(0);
+    setOpenServiceIds({});
     if (restored.items.length === 0) {
+      setOrderItems([]);
       setRepeatOrderIssues(
         restored.issues.length > 0
           ? restored.issues
@@ -2525,44 +2724,39 @@ const NewOrder = () => {
         restored.items.map((item) => [String(item.service._id), true]),
       ),
     );
-    setAdditionalRequirements(draft.additionalRequirements || "");
-    setCouponInput(draft.couponCode || "");
-    setAppliedCouponCode(draft.couponCode || "");
-    setPaymentMethod("cod");
-    setChequeType("");
-    setEditingDraftId(String(draft._id));
-    setDraftQuote(null);
-    setDraftQuoteError("");
-    setRepeatOrderIssues(restored.issues);
-    setDraftNotice("");
-    setError("");
     return true;
   };
 
   const handleOpenDraft = async (draftId) => {
-    if (draftBusy || loadingServices) {
+    if (draftOperationRef.current || submitting || loadingServices) {
       return;
     }
 
+    draftOperationRef.current = true;
     setDraftBusy(true);
     setDraftsError("");
     try {
       const response = await draftService.getDraft(draftId);
-      restoreDraft(response.draft);
+      const catalogue = await serviceService.getServices();
+      const currentServices = catalogue.services || [];
+      setServices(currentServices);
+      restoreDraft(response.draft, currentServices, response.accessIssues || []);
     } catch (openError) {
       setDraftsError(
         openError.response?.data?.message || "Unable to open this draft.",
       );
     } finally {
+      draftOperationRef.current = false;
       setDraftBusy(false);
     }
   };
 
   const handleDeleteDraft = async (draftId) => {
-    if (draftBusy || !window.confirm("Delete this saved draft?")) {
+    if (draftOperationRef.current || submitting || !window.confirm("Delete this saved draft?")) {
       return;
     }
 
+    draftOperationRef.current = true;
     setDraftBusy(true);
     setDraftsError("");
     try {
@@ -2580,11 +2774,13 @@ const NewOrder = () => {
         deleteError.response?.data?.message || "Unable to delete this draft.",
       );
     } finally {
+      draftOperationRef.current = false;
       setDraftBusy(false);
     }
   };
 
   const handleSaveDraft = async () => {
+    if (repeatOrderIssues.length) { setError("Review the service changes and confirm the remaining configuration before saving."); return; }
     if (draftOperationRef.current || submitting || !orderItems.length) {
       return;
     }
@@ -2596,7 +2792,7 @@ const NewOrder = () => {
     try {
       const payload = {
         title: `Draft ${new Date().toLocaleDateString("en-IN")}`,
-        services: buildServicesPayload(),
+        services: buildServicesPayload(orderItems),
         additionalRequirements: additionalRequirements.trim(),
         couponCode: appliedCouponCode,
       };
@@ -3060,68 +3256,6 @@ const NewOrder = () => {
   | Active Fields / Cleanup
   |--------------------------------------------------------------------------
   */
-
-  useEffect(() => {
-    if (!orderItems.length) {
-      return;
-    }
-
-    setOrderItems((current) => {
-      let changed = false;
-
-      const nextItems = current.map((item) => {
-        const configuredDynamicFieldNames = new Set();
-
-        const collectFieldNames = (fields) => {
-          if (!Array.isArray(fields)) {
-            return;
-          }
-
-          fields.forEach((field) => {
-            const fieldName = String(field?.name || "").trim();
-
-            if (fieldName) {
-              configuredDynamicFieldNames.add(fieldName);
-            }
-          });
-        };
-
-        collectFieldNames(item.service?.fields);
-
-        getPricingOptions(item.service).forEach((pricingOption) => {
-          collectFieldNames(pricingOption?.fields);
-        });
-
-        const activeFields = new Set(
-          getActiveFieldsForItem(item)
-            .map((field) => String(field?.name || "").trim())
-            .filter(Boolean),
-        );
-
-        const nextFormData = {
-          ...(item.formData || {}),
-        };
-
-        configuredDynamicFieldNames.forEach((fieldName) => {
-          if (!activeFields.has(fieldName) && fieldName in nextFormData) {
-            delete nextFormData[fieldName];
-            changed = true;
-          }
-        });
-
-        if (!changed) {
-          return item;
-        }
-
-        return {
-          ...item,
-          formData: nextFormData,
-        };
-      });
-
-      return changed ? nextItems : current;
-    });
-  }, [orderItems]);
 
   /*
   |--------------------------------------------------------------------------
@@ -3733,162 +3867,6 @@ const NewOrder = () => {
   |--------------------------------------------------------------------------
   */
 
-  const buildCleanFormData = (item) => {
-    const cleanFormData = {};
-    const fields = getActiveFieldsForItem(item);
-
-    if (isGridPostsService(item.service)) {
-      cleanFormData.pricingMode = item.formData?.pricingMode || "line";
-    }
-
-    for (const field of fields) {
-      const value = item.formData?.[field.name];
-
-      if (value !== undefined && value !== null) {
-        cleanFormData[field.name] = value;
-      }
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Repeatable Groups
-    |--------------------------------------------------------------------------
-    */
-
-    const repeatableGroups = getRepeatableGroups(item.service);
-
-    for (const group of repeatableGroups) {
-      const entries = Array.isArray(item.formData?.[group.name])
-        ? item.formData[group.name]
-        : [];
-
-      if (entries.length > 0) {
-        const repeatablePricingGroups = getRepeatableGroupPricingGroups(
-          item.service,
-          group,
-        );
-
-        cleanFormData[group.name] = entries.map((entry) => {
-          const cleanEntry = {
-            pricingOptions: {},
-            pricingQuantities: {},
-            fields: {},
-          };
-
-          /*
-           * Repeatable fields
-           */
-          const activeFields = getActiveFieldsForRepeatableEntry(
-            item.service,
-            group,
-            entry,
-          );
-
-          for (const field of activeFields) {
-            const fieldName = String(field?.name || "").trim();
-
-            if (!fieldName) {
-              continue;
-            }
-
-            const value = entry?.fields?.[fieldName];
-
-            if (value !== undefined && value !== null) {
-              cleanEntry.fields[fieldName] = value;
-            }
-          }
-
-          /*
-           * Repeatable pricing selections + quantities
-           */
-          for (const pricingGroup of repeatablePricingGroups) {
-            const selectedOptionId = entry?.pricingOptions?.[pricingGroup.name];
-
-            if (!selectedOptionId) {
-              continue;
-            }
-
-            cleanEntry.pricingOptions[pricingGroup.name] =
-              String(selectedOptionId);
-
-            const option = pricingGroup.options.find(
-              (candidate) => String(candidate._id) === String(selectedOptionId),
-            );
-
-            const rules = getQuantityRules(item.service, option);
-
-            const rawQuantity = entry?.pricingQuantities?.[pricingGroup.name];
-
-            cleanEntry.pricingQuantities[pricingGroup.name] =
-              rawQuantity !== undefined && rawQuantity !== null
-                ? Number(rawQuantity)
-                : rules.minQuantity;
-          }
-
-          return cleanEntry;
-        });
-      }
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Grouped Pricing
-    |--------------------------------------------------------------------------
-    */
-
-    if (item.isGroupedPricing && !isRepeatableOnlyService(item.service)) {
-      for (const [group, option] of Object.entries(
-        item.selectedPricingOptions || {},
-      )) {
-        if (option) {
-          cleanFormData[group] = String(option._id);
-        }
-      }
-
-      const selectedQuantities = {};
-
-      for (const [group, option] of Object.entries(
-        item.selectedPricingOptions || {},
-      )) {
-        if (!option) {
-          continue;
-        }
-
-        const rules = getQuantityRules(item.service, option);
-
-        const rawQuantity = item.pricingQuantities?.[group];
-
-        selectedQuantities[group] =
-          rawQuantity !== undefined && rawQuantity !== null
-            ? Number(rawQuantity)
-            : rules.minQuantity;
-      }
-
-      cleanFormData.pricingQuantities = selectedQuantities;
-    }
-
-    return cleanFormData;
-  };
-
-  function buildServicesPayload() {
-    return orderItems.map((item) => ({
-      serviceId: item.service._id,
-      ...(item.isGroupedPricing
-        ? {}
-        : {
-            pricingOptionId: item.selectedPricingOption?._id || undefined,
-          }),
-      quantity: item.isGroupedPricing
-        ? 1
-        : item.selectedPricingOption ||
-            item.service?.pricingType === "per_unit" ||
-            item.service?.pricingType === "starting_from"
-          ? getItemQuantity(item)
-          : 1,
-      formData: buildCleanFormData(item),
-    }));
-  }
-
   /*
   |--------------------------------------------------------------------------
   | Submit
@@ -3897,7 +3875,7 @@ const NewOrder = () => {
 
   const getDraftQuoteRequestKey = () =>
     JSON.stringify({
-      services: buildServicesPayload(),
+      services: buildServicesPayload(orderItems),
       additionalRequirements: additionalRequirements.trim(),
       paymentMethod,
       chequeType: paymentMethod === "cheque" ? chequeType : "",
@@ -3917,7 +3895,8 @@ const NewOrder = () => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (submitInFlight.current) return;
+    if (submitInFlight.current || draftOperationRef.current || draftBusy) return;
+    if (repeatOrderIssues.length) { setError("Review the service changes and confirm the remaining configuration before submitting."); return; }
     setError("");
     setValidationServiceId("");
 
@@ -4011,7 +3990,7 @@ const NewOrder = () => {
         setDraftQuoteLoading(true);
         setDraftQuoteError("");
         const quoteResponse = await orderService.getOrderQuote({
-          services: buildServicesPayload(),
+          services: buildServicesPayload(orderItems),
           adCredit: appliedAdCredit,
           paymentMethod,
           ...(paymentMethod === "cheque" ? { chequeType } : {}),
@@ -4039,7 +4018,7 @@ const NewOrder = () => {
       submitInFlight.current = true;
       setSubmitting(true);
 
-      const servicesPayload = buildServicesPayload();
+      const servicesPayload = buildServicesPayload(orderItems);
 
       const orderResponse = await orderService.createOrder({
         services: servicesPayload,
@@ -4286,7 +4265,7 @@ const NewOrder = () => {
   |--------------------------------------------------------------------------
   */
 
-  if (!services.length) {
+  if (!services.length && !savedDrafts.length && !repeatOrderIssues.length) {
     return (
       <div className="mx-auto flex min-h-[60vh] w-full max-w-[1180px] items-center justify-center px-5">
         <div className="max-w-md text-center">
@@ -4301,7 +4280,7 @@ const NewOrder = () => {
           <p className="mt-2 text-sm leading-6 text-zinc-500">
             {error
               ? "Your service list could not be loaded. Please try again."
-              : "There are currently no active services available for ordering."}
+              : "No services are currently available for your account. Contact your administrator to check your service access."}
           </p>
 
           {error ? (
@@ -4369,7 +4348,7 @@ const NewOrder = () => {
                 ) : latestPreviousOrder ? (
                   <button
                     type="button"
-                    disabled={loadingServices}
+                    disabled={loadingServices || draftBusy || submitting}
                     onClick={() =>
                       handleRepeatPreviousOrder(latestPreviousOrder)
                     }
@@ -4500,8 +4479,8 @@ const NewOrder = () => {
               </div>
 
               {repeatOrderIssues.length > 0 && (
-                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-                  <div className="flex items-start justify-between gap-3">
+                <div role="alert" className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+                  <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
                     <div className="space-y-1">
                       {repeatOrderIssues.map((issue) => (
                         <p
@@ -4517,7 +4496,7 @@ const NewOrder = () => {
                       onClick={() => setRepeatOrderIssues([])}
                       className="shrink-0 text-xs font-medium text-amber-800 underline underline-offset-2"
                     >
-                      Dismiss
+                      I reviewed the remaining configuration
                     </button>
                   </div>
                 </div>
@@ -4662,6 +4641,7 @@ const NewOrder = () => {
                               <span className="block truncate text-sm font-semibold text-zinc-900 sm:text-[15px]">
                                 {service.name}
                               </span>
+                              {service.serviceGroup && service.serviceGroup !== "content" && <span className="mt-1 block text-xs font-medium text-zinc-500">{service.serviceGroup === "seo" ? "SEO" : "Development"}</span>}
                             </span>
                           </button>
                         </div>

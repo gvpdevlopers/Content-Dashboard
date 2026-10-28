@@ -1,3 +1,4 @@
+import { buildServiceEditPayload } from "../../utils/serviceEditPayload";
 import FormFeedback from "../../components/FormFeedback";
 import CustomSelect from "../../components/CustomSelect";
 import { useEffect, useMemo, useState } from "react";
@@ -95,6 +96,8 @@ const createEmptyPricingOption = (order = 0) => ({
 });
 
 const emptyService = {
+  serviceGroup: "content",
+  isPublic: true,
   name: "",
   slug: "",
   category: "",
@@ -237,6 +240,8 @@ const hydrateService = (service) => ({
     ? service.fields.map((field, index) => hydrateField(field, index))
     : [],
 
+  serviceGroup: service.serviceGroup ?? "content",
+  isPublic: service.isPublic ?? (service.isActive !== false),
   isActive: service.isActive === undefined ? true : Boolean(service.isActive),
 
   displayOrder:
@@ -249,180 +254,6 @@ const hydrateService = (service) => ({
    Custom Select
 ========================================================= */
 
-
-const cleanFieldForPayload = (field, index = 0) => {
-  const cleaned = {
-    name: String(field.name || "").trim(),
-
-    label: String(field.label || "").trim(),
-
-    type: field.type || "text",
-
-    placeholder: String(field.placeholder || "").trim(),
-
-    helpText: String(field.helpText || "").trim(),
-
-    required: Boolean(field.required),
-    includeValueInPrice:
-      field.type === "number" && Boolean(field.includeValueInPrice),
-
-    order: Number.isFinite(Number(field.order)) ? Number(field.order) : index,
-  };
-
-  if (isOptionFieldType(cleaned.type)) {
-    cleaned.options = Array.isArray(field.options)
-      ? field.options.map((option) => ({
-          label: String(option.label || "").trim(),
-
-          value: String(option.value || "").trim(),
-
-          price:
-            option.price === "" ||
-            option.price === null ||
-            option.price === undefined
-              ? 0
-              : Number(option.price),
-        }))
-      : [];
-  } else {
-    cleaned.options = [];
-  }
-
-  if (isNumberFieldType(cleaned.type)) {
-    if (field.min !== "" && field.min !== null && field.min !== undefined) {
-      cleaned.min = Number(field.min);
-    }
-
-    if (field.max !== "" && field.max !== null && field.max !== undefined) {
-      cleaned.max = Number(field.max);
-    }
-
-    if (field.step !== "" && field.step !== null && field.step !== undefined) {
-      cleaned.step = Number(field.step);
-    }
-  }
-
-  return cleaned;
-};
-
-const cleanPricingOptionForPayload = (option, index = 0) => {
-  const cleaned = {
-    name: String(option.name || "").trim(),
-
-    description: String(option.description || "").trim(),
-
-    price:
-      option.price === "" || option.price === null || option.price === undefined
-        ? 0
-        : Number(option.price),
-
-    unit: String(option.unit || "").trim(),
-
-    group: String(option.group || "").trim(),
-
-    minQuantity:
-      option.minQuantity === "" ||
-      option.minQuantity === null ||
-      option.minQuantity === undefined
-        ? 1
-        : Number(option.minQuantity),
-
-    isActive: Boolean(option.isActive),
-
-    /*
-     * IMPORTANT:
-     * Nested option-specific fields are preserved.
-     */
-    fields: Array.isArray(option.fields)
-      ? option.fields.map((field, fieldIndex) =>
-          cleanFieldForPayload(field, fieldIndex),
-        )
-      : [],
-
-    order:
-      option.order === "" || option.order === null || option.order === undefined
-        ? index
-        : Number(option.order),
-  };
-
-  if (
-    option.maxQuantity !== "" &&
-    option.maxQuantity !== null &&
-    option.maxQuantity !== undefined
-  ) {
-    cleaned.maxQuantity = Number(option.maxQuantity);
-  }
-
-  /*
-   * Existing option:
-   * preserve MongoDB _id.
-   *
-   * Newly duplicated option:
-   * no _id => backend creates a new subdocument.
-   */
-  if (option._id) {
-    cleaned._id = option._id;
-  }
-
-  return cleaned;
-};
-
-const buildPayload = (form) => ({
-  name: String(form.name || "").trim(),
-
-  slug: String(form.slug || "")
-    .trim()
-    .toLowerCase(),
-
-  category: String(form.category || "").trim(),
-
-  description: String(form.description || "").trim(),
-
-  pricingType: form.pricingType || "fixed",
-
-  basePrice:
-    form.basePrice === "" ||
-    form.basePrice === null ||
-    form.basePrice === undefined
-      ? 0
-      : Number(form.basePrice),
-
-  unit: String(form.unit || "").trim(),
-
-  minQuantity:
-    form.minQuantity === "" ||
-    form.minQuantity === null ||
-    form.minQuantity === undefined
-      ? 1
-      : Number(form.minQuantity),
-
-  ...(form.maxQuantity !== "" &&
-  form.maxQuantity !== null &&
-  form.maxQuantity !== undefined
-    ? {
-        maxQuantity: Number(form.maxQuantity),
-      }
-    : {}),
-
-  pricingOptions: Array.isArray(form.pricingOptions)
-    ? form.pricingOptions.map((option, index) =>
-        cleanPricingOptionForPayload(option, index),
-      )
-    : [],
-
-  fields: Array.isArray(form.fields)
-    ? form.fields.map((field, index) => cleanFieldForPayload(field, index))
-    : [],
-
-  isActive: Boolean(form.isActive),
-
-  displayOrder:
-    form.displayOrder === "" ||
-    form.displayOrder === null ||
-    form.displayOrder === undefined
-      ? 0
-      : Number(form.displayOrder),
-});
 
 /* =========================================================
    Validation
@@ -1961,7 +1792,7 @@ const AdminEditService = () => {
       return;
     }
 
-    const payload = buildPayload(form);
+    const payload = buildServiceEditPayload(form);
 
     try {
       setSaving(true);
@@ -2247,6 +2078,16 @@ const AdminEditService = () => {
                 placeholder="Describe this service..."
               />
             </div>
+          </div>
+
+          <div className="mt-5 space-y-4">
+            <label className="block text-sm font-medium">Service group
+              <select className="mt-2 w-full rounded-lg border border-zinc-200 bg-white p-3" value={form.serviceGroup} onChange={(event) => updateForm({ serviceGroup: event.target.value })}>
+                <option value="content">Content</option><option value="seo">SEO</option><option value="development">Development</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.isPublic} onChange={(event) => updateForm({ isPublic: event.target.checked })} />Visible on public website</label>
+            <p className="text-xs text-zinc-500">Public visibility is for marketing. Ordering also requires an active service and client permission.</p>
           </div>
 
           <div className="mt-5">

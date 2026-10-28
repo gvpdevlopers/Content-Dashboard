@@ -1,42 +1,36 @@
+import useAsyncResource from "../hooks/useAsyncResource";
+import useCollectionPaymentRefresh from "../hooks/useCollectionPaymentRefresh";
 import PaymentPinDialog from "../components/PaymentPinDialog";
-import { canEnterCashPaymentPin } from "../utils/paymentPin";
+import { useAuth } from "../context/authSessionContext";
+import { canEnterPaymentPin, canUseOrderPaymentPin } from "../utils/paymentPin";
 import { toast } from "sonner";
 import PaymentStatusBadge from "../components/PaymentStatusBadge";
 import StatusBadge from "../components/OrderStatusBadge";
 import OrderItemsOverview from "../components/OrderItemsOverview";
 import OrderResourceAction from "../components/OrderResourceAction";
 import { hasProjectDetails, validResourceUrl } from "../utils/orderResources";
-import { useEffect, useId, useState } from "react";
+import { useCallback, useId, useState } from "react";
 import { ArrowRight, ChevronDown, ChevronUp, ClipboardList, Loader2, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import orderService from "../services/orderService";
 
 const OrderHistory = () => {
-  const [orders, setOrders] = useState([]);
   const [pinOrder, setPinOrder] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const { user } = useAuth();
+  const openPin = (order) => { if (canUseOrderPaymentPin(order, user)) setPinOrder(order); };
 
-  const loadOrders = async () => {
-    try {
-      setLoading(true);
-      setError("");
-
-      const data = await orderService.getMyOrders();
-
-      setOrders(Array.isArray(data?.orders) ? data.orders : []);
-    } catch (error) {
-      console.error("Get orders error:", error);
-
-      setError(error.response?.data?.message || "Unable to load your orders.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadOrders();
+  const readOrders = useCallback(async () => {
+    const response = await orderService.getMyOrders();
+    return Array.isArray(response?.orders) ? response.orders : [];
   }, []);
+  const reconcilePinOrder = useCallback((orders) => setPinOrder((selected) => {
+    if (!selected) return null;
+    const current = orders.find((order) => String(order._id || order.id) === String(selected._id || selected.id));
+    return current && canEnterPaymentPin(current) ? current : null;
+  }), []);
+  const { data: orders, setData: setOrders, loading, error, reload: loadOrders } = useAsyncResource(readOrders,
+    { initialData: [], errorMessage: "Unable to load your orders.", onSuccess: reconcilePinOrder });
+  useCollectionPaymentRefresh(orders, loadOrders);
 
   return (
     <div className="mx-auto max-w-[1500px] animate-fade-up">
@@ -240,7 +234,7 @@ const OrderHistory = () => {
 
             <div>
               {orders.map((order) => (
-                <OrderTableRow key={order._id || order.id} order={order} onEnterPin={setPinOrder} />
+                <OrderTableRow key={order._id || order.id} order={order} onEnterPin={user?.role === "client" ? openPin : undefined} />
               ))}
             </div>
           </div>
@@ -251,20 +245,20 @@ const OrderHistory = () => {
 
           <div className="space-y-4 lg:hidden">
             {orders.map((order) => (
-              <OrderMobileCard key={order._id || order.id} order={order} onEnterPin={setPinOrder} />
+              <OrderMobileCard key={order._id || order.id} order={order} onEnterPin={user?.role === "client" ? openPin : undefined} />
             ))}
           </div>
         </>
       )}
-      {pinOrder && (
-        <PaymentPinDialog order={pinOrder} onClose={() => setPinOrder(null)}
+      {pinOrder && canUseOrderPaymentPin(pinOrder, user) && (
+        <PaymentPinDialog key={`${pinOrder._id || pinOrder.id}:${pinOrder.codPinGeneratedAt}`} order={pinOrder} onClose={() => setPinOrder(null)}
           onVerified={(update) => {
             const orderId = pinOrder._id || pinOrder.id;
             setOrders((current) => current.map((order) =>
               (order._id || order.id) === orderId ? { ...order, ...update } : order,
             ));
             setPinOrder(null);
-            toast.success("Cash payment verified.");
+            toast.success("Payment marked as Paid.");
           }} />
       )}
     </div>
@@ -657,11 +651,11 @@ const MobileDetail = ({ label, value, paymentDone = false }) => {
   );
 };
 
-const EnterPaymentPinAction = ({ order, onEnterPin }) => canEnterCashPaymentPin(order) ? (
+const EnterPaymentPinAction = ({ order, onEnterPin }) => onEnterPin && canEnterPaymentPin(order) ? (
   <button type="button" onClick={() => onEnterPin(order)} aria-haspopup="dialog"
-    aria-label={`Enter Payment PIN for ${order.orderNumber || "order"}`}
+    aria-label={`Enter PIN for ${order.orderNumber || "order"}`}
     className="dashboard-action dashboard-action--secondary dashboard-action--compact mt-2 w-full min-w-0 [overflow-wrap:anywhere] sm:w-auto">
-    Enter Payment PIN
+    Enter PIN
   </button>
 ) : null;
 
@@ -864,9 +858,7 @@ const formatQuantity = (quantity) => {
 const isPaymentCompleted = (order) => {
   return (
     order?.paymentStatus === "paid" ||
-    order?.paymentStatus === "collected" ||
-    (order?.paymentMethod === "cod" &&
-      (order?.codPinStatus === "verified" || order?.codPinStatus === "used"))
+    order?.paymentStatus === "collected"
   );
 };
 

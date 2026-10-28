@@ -1,7 +1,9 @@
+const { normalizeServiceId } = require("../utils/serviceIdentity");
+const { canClientOrderService } = require("../utils/serviceAccess");
 const { changeOrderStatus } = require("../utils/adCreditCancellation");
 const { quoteCredit, spendCredit } = require("../utils/adCredit");
 const crypto = require("crypto");
-const { pinHasExpired } = require("../utils/pinPolicy");
+const { pinIsLocked } = require("../utils/pinPolicy");
 const { acquireLock } = require("../utils/requestLock");
 const Order = require("../models/Order");
 const { supportsServiceDelivery } = require("../config/serviceDelivery");
@@ -2248,7 +2250,7 @@ const toOrderWithServiceProgress = (order) => {
       ? order.toObject({ flattenMaps: true })
       : { ...order };
 
-  if (pinHasExpired(visibleOrder)) visibleOrder.codPinStatus = "expired";
+  if (pinIsLocked(visibleOrder)) visibleOrder.codPinStatus = "locked";
 
   if (Array.isArray(visibleOrder.items)) {
     visibleOrder.items = visibleOrder.items.map((item) => {
@@ -2279,23 +2281,29 @@ const toOrderWithServiceProgress = (order) => {
 ========================================================= */
 
 const processOrderServiceItem = async ({
+  user,
   serviceId,
   pricingOptionId,
   quantity = 1,
   formData = {},
 }) => {
+  const normalizedServiceId = normalizeServiceId(serviceId);
+  if (!normalizedServiceId) return { success: false, message: "Each service must contain a valid serviceId." };
   const storedService =
     await Service.findOne({
-      _id: serviceId,
-      isActive: true,
+      _id: normalizedServiceId,
     });
 
   if (!storedService) {
     return {
       success: false,
       message:
-        "Selected service is not available.",
+        `Selected service (${serviceId}) is not available. Review your configuration.`,
     };
+  }
+
+  if (!canClientOrderService(user, storedService)) {
+    return { success: false, message: `${storedService.name} is not available for your account. Review your selected services before submitting.` };
   }
 
   const service = normalizeAdsService(storedService);
@@ -2692,7 +2700,7 @@ const calculateCouponQuote = ({
   };
 };
 
-const buildProcessedServiceResults = async (serviceRequests) => {
+const buildProcessedServiceResults = async (serviceRequests, user) => {
   if (!Array.isArray(serviceRequests) || serviceRequests.length === 0) {
     throw new Error("At least one service is required.");
   }
@@ -2709,7 +2717,8 @@ const buildProcessedServiceResults = async (serviceRequests) => {
       throw new Error("Each service must contain a serviceId.");
     }
 
-    const serviceId = String(request.serviceId);
+    const serviceId = normalizeServiceId(request.serviceId);
+    if (!serviceId) throw new Error("Each service must contain a valid serviceId.");
     if (serviceIds.has(serviceId)) {
       throw new Error(
         "The same service cannot be added more than once to an order.",
@@ -2718,6 +2727,7 @@ const buildProcessedServiceResults = async (serviceRequests) => {
     serviceIds.add(serviceId);
 
     const result = await processOrderServiceItem({
+      user,
       serviceId: request.serviceId,
       pricingOptionId: request.pricingOptionId,
       quantity: request.quantity ?? 1,
@@ -2760,7 +2770,7 @@ const getCouponQuote = async (req, res) => {
         message: "Select a valid cheque payment type.",
       });
     }
-    const serviceResults = await buildProcessedServiceResults(services);
+    const serviceResults = await buildProcessedServiceResults(services, req.user);
     const normalizedCode = normalizeCouponCode(code);
     const coupon = await Coupon.findOne({ code: normalizedCode });
 
@@ -2818,7 +2828,7 @@ const getOrderQuote = async (req, res) => {
       });
     }
 
-    const serviceResults = await buildProcessedServiceResults(services);
+    const serviceResults = await buildProcessedServiceResults(services, req.user);
     const originalSubtotal = roundCurrency(
       serviceResults.reduce((sum, result) => sum + result.amount, 0),
     );
@@ -3154,8 +3164,10 @@ const createOrder = async (
         });
       }
 
-      const normalizedId =
-        String(request.serviceId);
+      const normalizedId = normalizeServiceId(request.serviceId);
+      if (!normalizedId) {
+        return res.status(400).json({ success: false, message: "Each service must contain a valid serviceId." });
+      }
 
       if (serviceIds.has(normalizedId)) {
         return res.status(400).json({
@@ -3180,6 +3192,7 @@ const createOrder = async (
     for (const request of serviceRequests) {
       const result =
         await processOrderServiceItem({
+          user: req.user,
           serviceId:
             request.serviceId,
           pricingOptionId:
@@ -3640,7 +3653,7 @@ const getOrderById = async (
 
 const toClientVisibleOrder = (order) => {
   const visibleOrder = toOrderWithServiceProgress(order);
-  for (const field of ["monthEndPaymentHistory", "notes", "codPin", "codPinAttempts", "razorpaySignature",
+  for (const field of ["monthEndPaymentHistory", "notes", "codPin", "codPinEmployee", "codPinVerifiedBy", "codPinAttempts", "razorpaySignature",
     "submissionKey", "submissionHash"]) delete visibleOrder[field];
 
   if (visibleOrder.orderStatus !== "completed") {
@@ -4057,28 +4070,24 @@ const updatePaymentStatus =
       }
 
       if (
-        order.paymentMethod ===
-          "cod" &&
-        paymentStatus ===
-          "collected"
+        ["cod", "cheque"].includes(order.paymentMethod) &&
+        ["paid", "collected"].includes(paymentStatus)
       ) {
         return res.status(400).json({
           success: false,
           message:
-            "COD payment must be completed through COD PIN verification.",
+            "Cash and cheque collection payments must be completed by the owning client through PIN verification.",
         });
       }
 
       if (
-        order.paymentMethod ===
-          "cod" &&
-        order.paymentStatus ===
-          "collected"
+        ["cod", "cheque"].includes(order.paymentMethod) &&
+        ["paid", "collected"].includes(order.paymentStatus)
       ) {
         return res.status(400).json({
           success: false,
           message:
-            "COD payment has already been collected.",
+            "This payment has already been completed.",
         });
       }
 
@@ -4116,8 +4125,12 @@ const updatePaymentStatus =
         }
         order.paymentStatus = paymentStatus;
       } else {
+        const paymentUpdate = await Order.updateOne({ _id: order._id,
+          paymentStatus: order.paymentStatus, adCreditReleased: { $ne: true } },
+        { $set: { paymentStatus } });
+        if (paymentUpdate.matchedCount !== 1) return res.status(409).json({ success: false,
+          message: "Payment changed. Refresh the order before updating its status." });
         order.paymentStatus = paymentStatus;
-        await order.save();
       }
 
       return res.status(200).json({

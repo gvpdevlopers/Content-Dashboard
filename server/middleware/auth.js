@@ -63,7 +63,7 @@ const protect = async (req, res, next) => {
     }
 
     const user = await User.findById(userId).select(
-      "_id role isActive tokenVersion allowMonthEndPayment",
+      "_id role isActive tokenVersion allowMonthEndPayment serviceAccess",
     );
 
     if (
@@ -80,7 +80,10 @@ const protect = async (req, res, next) => {
     req.user = {
       ...decoded,
       _id: user._id,
+      userId: String(user._id),
       role: user.role,
+      isActive: user.isActive,
+      serviceAccess: user.serviceAccess,
       allowMonthEndPayment: user.role === "client" && user.allowMonthEndPayment === true,
     };
 

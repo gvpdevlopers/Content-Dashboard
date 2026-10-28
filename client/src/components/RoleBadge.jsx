@@ -1,8 +1,8 @@
 import { ShieldCheck } from "lucide-react";
 
 const roles = {
-  admin: { label: "Admin", style: "border-purple-200 bg-purple-50 text-purple-700" },
-  employee: { label: "Employee", style: "border-blue-200 bg-blue-50 text-blue-700" },
+  admin: { label: "Admin", style: "border-zinc-200 bg-zinc-50 text-zinc-700" },
+  employee: { label: "Employee", style: "border-zinc-200 bg-zinc-50 text-zinc-600" },
   client: { label: "Client", style: "border-zinc-200 bg-zinc-50 text-zinc-500" },
 };
 
