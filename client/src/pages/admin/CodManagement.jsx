@@ -402,7 +402,7 @@ const CodManagement = () => {
 
         <StatCard
           icon={CheckCircle2}
-          label="Paid"
+          label="Payment Done"
           value={stats.collected}
         />
       </div>
@@ -504,7 +504,7 @@ const CodManagement = () => {
                 },
                 {
                   value: "collected",
-                  label: "Paid",
+                  label: "Payment Done",
                 },
               ]}
             />
@@ -853,14 +853,32 @@ const CodOrderCard = ({ order, pinAssignment, onGenerated, user }) => {
 
         {/* Generate / PIN */}
 
-        <div className="w-full xl:w-auto">
-          <OrderPaymentPinActions order={order} user={user} onUpdated={() => onGenerated(true)} />
-          {["active", "locked"].includes(order.codPinStatus) && !isPaymentDone && <button type="button" className="dashboard-action dashboard-action--destructive mb-3" disabled={loading} onClick={disablePin}><XCircle size={16} />Disable PIN</button>}
-          {canGenerate && <PinEmployeeSelect assignment={pinAssignment} disabled={loading} />}
+        <div className="w-full xl:w-[360px] xl:shrink-0">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <OrderPaymentPinActions
+                order={order}
+                user={user}
+                onUpdated={() => onGenerated(true)}
+                className="!mt-0"
+              />
+              {["active", "locked"].includes(order.codPinStatus) && !isPaymentDone && (
+                <button
+                  type="button"
+                  className="dashboard-action dashboard-action--destructive inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 sm:flex-none"
+                  disabled={loading}
+                  onClick={disablePin}
+                >
+                  <XCircle size={16} />
+                  Disable PIN
+                </button>
+              )}
+            </div>
+            {canGenerate && <PinEmployeeSelect assignment={pinAssignment} disabled={loading} />}
           {isPaymentDone ? (
             <div
               className="
-                flex
+                flex w-full
                 items-center
                 gap-2
                 rounded-xl
@@ -874,7 +892,7 @@ const CodOrderCard = ({ order, pinAssignment, onGenerated, user }) => {
               "
             >
               <CheckCircle2 className="icon-accent-green" size={17} />
-              Payment Paid
+              Payment Done
             </div>
           ) : pin && isPinActive ? (
             <PinDisplay
@@ -886,7 +904,7 @@ const CodOrderCard = ({ order, pinAssignment, onGenerated, user }) => {
           ) : isPinActive ? (
             <div
               className="
-                rounded-xl
+                w-full rounded-xl
                 border border-amber-200
                 bg-amber-50
                 px-4
@@ -899,8 +917,8 @@ const CodOrderCard = ({ order, pinAssignment, onGenerated, user }) => {
               PIN Active
             </div>
           ) : isPinVerified ? (
-            <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
-              PIN Verified · Payment Pending
+            <div className="w-full rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
+              Payment Done
             </div>
           ) : canGenerate ? (
             <button
@@ -927,7 +945,7 @@ const CodOrderCard = ({ order, pinAssignment, onGenerated, user }) => {
                 hover:shadow-md
                 disabled:cursor-not-allowed
                 disabled:opacity-50
-                xl:w-auto
+                xl:w-full
               "
             >
               <KeyRound size={17} />
@@ -935,6 +953,7 @@ const CodOrderCard = ({ order, pinAssignment, onGenerated, user }) => {
               {loading ? "Generating..." : "Generate PIN"}
             </button>
           ) : null}
+          </div>
         </div>
       </div>
 
@@ -1045,7 +1064,7 @@ const CodOrderCard = ({ order, pinAssignment, onGenerated, user }) => {
           value={
             isChequeOrder
               ? isPaymentDone
-                ? "Paid"
+                ? "Payment Done"
                 : "Pending"
               : order.codCollectedAt
                 ? formatDateTime(order.codCollectedAt)
@@ -1091,7 +1110,7 @@ const CodOrderCard = ({ order, pinAssignment, onGenerated, user }) => {
                 text-zinc-800
               "
             >
-              {isPaymentDone ? "Payment Paid" : "Payment Pending"}
+              {isPaymentDone ? "Payment Done" : "Payment Pending"}
             </p>
           </div>
 
@@ -1161,7 +1180,7 @@ const CodOrderCard = ({ order, pinAssignment, onGenerated, user }) => {
 
 const PinDisplay = ({ pin, copied, onCopy, paymentMethod }) => {
   return (
-    <div>
+    <div className="w-full">
       <p
         className="
           mb-2
@@ -1175,7 +1194,7 @@ const PinDisplay = ({ pin, copied, onCopy, paymentMethod }) => {
         {paymentMethod === "cheque" ? "Cheque PIN" : "COD PIN"}
       </p>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-3">
         <div
           className="
             rounded-xl

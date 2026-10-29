@@ -150,7 +150,7 @@ const updateCoupon = async (req, res) => {
     const coupon = await Coupon.findByIdAndUpdate(
       req.params.id,
       { $set: couponData },
-      { new: true, runValidators: true },
+      { returnDocument: "after", runValidators: true },
     );
     if (!coupon) {
       return res.status(404).json({

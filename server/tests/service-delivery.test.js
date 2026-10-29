@@ -118,7 +118,7 @@ test("client detail queries scope service links to the authenticated owner and p
   assert.equal(res.body.order.items[0].supportsDelivery, true);
   assert.equal(res.body.order.invoice, undefined);
   assert.equal(res.body.order.deliveryLink, undefined);
-  const missing = response(); await controller.getOrderById({ user: { _id: clientId }, params: { id: "other" } }, missing);
+  const missing = response(); await controller.getOrderById({ user: { _id: clientId }, params: { id: "123456789012345678901237" } }, missing);
   assert.equal(missing.statusCode, 404);
   raw.orderStatus = "completed";
   const complete = response(); await controller.getOrderById({ user: { _id: clientId }, params: { id: orderId } }, complete);

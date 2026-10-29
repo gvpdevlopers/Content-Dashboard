@@ -2196,8 +2196,33 @@ const reduceOrderItems = (current, update) => cleanInactiveOrderFields(
   typeof update === "function" ? update(current) : update, getPricingOptions, getActiveFieldsForItem,
 );
 
+const getServiceCategory = (service) => {
+  const value = String(service?.serviceGroup || service?.category || "Other").trim();
+  const normalized = value.toLowerCase();
+
+  if (normalized === "content") return "Content & Ads";
+  if (normalized === "seo") return "SEO";
+  if (normalized === "development") return "Development";
+
+  return value || "Other";
+};
+
 const NewOrder = () => {
   const [services, setServices] = useState([]);
+  const serviceGroups = useMemo(() => {
+    const groups = new Map();
+
+    services.forEach((service) => {
+      const category = getServiceCategory(service);
+      if (!groups.has(category)) groups.set(category, []);
+      groups.get(category).push(service);
+    });
+
+    return Array.from(groups, ([category, groupedServices]) => ({
+      category,
+      services: groupedServices,
+    }));
+  }, [services]);
   const [adCreditData, setAdCreditData] = useState(null);
   const [adCreditError, setAdCreditError] = useState("");
   const [selectedAdCredit, setSelectedAdCredit] = useState({
@@ -4043,6 +4068,11 @@ const NewOrder = () => {
         );
       }
 
+      const createdOrderId = createdOrder._id || createdOrder.id;
+      if (!/^[a-f\d]{24}$/i.test(String(createdOrderId || ""))) {
+        throw new Error("Order was created but no valid order ID was returned. Please open Order History and try again.");
+      }
+
       /*
       |--------------------------------------------------------------------------
       | COD
@@ -4502,8 +4532,19 @@ const NewOrder = () => {
                 </div>
               )}
 
-              <div className="mt-6 space-y-4">
-                {services.map((service) => {
+              <div className="mt-6 space-y-8">
+                {serviceGroups.map((group) => (
+                  <section key={group.category}>
+                    {serviceGroups.length > 1 && (
+                      <div className="mb-4 flex items-center gap-3">
+                        <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                          {group.category}
+                        </h3>
+                        <div className="h-px flex-1 bg-zinc-200" aria-hidden="true" />
+                      </div>
+                    )}
+                    <div className="space-y-4">
+                      {group.services.map((service) => {
                   const serviceId = String(service._id);
 
                   const selectedIndex = orderItems.findIndex(
@@ -4641,7 +4682,6 @@ const NewOrder = () => {
                               <span className="block truncate text-sm font-semibold text-zinc-900 sm:text-[15px]">
                                 {service.name}
                               </span>
-                              {service.serviceGroup && service.serviceGroup !== "content" && <span className="mt-1 block text-xs font-medium text-zinc-500">{service.serviceGroup === "seo" ? "SEO" : "Development"}</span>}
                             </span>
                           </button>
                         </div>
@@ -5381,7 +5421,10 @@ const NewOrder = () => {
                       )}
                     </div>
                   );
-                })}
+                      })}
+                    </div>
+                  </section>
+                ))}
               </div>
 
               {loadingServiceId && (

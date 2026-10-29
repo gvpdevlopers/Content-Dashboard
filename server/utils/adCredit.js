@@ -65,7 +65,7 @@ const spendCredit = async ({ client, order, requested, session, actor }) => {
     const amountPaise = requested[platform];
     if (!amountPaise) continue;
     const wallet = await Wallet.findOneAndUpdate({ _id: `${client}:${platform}`,
-      balancePaise: { $gte: amountPaise } }, { $inc: { balancePaise: -amountPaise } }, { session, new: true });
+      balancePaise: { $gte: amountPaise } }, { $inc: { balancePaise: -amountPaise } }, { session, returnDocument: "after" });
     if (!wallet) throw creditError("Insufficient ad credit. Refresh your balance and try again.", 409);
     await Entry.create([{ client, order, platform, kind: "applied", amountPaise, actor,
       note: "Applied to the ad spend of this order." }], { session });

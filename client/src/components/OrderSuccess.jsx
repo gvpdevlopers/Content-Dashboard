@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 import AdCreditBreakdown from "./AdCreditBreakdown";
 
 const OrderSuccess = ({ order }) => {
+  const orderId = order?._id || order?.id;
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-2xl items-center justify-center">
       <div
@@ -154,7 +155,7 @@ const OrderSuccess = ({ order }) => {
           </div>
           {order.paymentMethod === "month_end" && (
             <div className="pt-4 text-left text-xs leading-5 text-zinc-500">
-              <p>Payment status: {order.paymentStatus === "paid" ? "Paid" : "Pending"}</p>
+              <p>Payment status: {order.paymentStatus === "paid" ? "Payment Done" : "Pending"}</p>
               {order.paymentStatus !== "paid" && <p>Payment is due at the end of the month.</p>}
             </div>
           )}
@@ -182,7 +183,7 @@ const OrderSuccess = ({ order }) => {
           "
         >
          <Link
-  to={`/dashboard/orders/${order.id}`}
+  to={orderId ? `/dashboard/orders/${orderId}` : "/dashboard/orders"}
   className="dashboard-action dashboard-action--primary
     group
     inline-flex

@@ -2,7 +2,9 @@ import useAsyncResource from "../hooks/useAsyncResource";
 import useCollectionPaymentRefresh from "../hooks/useCollectionPaymentRefresh";
 import SharedOrderStatusBadge from "../components/OrderStatusBadge";
 import PaymentStatusBadge from "../components/PaymentStatusBadge";
+import PaymentPinDialog from "../components/PaymentPinDialog";
 import { useCallback, useMemo } from "react";
+import { useState } from "react";
 
 import {
   ArrowRight,
@@ -18,9 +20,11 @@ import {
 import { useAuth } from "../context/authSessionContext";
 import { Link } from "react-router-dom";
 import orderService from "../services/orderService";
+import { canUseOrderPaymentPin } from "../utils/paymentPin";
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const [pinOrder, setPinOrder] = useState(null);
 
 
   /* =========================================================
@@ -831,11 +835,26 @@ const Dashboard = () => {
               "
           >
             {recentOrders.map((order) => (
-              <RecentOrder key={order._id || order.id} order={order} />
+              <RecentOrder
+                key={order._id || order.id}
+                order={order}
+                onEnterPin={canUseOrderPaymentPin(order, user) ? setPinOrder : undefined}
+              />
             ))}
           </div>
         )}
       </section>
+      {pinOrder && canUseOrderPaymentPin(pinOrder, user) && (
+        <PaymentPinDialog
+          key={`${pinOrder._id || pinOrder.id}:${pinOrder.codPinGeneratedAt}`}
+          order={pinOrder}
+          onClose={() => setPinOrder(null)}
+          onVerified={() => {
+            setPinOrder(null);
+            loadOrders(true);
+          }}
+        />
+      )}
     </div>
   );
 };
@@ -925,7 +944,7 @@ const StatCard = ({ icon: Icon, label, value, description, tone = "slate" }) => 
    RECENT ORDER
 ========================================================= */
 
-const RecentOrder = ({ order }) => {
+const RecentOrder = ({ order, onEnterPin }) => {
   /*
    * Service name comes from the snapshot first so that
    * historical orders continue showing the service name
@@ -1057,6 +1076,21 @@ const RecentOrder = ({ order }) => {
             paymentStatus={paymentStatus}
             isCodPaymentDone={isCodPaymentDone}
           />
+          {onEnterPin && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onEnterPin(order);
+              }}
+              className="dashboard-action dashboard-action--secondary dashboard-action--compact"
+              aria-haspopup="dialog"
+              aria-label={`Enter PIN for ${order.orderNumber || "order"}`}
+            >
+              Enter PIN
+            </button>
+          )}
         </div>
 
         <ArrowRight

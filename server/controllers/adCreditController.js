@@ -64,7 +64,7 @@ const issueAdCredit = async (req, res) => {
       if (updated.modifiedCount !== 1) throw creditError("Unused spend was already recorded for this platform and order.", 409);
       await Wallet.findOneAndUpdate({ _id: `${order.client}:${platform}` },
         { $inc: { balancePaise: amountPaise }, $setOnInsert: { client: order.client, platform } },
-        { session, upsert: true, new: true, setDefaultsOnInsert: false });
+  { session, upsert: true, returnDocument: "after", setDefaultsOnInsert: false });
       await Entry.create([{ client: order.client, platform, kind: "issued", amountPaise,
         order: order._id, actor: req.user._id, note: note.trim() }], { session });
     });

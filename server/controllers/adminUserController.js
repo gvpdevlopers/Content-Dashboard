@@ -358,7 +358,7 @@ const updateMonthEndPermission = async (req, res) => {
     const user = await User.findOneAndUpdate(
       { _id: req.params.id, role: "client" },
       { $set: { allowMonthEndPayment } },
-      { new: true, runValidators: true },
+      { returnDocument: "after", runValidators: true },
     ).select("-password");
     if (!user) {
       return res.status(404).json({ success: false, message: "Client not found." });
@@ -377,7 +377,7 @@ const updateServiceAccess = async (req, res) => {
     const user = await User.findOneAndUpdate(
       { _id: req.params.id, role: "client" },
       { $set: { serviceAccess } },
-      { new: true, runValidators: true },
+      { returnDocument: "after", runValidators: true },
     ).select("-password");
     if (!user) return res.status(404).json({ success: false, message: "Client not found." });
     return res.json({ success: true, message: "Service access updated.", user });

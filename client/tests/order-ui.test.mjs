@@ -180,7 +180,7 @@ test("contact form reuses the accessible service select without changing submiss
 
 test("payment badges distinguish pending, failed, refunded and settled payments across views", () => {
   for (const [status, label, color] of [
-    ["paid", "Paid", "emerald"], ["collected", "Collected", "emerald"],
+    ["paid", "Payment Done", "emerald"], ["collected", "Payment Done", "emerald"],
     ["pending", "Pending", "amber"], ["processing", "Processing", "blue"],
     ["failed", "Failed", "red"], ["refunded", "Refunded", "blue"],
   ]) {
@@ -194,7 +194,7 @@ test("payment badges distinguish pending, failed, refunded and settled payments 
     assert.match(html, /text-zinc-600/);
     assert.doesNotMatch(html, /emerald/);
   }
-  assert.match(render(PaymentBadge, { status: "PAID" }), /Payment: Paid/);
+  assert.match(render(PaymentBadge, { status: "PAID" }), /Payment: Payment Done/);
 });
 
 test("custom validation can announce required selects without adding browser validation", () => {
@@ -306,7 +306,7 @@ test("client details offer inline entry only for active collection PINs and conf
       assert.doesNotMatch(render(ClientPin, { order: { ...order, codPinStatus }, user }), /<input|Verify PIN/);
     }
     const paid = render(ClientPin, { order: { ...order, paymentStatus: "paid", codPinStatus: "used" }, user });
-    assert.match(paid, /Paid/); assert.doesNotMatch(paid, /<input|Verify PIN/);
+    assert.match(paid, /Payment Done/); assert.doesNotMatch(paid, /<input|Verify PIN/);
     for (const role of ["admin", "employee"]) assert.equal(render(ClientPin, { order, user: { role } }), "");
   }
 });

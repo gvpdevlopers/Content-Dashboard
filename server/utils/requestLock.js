@@ -7,7 +7,7 @@ const acquireLock = async (key) => {
     await RequestLock.findOneAndUpdate(
       { _id: key, expiresAt: { $lte: new Date() } },
       { $set: { expiresAt } },
-      { upsert: true, new: true },
+    { upsert: true, returnDocument: "after" },
     );
   } catch (error) {
     if (error.code !== 11000) throw error;

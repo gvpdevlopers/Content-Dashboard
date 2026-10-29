@@ -169,7 +169,7 @@ const updateDraft = async (req, res) => {
         status: "active",
       },
       { $set: await validateDraftAccess(normalizeDraftInput(req.body), req.user) },
-      { new: true, runValidators: true },
+      { returnDocument: "after", runValidators: true },
     );
     if (!draft) {
       return res.status(404).json({

@@ -14,6 +14,7 @@ export default function AssignedPaymentPins() {
     window.addEventListener("focus", onFocus);
     return () => { clearInterval(interval); window.removeEventListener("focus", onFocus); };
   }, [reload]);
+  if (!orders.length && !error) return null;
   return <section className="mb-6 rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6" aria-label="Assigned payment PINs">
     <div className="flex items-center justify-between gap-3">
       <h2 className="flex items-center gap-2 text-lg font-medium text-zinc-900"><KeyRound size={18} className="text-zinc-500" />Your assigned payment PINs</h2>

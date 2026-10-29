@@ -67,6 +67,9 @@ const getLatestMyOrder = async () => {
 };
 
 const getOrderById = async (orderId) => {
+  if (!/^[a-f\d]{24}$/i.test(String(orderId || ""))) {
+    throw new Error("A valid order ID is required to open this order.");
+  }
   const response = await api.get(`/orders/${orderId}`);
 
   return response.data;

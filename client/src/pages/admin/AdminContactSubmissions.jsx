@@ -266,7 +266,7 @@ const AdminContactSubmissions = () => {
 
       <section
         aria-label="Submission totals"
-        className="mb-6 grid grid-cols-2 overflow-hidden rounded-2xl border border-zinc-200 bg-white sm:grid-cols-3 lg:grid-cols-5"
+        className="mb-6 grid grid-cols-2 overflow-hidden rounded-2xl border border-zinc-200 bg-white sm:grid-cols-3 lg:grid-cols-6"
       >
         <SummaryItem label="All enquiries" value={submissions.length} />
         {STATUS_OPTIONS.map((option) => (
@@ -548,7 +548,7 @@ const AdminContactSubmissions = () => {
 };
 
 const SummaryItem = ({ label, value }) => (
-  <div className="border-b border-r border-zinc-100 px-4 py-4 last:border-r-0 sm:px-5">
+  <div className="border-b border-r border-zinc-100 px-4 py-4 last:border-r-0 sm:px-5 lg:border-b-0">
     <p className="text-xs text-zinc-500">{label}</p>
     <p className="mt-1 text-2xl font-medium tracking-tight text-zinc-900">
       {value}

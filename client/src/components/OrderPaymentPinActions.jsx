@@ -6,7 +6,7 @@ import codService from "../services/codService";
 import { canUseOrderPaymentPin, canViewOrderPaymentPin } from "../utils/paymentPin";
 import { toast } from "sonner";
 
-function PaymentPinActionsContent({ order, user, onUpdated }) {
+function PaymentPinActionsContent({ order, user, onUpdated, className = "" }) {
   const [entering, setEntering] = useState(false);
   const [viewing, setViewing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -32,12 +32,12 @@ function PaymentPinActionsContent({ order, user, onUpdated }) {
     } finally { if (version === requestVersion.current) setLoading(false); }
   };
   if (!canEnter && !canView) return null;
-  return <div className="relative z-10 mt-2 flex flex-wrap gap-2">
+  return <div className={`relative z-10 flex flex-wrap items-center gap-2 ${className}`}>
     {canView && <button type="button" className="dashboard-action dashboard-action--secondary dashboard-action--compact" onClick={viewPin} title="View assigned payment PIN"><Eye size={14} />View PIN</button>}
     {canEnter && <button type="button" className="dashboard-action dashboard-action--secondary dashboard-action--compact" onClick={() => setEntering(true)} title="Enter and verify payment PIN"><KeyRound size={14} />Enter PIN</button>}
     {canEnter && entering && <PaymentPinDialog order={order} onClose={() => setEntering(false)} onVerified={(update) => {
       onUpdated?.(update); setEntering(false); setPin(""); setViewing(false);
-      toast.success("Payment marked as Paid.");
+      toast.success("Payment marked as Payment Done.");
     }} />}
     {viewing && <Modal titleId={`${id}-title`} onClose={closeView} className="max-w-sm">
       <div className="flex items-center justify-between gap-3"><h2 id={`${id}-title`} className="font-semibold">Payment PIN</h2><button type="button" className="dashboard-action dashboard-action--tertiary dashboard-action--icon" onClick={closeView} aria-label="Close PIN display"><X size={18} /></button></div>

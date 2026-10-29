@@ -76,6 +76,8 @@ const isPlainObject = (value) => {
   );
 };
 
+const isValidOrderId = (value) => mongoose.isValidObjectId(value);
+
 /* =========================================================
    FIELD VALIDATION
 ========================================================= */
@@ -2251,6 +2253,7 @@ const toOrderWithServiceProgress = (order) => {
       : { ...order };
 
   if (pinIsLocked(visibleOrder)) visibleOrder.codPinStatus = "locked";
+  if (visibleOrder._id) visibleOrder.id = String(visibleOrder._id);
 
   if (Array.isArray(visibleOrder.items)) {
     visibleOrder.items = visibleOrder.items.map((item) => {
@@ -2942,7 +2945,7 @@ const reserveCouponUsage = async ({
   const reservedCoupon = await Coupon.findOneAndUpdate(
     couponFilter,
     { $inc: { usageCount: 1 } },
-    { new: true, session },
+    { returnDocument: "after", session },
   );
 
   if (!reservedCoupon) {
@@ -2968,7 +2971,7 @@ const reserveCouponUsage = async ({
         $setOnInsert: { coupon: coupon._id, client: clientId },
       },
       {
-        new: true,
+        returnDocument: "after",
         upsert: true,
         session,
         setDefaultsOnInsert: false,
@@ -3610,6 +3613,13 @@ const getOrderById = async (
   res,
 ) => {
   try {
+    if (!isValidOrderId(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: "A valid order ID is required.",
+      });
+    }
+
     const order =
       await Order.findOne({
         _id: req.params.id,
@@ -3719,6 +3729,10 @@ const getAdminOrderById = async (
   res,
 ) => {
   try {
+    if (!isValidOrderId(req.params.id)) {
+      return res.status(400).json({ success: false, message: "A valid order ID is required." });
+    }
+
     const order =
       await Order.findById(
         req.params.id,
@@ -3787,6 +3801,10 @@ const getStaffOrders = async (req, res) => {
 
 const getStaffOrderById = async (req, res) => {
   try {
+    if (!isValidOrderId(req.params.id)) {
+      return res.status(400).json({ success: false, message: "A valid order ID is required." });
+    }
+
     const order = await Order.findById(req.params.id)
       .select("-codPin -notes")
       .populate("client", "name email username")

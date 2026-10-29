@@ -18,7 +18,7 @@ module.exports = async (req, res, next) => {
       const bucket = await RateBucket.findOneAndUpdate(
         { _id: `${kind}:${hash}:${windowId}` },
         { $inc: { count: 1 }, $set: { expiresAt: new Date((windowId + 1) * windowMs) } },
-        { upsert: true, new: true },
+        { upsert: true, returnDocument: "after" },
       );
       if (bucket.count > limit) {
         res.set("Retry-After", String(Math.ceil(((windowId + 1) * windowMs - Date.now()) / 1000)));

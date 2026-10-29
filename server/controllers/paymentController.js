@@ -39,7 +39,7 @@ const recordCapturedPayment = async (order, paymentId, capture = false) => {
     _id: order._id, paymentMethod: "online", razorpayOrderId: payment.order_id,
     adCreditReleased: { $ne: true },
     $or: [{ paymentStatus: { $ne: "paid" } }, { razorpayPaymentId: paymentId }],
-  }, { $set: { razorpayPaymentId: paymentId, paymentStatus: "paid" } }, { new: true });
+}, { $set: { razorpayPaymentId: paymentId, paymentStatus: "paid" } }, { returnDocument: "after" });
   if (!updated) throw fail("Order payment changed. Please refresh.", 409);
   return updated;
 };
@@ -77,7 +77,7 @@ const createRazorpayOrder = async (req, res) => {
     // Do not overwrite a payment that a webhook verified while the API call ran.
     const initialized = await Order.findOneAndUpdate({ _id: order._id, paymentStatus: { $ne: "paid" },
       orderStatus: { $ne: "cancelled" }, adCreditReleased: { $ne: true } },
-      { $set: { razorpayOrderId: providerOrder.id, paymentStatus: "processing" } }, { new: true });
+{ $set: { razorpayOrderId: providerOrder.id, paymentStatus: "processing" } }, { returnDocument: "after" });
     if (!initialized) {
       const latest = await Order.findOne({ _id: order._id, client: req.user._id });
       if (latest?.paymentStatus === "paid") {

@@ -56,6 +56,24 @@ const toDateInputValue = (value) => {
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 };
 
+const SERVICE_CATEGORY_TABS = [
+  { key: "content", label: "Content & Ads" },
+  { key: "seo", label: "SEO" },
+  { key: "development", label: "Development" },
+];
+
+const getServiceGroup = (service) => {
+  const group = String(service?.serviceGroup || "").trim().toLowerCase();
+  if (group === "content" || group === "seo" || group === "development") {
+    return group;
+  }
+
+  const category = String(service?.category || "").trim().toLowerCase();
+  if (category.includes("seo")) return "seo";
+  if (category.includes("develop")) return "development";
+  return "content";
+};
+
 const AdminCoupons = () => {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
@@ -71,6 +89,7 @@ const AdminCoupons = () => {
   const [usagesByCoupon, setUsagesByCoupon] = useState({});
   const [loadingUsageId, setLoadingUsageId] = useState("");
   const [form, setForm] = useState(emptyForm);
+  const [activeServiceCategory, setActiveServiceCategory] = useState("content");
 
   const readData = useCallback(async () => {
     const [couponResponse, serviceResponse] = await Promise.all([
@@ -95,6 +114,10 @@ const AdminCoupons = () => {
           Number(left.displayOrder || 0) - Number(right.displayOrder || 0),
       ),
     [services],
+  );
+  const visibleDiscountServices = useMemo(
+    () => sortedServices.filter((service) => getServiceGroup(service) === activeServiceCategory),
+    [sortedServices, activeServiceCategory],
   );
 
   const filteredCoupons = useMemo(() => coupons.filter((coupon) => {
@@ -414,8 +437,29 @@ const AdminCoupons = () => {
           <legend className="text-sm font-semibold text-zinc-800">
             Service discounts
           </legend>
-          <div className="mt-3 grid gap-2 md:grid-cols-2">
-            {sortedServices.map((service) => {
+          <div className="mt-3 flex flex-wrap gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-1.5" role="tablist" aria-label="Service discount categories">
+            {SERVICE_CATEGORY_TABS.map((category) => {
+              const selected = activeServiceCategory === category.key;
+              return (
+                <button
+                  key={category.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => setActiveServiceCategory(category.key)}
+                  className={`rounded-lg px-3.5 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-1 sm:px-4 ${
+                    selected
+                      ? "border border-zinc-200 bg-white text-zinc-900 shadow-sm"
+                      : "border border-transparent text-zinc-500 hover:bg-white/70 hover:text-zinc-800"
+                  }`}
+                >
+                  {category.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-2" role="tabpanel">
+            {visibleDiscountServices.map((service) => {
               const discount = form.serviceDiscounts.find(
                 (entry) => String(entry.serviceId) === String(service._id),
               );
@@ -454,6 +498,11 @@ const AdminCoupons = () => {
                 </label>
               );
             })}
+            {visibleDiscountServices.length === 0 && (
+              <p className="rounded-xl border border-dashed border-zinc-200 px-4 py-6 text-center text-sm text-zinc-500 md:col-span-2">
+                No services in this category.
+              </p>
+            )}
           </div>
         </fieldset>
 

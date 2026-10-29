@@ -185,7 +185,7 @@ const updateContactSubmissionStatus = async (req, res) => {
     const submission = await ContactSubmission.findByIdAndUpdate(
       req.params.id,
       { status },
-      { new: true, runValidators: true },
+      { returnDocument: "after", runValidators: true },
     );
 
     if (!submission) {
