@@ -3,6 +3,7 @@ import { Activity, CheckCircle2, Clock3, Settings2, XCircle } from "lucide-react
 const statuses = {
   pending: ["Pending", Clock3, "border-amber-200 bg-amber-50 text-amber-700"],
   pending_start: ["Pending Start", Clock3, "border-amber-200 bg-amber-50 text-amber-700"],
+  scheduled: ["Scheduled", Clock3, "border-violet-200 bg-violet-50 text-violet-700"],
   confirmed: ["Confirmed", CheckCircle2, "border-blue-200 bg-blue-50 text-blue-700"],
   processing: ["Processing", Settings2, "border-blue-200 bg-blue-50 text-blue-700"],
   in_progress: ["In Progress", Activity, "border-blue-200 bg-blue-50 text-blue-700"],

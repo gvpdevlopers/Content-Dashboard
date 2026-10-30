@@ -11,7 +11,8 @@ import {
   KeyRound,
   Layers3,
   MessageSquareText,
-  TicketPercent
+  TicketPercent,
+  PackageOpen
 } from "lucide-react";
 import { useAuth } from "../context/authSessionContext";
 import { toast } from "sonner";
@@ -219,6 +220,13 @@ const AdminLayout = () => {
               icon={TicketPercent}
               label="Coupons"
               to="/admin/coupons"
+              onClick={closeSidebar}
+            />}
+
+            {!isEmployee && <AdminSidebarItem
+              icon={PackageOpen}
+              label="Packages"
+              to="/admin/packages"
               onClick={closeSidebar}
             />}
 

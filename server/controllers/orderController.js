@@ -12,6 +12,9 @@ const Coupon = require("../models/Coupon");
 const CouponUsage = require("../models/CouponUsage");
 const CouponClientUsage = require("../models/CouponClientUsage");
 const OrderDraft = require("../models/OrderDraft");
+const Package = require("../models/Package");
+const { applyFixedPackagePrice } = require("../utils/packagePricing");
+const { mergePackageRequests } = require("../utils/packageConfiguration");
 const mongoose = require("mongoose");
 const generateOrderNumber = require("../utils/generateOrderNumber");
 const normalizeAdsService = require("../utils/normalizeAdsService");
@@ -2031,7 +2034,7 @@ const getServiceProgressDefinition = (item) => {
   const resolvedSlug =
     slug ||
     name
-      .replace(/[–—]/g, "-")
+      .replace(/[â€“â€”]/g, "-")
       .replace(/\s+/g, "-")
       .replace(/[^a-z0-9-]/g, "");
 
@@ -2169,6 +2172,63 @@ const getCalendarDayInKolkata = (date) => {
   );
 };
 
+const parseKolkataDateOnly = (value) => {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const utcDate = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(utcDate.getTime()) || utcDate.toISOString().slice(0, 10) !== value) {
+    return null;
+  }
+  const candidate = new Date(utcDate.getTime() - (5.5 * 60 * 60 * 1000));
+  return Number.isNaN(candidate.getTime())
+    ? null
+    : candidate;
+};
+
+const activateDueScheduledProgress = (order, now = new Date()) => {
+  let changed = false;
+  const items = Array.isArray(order?.items) ? order.items : [];
+  const progressItems = items.length ? items : [order];
+
+  for (const item of progressItems) {
+    const progress = getOrderItemServiceProgress(item);
+    if (!progress || progress.type !== "time_based" || progress.status === "completed" ||
+        !progress.scheduledStartAt || progress.startAt || new Date(progress.scheduledStartAt) > now) {
+      continue;
+    }
+
+    progress.startAt = new Date(progress.scheduledStartAt);
+    progress.scheduledStartAt = null;
+    progress.status = "in_progress";
+    if (item === order) order.serviceProgress = progress;
+    else item.serviceProgress = progress;
+    changed = true;
+  }
+
+  return changed;
+};
+
+const activateDueScheduledServices = async () => {
+  const now = new Date();
+  const orders = await Order.find({
+    $or: [
+      { "serviceProgress.scheduledStartAt": { $ne: null, $lte: now } },
+      { "items.serviceProgress.scheduledStartAt": { $ne: null, $lte: now } },
+    ],
+  });
+  let activated = 0;
+  for (const order of orders) {
+    if (activateDueScheduledProgress(order, now)) {
+      await order.save();
+      activated += 1;
+    }
+  }
+  return activated;
+};
+
 const toServiceProgressView = (progress, now = new Date()) => {
   if (!progress) {
     return undefined;
@@ -2183,6 +2243,17 @@ const toServiceProgressView = (progress, now = new Date()) => {
         dayNumber: progress.durationDays,
         remainingDays: 0,
         progressPercent: 100,
+      };
+    }
+
+    if (!progress.startAt && progress.scheduledStartAt && new Date(progress.scheduledStartAt) > now) {
+      return {
+        ...progress,
+        displayStatus: "scheduled",
+        elapsedDays: 0,
+        dayNumber: 0,
+        remainingDays: progress.durationDays,
+        progressPercent: 0,
       };
     }
 
@@ -2642,7 +2713,7 @@ const calculateCouponQuote = ({
 
   if (originalSubtotal < Number(coupon.minimumOrderAmount || 0)) {
     throw couponRequestError(
-      `This coupon requires a minimum order amount of ₹${Number(
+      `This coupon requires a minimum order amount of â‚¹${Number(
         coupon.minimumOrderAmount,
       ).toLocaleString("en-IN")}.`,
     );
@@ -2747,6 +2818,29 @@ const buildProcessedServiceResults = async (serviceRequests, user) => {
   return results;
 };
 
+const resolvePackageQuoteRequests = async (packageId, requests, user) => {
+  if (!packageId) return requests;
+  if (!mongoose.Types.ObjectId.isValid(packageId)) throw new Error("Package reference is invalid.");
+  const item = await Package.findById(packageId);
+  if (!item || !item.isActive) throw new Error("This package is no longer available.");
+  if (item.visibility === "selected" && !item.clients.some((client) => String(client) === String(user._id))) throw new Error("You are not eligible for this package.");
+  return mergePackageRequests(item, requests);
+};
+
+const applyPackageQuote = async (packageId, serviceResults, user) => {
+  if (!packageId) return null;
+  if (!mongoose.Types.ObjectId.isValid(packageId)) throw new Error("Package reference is invalid.");
+  const packageItem = await Package.findById(packageId);
+  if (!packageItem || !packageItem.isActive) throw new Error("This package is no longer available.");
+  if (packageItem.visibility === "selected" && !packageItem.clients.some((client) => String(client) === String(user._id))) throw new Error("You are not eligible for this package.");
+  if (packageItem.pricingMode === "fixed") {
+    const price = Number(packageItem.price);
+    if (!Number.isFinite(price) || price < 0) throw new Error("This package has invalid pricing.");
+    applyFixedPackagePrice(serviceResults, price);
+  }
+  return packageItem;
+};
+
 const getCouponQuote = async (req, res) => {
   try {
     if (!req.user?._id || req.user.role !== "client") {
@@ -2757,7 +2851,7 @@ const getCouponQuote = async (req, res) => {
     }
 
     if (rejectIneligibleMonthEnd(req, res)) return;
-    const { services, code, paymentMethod, chequeType } = req.body || {};
+    const { services, code, paymentMethod, chequeType, packageId } = req.body || {};
     if (!["cod", "online", "cheque", "month_end"].includes(paymentMethod)) {
       return res.status(400).json({
         success: false,
@@ -2773,7 +2867,8 @@ const getCouponQuote = async (req, res) => {
         message: "Select a valid cheque payment type.",
       });
     }
-    const serviceResults = await buildProcessedServiceResults(services, req.user);
+    const serviceResults = await buildProcessedServiceResults(await resolvePackageQuoteRequests(packageId, services, req.user), req.user);
+    await applyPackageQuote(packageId, serviceResults, req.user);
     const normalizedCode = normalizeCouponCode(code);
     const coupon = await Coupon.findOne({ code: normalizedCode });
 
@@ -2814,7 +2909,7 @@ const getOrderQuote = async (req, res) => {
     }
 
     if (rejectIneligibleMonthEnd(req, res)) return;
-    const { services, couponCode, paymentMethod, chequeType } = req.body || {};
+    const { services, couponCode, paymentMethod, chequeType, packageId } = req.body || {};
     if (!["cod", "online", "cheque", "month_end"].includes(paymentMethod)) {
       return res.status(400).json({
         success: false,
@@ -2831,7 +2926,8 @@ const getOrderQuote = async (req, res) => {
       });
     }
 
-    const serviceResults = await buildProcessedServiceResults(services, req.user);
+    const serviceResults = await buildProcessedServiceResults(await resolvePackageQuoteRequests(packageId, services, req.user), req.user);
+    await applyPackageQuote(packageId, serviceResults, req.user);
     const originalSubtotal = roundCurrency(
       serviceResults.reduce((sum, result) => sum + result.amount, 0),
     );
@@ -3046,6 +3142,7 @@ const createOrder = async (
       couponCode,
       draftId,
       confirmedAmount,
+      packageId,
     } = req.body;
 
     if (rejectIneligibleMonthEnd(req, res)) return;
@@ -3114,10 +3211,30 @@ const createOrder = async (
     */
 
     let serviceRequests = [];
+    let selectedPackage = null;
 
-    if (Array.isArray(services)) {
+    if (packageId !== undefined) {
+      if (!mongoose.Types.ObjectId.isValid(packageId)) {
+        return res.status(400).json({ success: false, message: "Package reference is invalid." });
+      }
+      selectedPackage = await Package.findById(packageId);
+      if (!selectedPackage || !selectedPackage.isActive) {
+        return res.status(409).json({ success: false, message: "This package is no longer available. Refresh the package catalogue." });
+      }
+      if (selectedPackage.visibility === "selected" && !selectedPackage.clients.some((client) => String(client) === String(req.user._id))) {
+        return res.status(403).json({ success: false, message: "You are not eligible for this package." });
+      }
+      const packageServices = await Service.find({ _id: { $in: selectedPackage.services.map((entry) => entry.service) }, isActive: true });
+      const packageServiceMap = new Map(packageServices.map((service) => [String(service._id), service]));
+      if (packageServiceMap.size !== selectedPackage.services.length || selectedPackage.services.some((entry) => !canClientOrderService(req.user, packageServiceMap.get(String(entry.service))))) {
+        return res.status(403).json({ success: false, message: "This package contains a service you cannot order." });
+      }
+      serviceRequests = mergePackageRequests(selectedPackage, services);
+    }
+
+    if (!selectedPackage && Array.isArray(services)) {
       serviceRequests = services;
-    } else if (serviceId) {
+    } else if (!selectedPackage && serviceId) {
       /*
       |--------------------------------------------------------------------------
       | Legacy single-service compatibility
@@ -3220,6 +3337,14 @@ const createOrder = async (
       items.push(result.item);
 
       serviceResults.push(result);
+    }
+
+    if (selectedPackage && selectedPackage.pricingMode === "fixed") {
+      const packagePrice = Number(selectedPackage.price);
+      if (!Number.isFinite(packagePrice) || packagePrice < 0) {
+        return res.status(409).json({ success: false, message: "This package has invalid pricing. Ask an administrator to review it." });
+      }
+      applyFixedPackagePrice(serviceResults, packagePrice);
     }
 
     /*
@@ -3352,6 +3477,21 @@ const createOrder = async (
         firstItem.formData,
 
       items,
+
+      ...(selectedPackage ? { packageSnapshot: {
+        packageId: selectedPackage._id,
+        slug: selectedPackage.slug,
+        name: selectedPackage.name,
+        pricingMode: selectedPackage.pricingMode,
+        packagePrice: selectedPackage.price,
+        services: selectedPackage.services.map((entry) => ({
+          serviceId: entry.service,
+          quantity: entry.quantity,
+          pricingOptionId: entry.pricingOptionId,
+          formData: entry.formData,
+          serviceSnapshot: entry.serviceSnapshot,
+        })),
+      } } : {}),
 
       additionalRequirements:
         typeof additionalRequirements ===
@@ -3555,6 +3695,10 @@ const getMyOrders = async (
           createdAt: -1,
         });
 
+    for (const order of orders) {
+      if (activateDueScheduledProgress(order)) await order.save();
+    }
+
     return res.status(200).json({
       success: true,
       orders: orders.map(toClientVisibleOrder),
@@ -3589,6 +3733,8 @@ const getLatestMyOrder = async (req, res) => {
       .populate("service", "name category")
       .populate("items.service", "name category")
       .sort({ createdAt: -1 });
+
+    if (order && activateDueScheduledProgress(order)) await order.save();
 
     return res.status(200).json({
       success: true,
@@ -3642,6 +3788,8 @@ const getOrderById = async (
           "Order not found.",
       });
     }
+
+    if (activateDueScheduledProgress(order)) await order.save();
 
     return res.status(200).json({
       success: true,
@@ -3702,6 +3850,10 @@ const getAdminOrders = async (
           createdAt: -1,
         });
 
+    for (const order of orders) {
+      if (activateDueScheduledProgress(order)) await order.save();
+    }
+
     return res.status(200).json({
       success: true,
       orders: orders.map(toOrderWithServiceProgress),
@@ -3759,6 +3911,8 @@ const getAdminOrderById = async (
       });
     }
 
+    if (activateDueScheduledProgress(order)) await order.save();
+
     return res.status(200).json({
       success: true,
       order: toOrderWithServiceProgress(order),
@@ -3785,6 +3939,10 @@ const getStaffOrders = async (req, res) => {
       .populate("service", "name category")
       .populate("items.service", "name category")
       .sort({ createdAt: -1 });
+
+    for (const order of orders) {
+      if (activateDueScheduledProgress(order)) await order.save();
+    }
 
     return res.status(200).json({
       success: true,
@@ -3818,6 +3976,8 @@ const getStaffOrderById = async (req, res) => {
       });
     }
 
+    if (activateDueScheduledProgress(order)) await order.save();
+
     return res.status(200).json({
       success: true,
       order: toOrderWithServiceProgress(order),
@@ -3834,7 +3994,7 @@ const getStaffOrderById = async (req, res) => {
 const updateServiceProgress = async (req, res) => {
   try {
     const { itemId } = req.params;
-    const { action, deliverableKey, status } = req.body;
+    const { action, deliverableKey, status, startDate } = req.body;
     const order = await Order.findById(req.params.id);
 
     if (!order) {
@@ -3872,6 +4032,8 @@ const updateServiceProgress = async (req, res) => {
       });
     }
 
+    activateDueScheduledProgress(order);
+
     if (progress.type === "time_based") {
       if (
         action === "start" &&
@@ -3879,7 +4041,27 @@ const updateServiceProgress = async (req, res) => {
         !progress.startAt
       ) {
         progress.startAt = new Date();
+        progress.scheduledStartAt = null;
         progress.status = "in_progress";
+      } else if (action === "set_start_date") {
+        if (progress.status === "completed") {
+          return res.status(400).json({ success: false, message: "Completed services cannot be rescheduled." });
+        }
+        const selectedDate = parseKolkataDateOnly(startDate);
+        if (!selectedDate) {
+          return res.status(400).json({ success: false, message: "Select a valid start date." });
+        }
+        const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+        const selectedKey = startDate;
+        if (selectedKey > todayKey) {
+          progress.scheduledStartAt = selectedDate;
+          progress.startAt = null;
+          progress.status = "pending_start";
+        } else {
+          progress.startAt = selectedKey === todayKey ? new Date() : selectedDate;
+          progress.scheduledStartAt = null;
+          progress.status = "in_progress";
+        }
       } else if (
         action === "complete" &&
         progress.status !== "completed" &&
@@ -4479,6 +4661,7 @@ const getAdminCodOrders =
 ========================================================= */
 
 module.exports = {
+  validateFieldValue, resolvePricingSelections, getApplicableFields, resolveGroupedPricingQuantities, validateQuantityRules, validateRepeatableGroups, calculateFieldOptionsAmount, calculateRepeatableGroupsAmount, calculateOrderAmount,
   updateServiceDelivery,
   getPaymentPricing,
   getCouponQuote,
@@ -4500,4 +4683,5 @@ module.exports = {
   updateInvoice,
   updateAdminNotes,
   getAdminCodOrders,
+  activateDueScheduledServices,
 };

@@ -1,5 +1,7 @@
 import CustomSelect from "./CustomSelect";
 import OrderStatusBadge from "./OrderStatusBadge";
+import ServiceStartDateDialog from "./ServiceStartDateDialog";
+import { useState } from "react";
 
 const formatKolkataDate = (value) => {
   if (!value) {
@@ -21,6 +23,7 @@ const ServiceProgress = ({
   compact = false,
   inactive = false,
 }) => {
+  const [startDateOpen, setStartDateOpen] = useState(false);
   const progress = item?.serviceProgress;
 
   if (!progress) {
@@ -77,34 +80,30 @@ const ServiceProgress = ({
             {progress.startAt && (
               <span>Started {formatKolkataDate(progress.startAt)} IST</span>
             )}
+            {progress.scheduledStartAt && !progress.startAt && (
+              <span>Scheduled {formatKolkataDate(progress.scheduledStartAt)} IST</span>
+            )}
           </div>
           {canManage && (
             <div className="mt-4 flex justify-end">
               {status === "pending_start" ? (
                 <button
                   type="button"
-                  onClick={() => onUpdate(item._id, { action: "start" })}
-                  disabled={updatingKey === `${item._id}:start`}
+                  onClick={() => setStartDateOpen(true)}
+                  disabled={updatingKey === `${item._id}:set_start_date`}
                   className="dashboard-action dashboard-action--primary rounded-lg bg-zinc-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-wait disabled:opacity-60"
                 >
-                  {updatingKey === `${item._id}:start`
-                    ? "Starting..."
-                    : "Start Service"}
+                  {updatingKey === `${item._id}:set_start_date` ? "Saving..." : "Start Service"}
                 </button>
               ) : status !== "completed" ? (
-                <button
-                  type="button"
-                  onClick={() => onUpdate(item._id, { action: "complete" })}
-                  disabled={updatingKey === `${item._id}:complete`}
-                  className="dashboard-action dashboard-action--secondary rounded-lg border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-wait disabled:opacity-60"
-                >
-                  {updatingKey === `${item._id}:complete`
-                    ? "Updating..."
-                    : "Mark Completed"}
-                </button>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <button type="button" onClick={() => setStartDateOpen(true)} disabled={updatingKey === `${item._id}:set_start_date`} className="dashboard-action dashboard-action--secondary rounded-lg border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-wait disabled:opacity-60">Change Start Date</button>
+                  {status !== "scheduled" && <button type="button" onClick={() => onUpdate(item._id, { action: "complete" })} disabled={updatingKey === `${item._id}:complete`} className="dashboard-action dashboard-action--secondary rounded-lg border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-wait disabled:opacity-60">{updatingKey === `${item._id}:complete` ? "Updating..." : "Mark Completed"}</button>}
+                </div>
               ) : null}
             </div>
           )}
+          {startDateOpen && <ServiceStartDateDialog progress={progress} busy={updatingKey === `${item._id}:set_start_date`} onClose={() => setStartDateOpen(false)} onSubmit={(startDate) => { onUpdate(item._id, { action: "set_start_date", startDate }); setStartDateOpen(false); }} />}
         </>
       ) : (
         <>

@@ -1,0 +1,197 @@
+{
+  "environment": "user-confirmed development Atlas database",
+  "database": "test",
+  "verifiedAt": "2026-10-30T07:01:13.813Z",
+  "scope": "QA package records and read-only checkout quotes; no service, user, order, coupon or payment writes",
+  "packages": [
+    {
+      "id": "6ae440ba01aa33a95539c35d",
+      "name": "[QA Test] Content - 30 Oct 2026",
+      "slug": "qa-package-flow-20261030-content",
+      "price": 32000,
+      "visibility": "all",
+      "selectedClientCount": 0,
+      "services": [
+        {
+          "name": "Social Media Profile Management",
+          "group": "content",
+          "quantity": 2,
+          "formData": {
+            "platform": "instagram_facebook"
+          }
+        },
+        {
+          "name": "Social Media Grid Posts",
+          "group": "content",
+          "quantity": 2,
+          "formData": {
+            "platform": "instagram"
+          }
+        }
+      ],
+      "checks": {
+        "eligibleClientVisibility": true,
+        "checkoutQuote": true,
+        "editPreservation": true
+      },
+      "quote": {
+        "gstRate": 18,
+        "gstAmount": 5760,
+        "amount": 37760,
+        "subtotal": 32000
+      },
+      "isActive": true
+    },
+    {
+      "id": "6ae440ba01aa33a95539c35e",
+      "name": "[QA Test] SEO - 30 Oct 2026",
+      "slug": "qa-package-flow-20261030-seo",
+      "price": 18900,
+      "visibility": "all",
+      "selectedClientCount": 0,
+      "services": [
+        {
+          "name": "Complete SEO Package",
+          "group": "seo",
+          "quantity": 1,
+          "formData": {}
+        },
+        {
+          "name": "Keyword Research",
+          "group": "seo",
+          "quantity": 1,
+          "formData": {}
+        }
+      ],
+      "checks": {
+        "eligibleClientVisibility": true,
+        "checkoutQuote": true,
+        "editPreservation": true
+      },
+      "quote": {
+        "gstRate": 18,
+        "gstAmount": 3402,
+        "amount": 22302,
+        "subtotal": 18900
+      },
+      "isActive": true
+    },
+    {
+      "id": "6ae440bb01aa33a95539c35f",
+      "name": "[QA Test] Development - 30 Oct 2026",
+      "slug": "qa-package-flow-20261030-development",
+      "price": 28000,
+      "visibility": "all",
+      "selectedClientCount": 0,
+      "services": [
+        {
+          "name": "Hourly Development Package",
+          "group": "development",
+          "quantity": 2,
+          "formData": {}
+        },
+        {
+          "name": "WordPress Website",
+          "group": "development",
+          "quantity": 1,
+          "formData": {}
+        }
+      ],
+      "checks": {
+        "eligibleClientVisibility": true,
+        "checkoutQuote": true,
+        "editPreservation": true
+      },
+      "quote": {
+        "gstRate": 18,
+        "gstAmount": 5040,
+        "amount": 33040,
+        "subtotal": 28000
+      },
+      "isActive": true
+    },
+    {
+      "id": "6ae440bb01aa33a95539c360",
+      "name": "[QA Test] Mixed - 30 Oct 2026",
+      "slug": "qa-package-flow-20261030-mixed",
+      "price": 38000,
+      "visibility": "all",
+      "selectedClientCount": 0,
+      "services": [
+        {
+          "name": "Social Media Profile Management",
+          "group": "content",
+          "quantity": 2,
+          "formData": {
+            "platform": "instagram_facebook"
+          }
+        },
+        {
+          "name": "Complete SEO Package",
+          "group": "seo",
+          "quantity": 1,
+          "formData": {}
+        },
+        {
+          "name": "Hourly Development Package",
+          "group": "development",
+          "quantity": 2,
+          "formData": {}
+        }
+      ],
+      "checks": {
+        "eligibleClientVisibility": true,
+        "checkoutQuote": true,
+        "editPreservation": true
+      },
+      "quote": {
+        "gstRate": 18,
+        "gstAmount": 6840,
+        "amount": 44840,
+        "subtotal": 38000
+      },
+      "isActive": true
+    },
+    {
+      "id": "6ae440bb01aa33a95539c361",
+      "name": "[QA Test] Selected Clients - 30 Oct 2026",
+      "slug": "qa-package-flow-20261030-selected-clients",
+      "price": 32000,
+      "visibility": "selected",
+      "selectedClientCount": 1,
+      "services": [
+        {
+          "name": "Social Media Profile Management",
+          "group": "content",
+          "quantity": 2,
+          "formData": {
+            "platform": "instagram_facebook"
+          }
+        },
+        {
+          "name": "Social Media Grid Posts",
+          "group": "content",
+          "quantity": 2,
+          "formData": {
+            "platform": "instagram"
+          }
+        }
+      ],
+      "checks": {
+        "eligibleClientVisibility": true,
+        "unassignedClientExcluded": true,
+        "checkoutQuote": true,
+        "editPreservation": true,
+        "deactivationBlocksCheckout": true
+      },
+      "quote": {
+        "gstRate": 18,
+        "gstAmount": 5760,
+        "amount": 37760,
+        "subtotal": 32000
+      },
+      "isActive": true
+    }
+  ],
+  "adminListingVerified": true
+}

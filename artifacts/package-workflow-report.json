@@ -1,0 +1,141 @@
+{
+  "environment": "isolated local replica set; existing Atlas records read-only",
+  "packages": [
+    {
+      "id": "6ae439390e50d45de2ce36b9",
+      "name": "QA Existing Content",
+      "visibility": "all",
+      "pricingMode": "calculated",
+      "price": 32000,
+      "services": [
+        {
+          "name": "Social Media Profile Management",
+          "group": "content",
+          "quantity": 2,
+          "formData": {
+            "platform": "instagram_facebook"
+          }
+        },
+        {
+          "name": "Social Media Grid Posts",
+          "group": "content",
+          "quantity": 2,
+          "formData": {
+            "platform": "instagram"
+          }
+        }
+      ],
+      "checkoutAmount": 32000,
+      "orderCreated": true,
+      "editingPreserved": true
+    },
+    {
+      "id": "6ae439390e50d45de2ce36bf",
+      "name": "QA Existing SEO",
+      "visibility": "all",
+      "pricingMode": "calculated",
+      "price": 18900,
+      "services": [
+        {
+          "name": "Complete SEO Package",
+          "group": "seo",
+          "quantity": 1,
+          "formData": {}
+        },
+        {
+          "name": "Keyword Research",
+          "group": "seo",
+          "quantity": 1,
+          "formData": {}
+        }
+      ],
+      "checkoutAmount": 18900,
+      "orderCreated": true,
+      "editingPreserved": true
+    },
+    {
+      "id": "6ae439390e50d45de2ce36c5",
+      "name": "QA Existing Development",
+      "visibility": "all",
+      "pricingMode": "calculated",
+      "price": 28000,
+      "services": [
+        {
+          "name": "Hourly Development Package",
+          "group": "development",
+          "quantity": 2,
+          "formData": {}
+        },
+        {
+          "name": "WordPress Website",
+          "group": "development",
+          "quantity": 1,
+          "formData": {}
+        }
+      ],
+      "checkoutAmount": 28000,
+      "orderCreated": true,
+      "editingPreserved": true
+    },
+    {
+      "id": "6ae439390e50d45de2ce36cb",
+      "name": "QA Existing Mixed",
+      "visibility": "all",
+      "pricingMode": "calculated",
+      "price": 38000,
+      "services": [
+        {
+          "name": "Social Media Profile Management",
+          "group": "content",
+          "quantity": 2,
+          "formData": {
+            "platform": "instagram_facebook"
+          }
+        },
+        {
+          "name": "Complete SEO Package",
+          "group": "seo",
+          "quantity": 1,
+          "formData": {}
+        },
+        {
+          "name": "Hourly Development Package",
+          "group": "development",
+          "quantity": 2,
+          "formData": {}
+        }
+      ],
+      "checkoutAmount": 38000,
+      "orderCreated": true,
+      "editingPreserved": true
+    },
+    {
+      "id": "6ae439390e50d45de2ce36d3",
+      "name": "QA Existing Selected Clients",
+      "visibility": "selected",
+      "pricingMode": "calculated",
+      "price": 32000,
+      "services": [
+        {
+          "name": "Social Media Profile Management",
+          "group": "content",
+          "quantity": 2,
+          "formData": {
+            "platform": "instagram_facebook"
+          }
+        },
+        {
+          "name": "Social Media Grid Posts",
+          "group": "content",
+          "quantity": 2,
+          "formData": {
+            "platform": "instagram"
+          }
+        }
+      ],
+      "checkoutAmount": 32000,
+      "orderCreated": true,
+      "editingPreserved": true
+    }
+  ]
+}

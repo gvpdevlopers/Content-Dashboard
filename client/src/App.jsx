@@ -35,6 +35,7 @@ import AdminCreateService from "./pages/admin/AdminCreateService";
 import AdminEditService from "./pages/admin/AdminEditService";
 import AdminContactSubmissions from "./pages/admin/AdminContactSubmissions";
 import AdminCoupons from "./pages/admin/AdminCoupons";
+import AdminPackages from "./pages/admin/AdminPackages";
 import NetworkStatus from "./components/NetworkStatus";
 import OnlineOnlyRoute from "./components/OnlineOnlyRoute";
 
@@ -117,6 +118,7 @@ const App = () => {
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/services" element={<AdminServices />} />
             <Route path="/admin/coupons" element={<AdminCoupons />} />
+            <Route path="/admin/packages" element={<AdminPackages />} />
             <Route path="/admin/services/new" element={<AdminCreateService />} />
             <Route
               path="/admin/services/:id/edit"

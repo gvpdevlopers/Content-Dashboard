@@ -39,6 +39,12 @@ const orderDraftSchema = new mongoose.Schema(
       maxlength: 40,
     },
 
+    packageId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Package",
+      default: null,
+    },
+
     status: {
       type: String,
       enum: ["active", "submitted"],

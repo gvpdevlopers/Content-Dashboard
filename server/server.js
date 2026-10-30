@@ -12,7 +12,9 @@ const adminUserRoutes = require("./routes/adminUserRoutes");
 const contactSubmissionRoutes = require("./routes/contactSubmissionRoutes");
 const couponRoutes = require("./routes/couponRoutes");
 const draftRoutes = require("./routes/draftRoutes");
+const packageRoutes = require("./routes/packageRoutes");
 const { getClientOrigins } = require("./utils/authSession");
+const { activateDueScheduledServices } = require("./controllers/orderController");
 
 const connectDB = require("./config/db");
 
@@ -54,9 +56,15 @@ app.use("/api/users", adminUserRoutes);
 app.use("/api/contact-submissions", contactSubmissionRoutes);
 app.use("/api/coupons", couponRoutes);
 app.use("/api/drafts", draftRoutes);
+app.use("/api/packages", packageRoutes);
 
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  const activateScheduled = () => activateDueScheduledServices().catch((error) => {
+    console.error("Scheduled service activation failed:", error.message);
+  });
+  activateScheduled();
+  setInterval(activateScheduled, 60 * 1000).unref();
 });

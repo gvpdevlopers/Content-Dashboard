@@ -611,6 +611,11 @@ const serviceProgressSchema = new mongoose.Schema(
       default: null,
     },
 
+    scheduledStartAt: {
+      type: Date,
+      default: null,
+    },
+
     durationDays: {
       type: Number,
       default: null,
@@ -970,6 +975,11 @@ const orderSchema = new mongoose.Schema(
 
     couponSnapshot: {
       type: couponSnapshotSchema,
+      default: undefined,
+    },
+
+    packageSnapshot: {
+      type: mongoose.Schema.Types.Mixed,
       default: undefined,
     },
 

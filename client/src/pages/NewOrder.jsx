@@ -2,6 +2,8 @@ import { cleanInactiveOrderFields } from "../utils/orderItemState";
 import { formatDraftDate, getDraftLabel } from "../utils/draftLabels";
 import {
   ArrowRight,
+  Boxes,
+  FilePlus2,
   Banknote,
   CalendarDays,
   Check,
@@ -25,6 +27,7 @@ import adCreditService from "../services/adCreditService";
 import orderService from "../services/orderService";
 import draftService from "../services/draftService";
 import serviceService from "../services/serviceService";
+import packageService from "../services/packageService";
 import paymentService from "../services/paymentService";
 import CustomSelect from "../components/CustomSelect";
 import OrderActionSection from "../components/OrderActionSection";
@@ -2290,6 +2293,10 @@ const NewOrder = () => {
     useState("");
 
   const [loadingServiceId, setLoadingServiceId] = useState("");
+  const [orderEntryMode, setOrderEntryMode] = useState("");
+  const [availablePackages, setAvailablePackages] = useState([]);
+  const [selectedPackageId, setSelectedPackageId] = useState("");
+  const [loadingPackages, setLoadingPackages] = useState(false);
 
   const [error, setError] = useState("");
   const [validationServiceId, setValidationServiceId] = useState("");
@@ -2307,6 +2314,39 @@ const NewOrder = () => {
 
   const [openServiceIds, setOpenServiceIds] = useState({});
   const draftOperationRef = useRef(false);
+
+  useEffect(() => {
+    if (orderEntryMode !== "packages") return;
+    let active = true;
+    setLoadingPackages(true); // eslint-disable-line react-hooks/set-state-in-effect
+    packageService.list()
+      .then((data) => { if (active) setAvailablePackages(data.packages || []); })
+      .catch((failure) => { if (active) setError(failure.response?.data?.message || "Unable to load packages."); })
+      .finally(() => { if (active) setLoadingPackages(false); });
+    return () => { active = false; };
+  }, [orderEntryMode]);
+
+  const handleChoosePackage = async (item) => {
+    try {
+      setDraftBusy(true); setError("");
+      const loaded = await Promise.all(item.services.map(async (entry) => {
+        const response = await serviceService.getServiceById(entry.serviceId);
+        const service = response?.service;
+        if (!service) throw new Error("A package service is no longer available.");
+        const next = createOrderItem(service);
+        const formData = { ...(next.formData || {}), ...(entry.formData || {}), quantity: entry.quantity };
+        const selectedPricingOptions = {};
+        const pricingQuantities = {};
+        for (const group of getPricingGroups(service)) {
+          const option = group.options.find((candidate) => String(candidate._id) === String(formData[group.name]));
+          if (option) { selectedPricingOptions[group.key] = option; pricingQuantities[group.key] = formData.pricingQuantities?.[group.name] ?? option.minQuantity ?? 1; }
+        }
+        return { ...next, formData, selectedPricingOptions, pricingQuantities, selectedPricingOption: entry.pricingOptionId ? (service.pricingOptions || []).find((option) => String(option._id) === String(entry.pricingOptionId)) || null : next.selectedPricingOption };
+      }));
+      setOrderItems(loaded); setSelectedPackageId(item._id); setOrderEntryMode("custom"); setActiveServiceIndex(0); setOpenServiceIds(Object.fromEntries(loaded.map((entry) => [String(entry.service._id), true])));
+    } catch (failure) { setError(failure.response?.data?.message || failure.message || "Unable to load this package."); }
+    finally { setDraftBusy(false); }
+  };
 
   /*
   |--------------------------------------------------------------------------
@@ -2452,6 +2492,7 @@ const NewOrder = () => {
         const response = await orderService.validateCoupon({
           code: appliedCouponCode,
           services: buildServicesPayload(orderItems),
+          ...(selectedPackageId ? { packageId: selectedPackageId } : {}),
           paymentMethod,
           ...(paymentMethod === "cheque" ? { chequeType } : {}),
         });
@@ -2477,7 +2518,7 @@ const NewOrder = () => {
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [appliedCouponCode, orderItems, paymentMethod, chequeType]);
+  }, [appliedCouponCode, orderItems, paymentMethod, chequeType, selectedPackageId]);
 
   useEffect(() => {
     let mounted = true;
@@ -2643,6 +2684,8 @@ const NewOrder = () => {
       const restored = restoreOrderItems(previousOrder, currentServices);
 
       setEditingDraftId("");
+      setSelectedPackageId(previousOrder.packageSnapshot?.packageId ? String(previousOrder.packageSnapshot.packageId) : "");
+      setOrderEntryMode("custom");
       setDraftQuote(null);
       setDraftQuoteError("");
       setCouponInput("");
@@ -2725,6 +2768,8 @@ const NewOrder = () => {
     setPaymentMethod("cod");
     setChequeType("");
     setEditingDraftId(String(draft._id));
+    setSelectedPackageId(draft.packageId ? String(draft.packageId) : "");
+    setOrderEntryMode("custom");
     setDraftQuote(null);
     setDraftQuoteError("");
     setRepeatOrderIssues(restored.issues);
@@ -2818,6 +2863,7 @@ const NewOrder = () => {
       const payload = {
         title: `Draft ${new Date().toLocaleDateString("en-IN")}`,
         services: buildServicesPayload(orderItems),
+        ...(selectedPackageId ? { packageId: selectedPackageId } : {}),
         additionalRequirements: additionalRequirements.trim(),
         couponCode: appliedCouponCode,
       };
@@ -4016,6 +4062,7 @@ const NewOrder = () => {
         setDraftQuoteError("");
         const quoteResponse = await orderService.getOrderQuote({
           services: buildServicesPayload(orderItems),
+          ...(selectedPackageId ? { packageId: selectedPackageId } : {}),
           adCredit: appliedAdCredit,
           paymentMethod,
           ...(paymentMethod === "cheque" ? { chequeType } : {}),
@@ -4047,6 +4094,7 @@ const NewOrder = () => {
 
       const orderResponse = await orderService.createOrder({
         services: servicesPayload,
+        ...(selectedPackageId ? { packageId: selectedPackageId } : {}),
         ...(adCreditTotal > 0 ? { adCredit: appliedAdCredit } : {}),
         additionalRequirements: additionalRequirements.trim(),
         paymentMethod,
@@ -4344,6 +4392,14 @@ const NewOrder = () => {
     );
   }
 
+  if (!orderEntryMode && !orderItems.length && !editingDraftId && !repeatOrderIssues.length && !savedDrafts.length && !loadingDrafts && !loadingPreviousOrders) {
+    return <PackageEntryChoice onCustom={() => setOrderEntryMode("custom")} onPackages={() => setOrderEntryMode("packages")} />;
+  }
+
+  if (orderEntryMode === "packages" && !orderItems.length) {
+    return <PackageCatalogue packages={availablePackages} loading={loadingPackages} error={error} onBack={() => { setError(""); setOrderEntryMode(""); }} onChoose={handleChoosePackage} onCustom={() => setOrderEntryMode("custom")} />;
+  }
+
   /*
   |--------------------------------------------------------------------------
   | Render
@@ -4354,6 +4410,10 @@ const NewOrder = () => {
     <div
       className={`mx-auto w-full max-w-[1180px] px-2 py-6 sm:px-5 sm:py-10 ${orderItems.length ? "new-order-has-shortcut" : ""}`}
     >
+      {selectedPackageId && <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div><p className="text-sm font-semibold text-slate-800">{availablePackages.find((item) => String(item._id) === selectedPackageId)?.name || "Package order"}</p><p className="mt-1 text-xs leading-5 text-slate-600">Complete the remaining service details below. Package quantities and saved defaults apply at checkout. Switch to a custom order to change the bundle.</p></div>
+        <button type="button" disabled={submitting || draftBusy} className="dashboard-action dashboard-action--secondary" onClick={() => { setSelectedPackageId(""); setAppliedCouponCode(""); }}>Switch to custom order</button>
+      </div>}
       <form onSubmit={handleSubmit}>
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           {/* ================================================================
@@ -6552,3 +6612,35 @@ const NewOrder = () => {
 };
 
 export default NewOrder;
+
+const PackageEntryChoice = ({ onCustom, onPackages }) => (
+  <div className="mx-auto flex min-h-[65vh] w-full max-w-[980px] items-center">
+    <div className="new-order-entry-shell w-full">
+      <div className="new-order-entry-orb new-order-entry-orb--top" aria-hidden="true" /><div className="new-order-entry-orb new-order-entry-orb--bottom" aria-hidden="true" />
+      <p className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-400">Start an order</p>
+      <h1 className="mt-3 text-3xl font-semibold tracking-tight text-zinc-900">How would you like to begin?</h1>
+      <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-500">Choose a ready-to-go package or build an order around the services you need.</p>
+      <div className="relative z-[1] mt-8 grid gap-5 md:grid-cols-2">
+        <button type="button" onClick={onCustom} className="new-order-entry-card new-order-entry-card--custom group">
+          <span className="new-order-entry-art new-order-entry-art--custom" aria-hidden="true"><FilePlus2 size={36} strokeWidth={1.75} /></span>
+          <span className="new-order-entry-card-title">Create Custom Order</span><span className="new-order-entry-card-description">Select individual services and configure every requirement for your project.</span><span className="dashboard-action dashboard-action--secondary new-order-entry-button">Build from scratch <ArrowRight size={16} aria-hidden="true" /></span>
+        </button>
+        <button type="button" onClick={onPackages} className="new-order-entry-card new-order-entry-card--package group">
+          <span className="new-order-entry-art new-order-entry-art--package" aria-hidden="true"><Boxes size={36} strokeWidth={1.75} /></span>
+          <span className="new-order-entry-card-title">Choose a Package</span><span className="new-order-entry-card-description">Start with a curated set of services configured for your account.</span><span className="dashboard-action dashboard-action--primary new-order-entry-button">Browse packages <ArrowRight size={16} aria-hidden="true" /></span>
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+const PackageCatalogue = ({ packages, loading, error, onBack, onChoose, onCustom }) => (
+  <div className="mx-auto w-full max-w-[1180px] px-5 py-8 sm:py-10">
+    <button type="button" onClick={onBack} className="text-sm font-medium text-zinc-500 hover:text-zinc-900">← Back to order options</button>
+    <div className="mt-6 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-400">Ready-made</p><h1 className="mt-2 text-3xl font-semibold text-zinc-900">Choose a package</h1></div><button type="button" onClick={onCustom} className="text-sm font-medium text-zinc-600 underline underline-offset-4">Create custom order</button></div>
+    {loading && <p role="status" className="mt-8 text-sm text-zinc-500">Loading packages...</p>}
+    {error && <p role="alert" className="mt-8 text-sm text-red-600">{error}</p>}
+    {!loading && !error && !packages.length && <div className="mt-8 rounded-2xl border border-dashed border-zinc-200 p-10 text-center"><p className="text-sm text-zinc-500">No packages are available for your account yet.</p><button type="button" onClick={onCustom} className="dashboard-action dashboard-action--secondary mt-4">Create custom order</button></div>}
+    <div className="mt-8 grid gap-4 md:grid-cols-2">{packages.map((item) => <article key={item._id} className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm"><h2 className="text-lg font-semibold text-zinc-900">{item.name}</h2><p className="mt-2 text-sm leading-6 text-zinc-500">{item.description}</p><div className="mt-5 space-y-2 text-sm text-zinc-700">{item.services.map((entry) => <div key={entry.serviceId} className="flex justify-between gap-3"><span>{entry.service?.name || "Service"}</span><span className="text-zinc-400">×{entry.quantity}</span></div>)}</div><div className="mt-6 flex items-center justify-between gap-3 border-t border-zinc-100 pt-4"><span className="text-lg font-semibold text-zinc-900">₹{Number(item.price || 0).toLocaleString("en-IN")}</span><button type="button" onClick={() => onChoose(item)} className="dashboard-action dashboard-action--primary">Choose package</button></div></article>)}</div>
+  </div>
+);

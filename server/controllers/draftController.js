@@ -70,11 +70,16 @@ const normalizeDraftInput = (body = {}) => {
     throw requestError("Coupon code is invalid.");
   }
 
+  if (body.packageId !== undefined && body.packageId !== null && !mongoose.Types.ObjectId.isValid(body.packageId)) {
+    throw requestError("Package reference is invalid.");
+  }
+
   return {
     title: String(body.title || "").trim().slice(0, 80),
     services,
     additionalRequirements,
     couponCode,
+    packageId: body.packageId || null,
   };
 };
 

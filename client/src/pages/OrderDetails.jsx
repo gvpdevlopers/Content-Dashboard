@@ -331,6 +331,21 @@ const OrderDetailsContent = ({ id }) => {
         </div>
       </div>
 
+      {order.packageSnapshot && (
+        <section className="mt-6 rounded-[24px] border border-zinc-200 bg-white p-6 shadow-sm sm:p-7">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-400">Package order</p>
+          <h2 className="mt-1 text-lg font-semibold text-zinc-900">{order.packageSnapshot.name}</h2>
+          <div className="mt-4 divide-y divide-zinc-100">
+            {(order.packageSnapshot.services || []).map((entry) => (
+              <div key={String(entry.serviceId)} className="flex items-center justify-between gap-4 py-3 text-sm">
+                <span className="text-zinc-700">{entry.serviceSnapshot?.name || "Included service"}</span>
+                <span className="text-zinc-500">×{entry.quantity}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* =====================================================
           SERVICE INFORMATION
       ====================================================== */}

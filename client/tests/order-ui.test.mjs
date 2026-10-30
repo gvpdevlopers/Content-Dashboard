@@ -12,10 +12,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { validResourceUrl, hasProjectDetails } from "../src/utils/orderResources.js";
 import { getSelectPlacement, findEnabledOption, findTypeaheadOption } from "../src/utils/selectNavigation.js";
 import { getDraftLabel, formatDraftDate } from "../src/utils/draftLabels.js";
+let PackageForm, PackageConfig;
 let server, cacheDirectory, Progress, Delivery, Resource, Badge, PaymentBadge, Select, Filters, Feedback, Modal, Confirm, PinEmployee, AccessEditor, Role, PinActions, ClientPin;
 before(async () => {
   cacheDirectory = await mkdtemp(join(tmpdir(), "glow-ui-vite-"));
   server = await createServer({ configFile: false, cacheDir: cacheDirectory, plugins: [react()], optimizeDeps: { noDiscovery: true, entries: [] }, resolve: { preserveSymlinks: true }, server: { middlewareMode: true }, appType: "custom" });
+  PackageForm = (await server.ssrLoadModule("/src/pages/admin/AdminPackages.jsx")).default;
+  PackageConfig = (await server.ssrLoadModule("/src/components/PackageServiceConfiguration.jsx")).default;
   Filters = (await server.ssrLoadModule("/src/components/ActiveFilters.jsx")).default;
   Feedback = (await server.ssrLoadModule("/src/components/FormFeedback.jsx")).default;
   Modal = (await server.ssrLoadModule("/src/components/Modal.jsx")).default;
@@ -309,4 +312,25 @@ test("client details offer inline entry only for active collection PINs and conf
     assert.match(paid, /Payment Done/); assert.doesNotMatch(paid, /<input|Verify PIN/);
     for (const role of ["admin", "employee"]) assert.equal(render(ClientPin, { order, user: { role } }), "");
   }
+});
+
+
+test("package form exposes numbered workflow, custom category/pricing selectors and safe initial states", () => {
+  const html = render(PackageForm, {});
+  for (const text of ["1. Basic information", "2. Pricing", "3. Included services", "4. Visibility", "Selected clients", "Create package", "Add service"]) assert.ok(html.includes(text), text);
+  assert.doesNotMatch(html, /<select/);
+  assert.match(html, /role="combobox"/);
+  assert.match(html, /dashboard-action--primary/);
+  assert.match(html, /Loading services/);
+});
+
+test("package configuration derives pricing, dynamic and repeated fields from service schema", () => {
+  const service = { _id: "one", minQuantity: 1, fields: [{ name: "site", label: "Website URL", type: "url", required: true }],
+    pricingOptions: [{ _id: "option", name: "Shoot", group: "shoot", price: 100, unit: "reel", fields: [{ name: "brief", label: "Shoot brief", type: "textarea" }] }],
+    repeatableGroups: [{ name: "reels", label: "Reel", minItems: 1, maxItems: 3, pricingGroups: ["shoot"], fields: [{ name: "site", label: "Reference URL", type: "url" }] }] };
+  const html = render(PackageConfig, { service, entry: { quantity: 2, formData: { reels: [{ fields: {}, pricingOptions: { shoot: "option" } }, { fields: {}, pricingOptions: {} }] } }, onChange: () => {} });
+  for (const text of ["Website URL", "Reference URL", "Shoot brief", "Add", "Client completes at checkout", "Remove Reel 1"]) assert.ok(html.includes(text), text);
+  assert.doesNotMatch(html, /<select/);
+  const ids = [...html.matchAll(/ id="([^"]+)"/g)].map((match) => match[1]);
+  assert.equal(new Set(ids).size, ids.length, "Repeated schema fields must have unique labels and control IDs");
 });
