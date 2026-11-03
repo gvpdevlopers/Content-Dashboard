@@ -3,8 +3,8 @@ import api from "./api";
 const getOrderRoot = (staffMode) =>
   staffMode ? "/orders/staff" : "/orders/admin";
 
-const getAdminOrders = async (staffMode = false) => {
-  const response = await api.get(getOrderRoot(staffMode));
+const getAdminOrders = async (staffMode = false, archived = false) => {
+  const response = await api.get(getOrderRoot(staffMode), { params: archived && !staffMode ? { archived: "true" } : {} });
   return response.data;
 };
 
@@ -96,6 +96,10 @@ const updateServiceDelivery = async (orderId, itemId, url, staffMode = false) =>
 };
 
 const adminOrderService = {
+  updateDeliverable: async (orderId, itemId, key, changes, staffMode = false) =>
+    (await api.patch(`${getOrderRoot(staffMode)}/${orderId}/items/${itemId}/deliverables/${encodeURIComponent(key)}`, changes)).data,
+  archiveOrder: async (id, confirmation, confirmProtected) => (await api.delete(`/orders/admin/${id}`, { data: { confirmation, confirmProtected } })).data,
+  restoreOrder: async id => (await api.post(`/orders/admin/${id}/restore`)).data,
   updateServiceDelivery,
   getAdminOrders,
   getAdminOrderById,

@@ -564,6 +564,7 @@ const OrderDetailsContent = ({ id }) => {
                 label={`Coupon (${order.couponSnapshot.code})`}
                 value={`−${formatCurrency(order.discountTotal)}`}
               />
+              {order.couponSnapshots?.length > 1 && order.couponSnapshots.map(coupon => <InfoRow key={coupon.code} label={`${coupon.code}: ${coupon.serviceBreakdown.filter(line => line.discountAmount > 0).map(line => line.optionBreakdown?.length ? `${line.serviceName} (${line.optionBreakdown.map(option => option.label).join(", ")})` : line.serviceName).join("; ")}`} value={`-${formatCurrency(coupon.discountTotal)}`} />)}
             </>
           )}
 

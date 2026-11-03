@@ -181,6 +181,97 @@ test("real package API persists all groups, validates assignments, quotes and su
       assert.equal(saved.items[0].formData.reels[0].fields.title, "Client title");
       assert.equal(saved.items[0].formData.reels[0].pricingOptions.shoot, pricingOptionId);
     });
+    await t.test("option coupons persist through checkout, usage reservation and later edits", async () => {
+      const coupons = require("../controllers/couponController");
+      const Coupon = require("../models/Coupon"), CouponUsage = require("../models/CouponUsage");
+      const service = await Service.create({ name: "Isolated coupon Reels", slug: "isolated-coupon-reels", category: "Content", basePrice: 1000,
+        fields: [{ name: "extras", label: "Extras", type: "checkbox", options: [{ value: "voice", label: "Voice-over", price: 200 }, { value: "subs", label: "Subtitles", price: 100 }] }] });
+      const target = JSON.stringify(["field", "service", "extras", "voice"]);
+      const payload = { code: "OPTION_QA", scope: "options", perClientUsageLimit: 1,
+        serviceDiscounts: [{ serviceId: String(service._id), discountPercent: 20, targets: [target] }] };
+      const created = await call(coupons.createCoupon, admin, payload); assert.equal(created.statusCode, 201, created.body.message);
+      const body = { paymentMethod: "online", couponCode: payload.code, services: [{ serviceId: String(service._id), formData: { extras: ["voice", "subs"] } }] };
+      const preview = await call(orders.getCouponQuote, clients[0], { ...body, code: payload.code }); assert.equal(preview.statusCode, 200, preview.body.message); assert.equal(preview.body.quote.discountTotal, 40);
+      const quote = await call(orders.getOrderQuote, clients[0], body); assert.equal(quote.statusCode, 200, quote.body.message); assert.equal(quote.body.quote.amount, 1486.8);
+      const createdOrder = await call(orders.createOrder, clients[0], { ...body, confirmedAmount: quote.body.quote.amount, discountTotal: 99999 });
+      assert.equal(createdOrder.statusCode, 201, createdOrder.body.message);
+      const saved = await Order.findById(createdOrder.body.order._id).lean(); assert.equal(saved.discountTotal, 40); assert.equal(saved.gstAmount, 226.8);
+      assert.equal(saved.couponSnapshot.serviceBreakdown[0].optionBreakdown[0].key, target);
+      const usage = await CouponUsage.findOne({ order: saved._id }).lean(); assert.equal(usage.serviceBreakdown[0].optionBreakdown[0].discountAmount, 40);
+      assert.equal((await Coupon.findById(created.body.coupon._id)).usageCount, 1);
+      assert.equal((await call(orders.getCouponQuote, clients[0], { ...body, code: payload.code })).statusCode, 400);
+      service.fields[0].options[0].label = "Renamed narration"; service.fields[0].options[0].price = 300; await service.save();
+      assert.equal((await call(orders.getCouponQuote, clients[1], { ...body, code: payload.code })).body.quote.discountTotal, 60);
+      assert.deepEqual((await Order.findById(saved._id).lean()).couponSnapshot, saved.couponSnapshot);
+      const updated = await call(coupons.updateCoupon, admin, { ...payload, serviceDiscounts: [{ ...payload.serviceDiscounts[0], discountType: "fixed", discountValue: 50 }] }, { id: String(created.body.coupon._id) });
+      assert.equal(updated.statusCode, 200, updated.body.message);
+      assert.equal((await call(orders.getCouponQuote, clients[1], { ...body, code: payload.code })).body.quote.discountTotal, 50);
+    });
+    await t.test("stacked coupons persist separately, upgrade the legacy index and roll back together", async () => {
+      const Coupon = require("../models/Coupon"), CouponUsage = require("../models/CouponUsage"), CouponClientUsage = require("../models/CouponClientUsage");
+      const service = await Service.create({ name: "Stacked voice-over", slug: "stacked-voice-over", category: "Content", basePrice: 0,
+        fields: [{ name: "voice", label: "Voice-over", type: "select", options: [{ label: "Voice-over", value: "yes", price: 2500 }] }] });
+      const first = await Coupon.create({ code: "STACK20", serviceDiscounts: [{ serviceId: service._id, serviceName: service.name, discountPercent: 20 }], perClientUsageLimit: 1 });
+      const second = await Coupon.create({ code: "STACK1000", scope: "options", minimumOrderAmount: 2500, serviceDiscounts: [{ serviceId: service._id, serviceName: service.name, discountPercent: 0, discountType: "fixed", discountValue: 1000, targets: [JSON.stringify(["field", "service", "voice", "yes"])] }] });
+      const body = { paymentMethod: "online", couponCodes: [first.code, second.code], services: [{ serviceId: String(service._id), quantity: 1, formData: { voice: "yes" } }] };
+      const draft = await call(drafts.createDraft, clients[0], { ...body, title: "Stacked coupon draft" }); assert.equal(draft.statusCode, 201, draft.body.message); assert.deepEqual([...draft.body.draft.couponCodes], body.couponCodes);
+      const q = await call(orders.getCouponQuote, clients[0], body); assert.equal(q.statusCode, 200, q.body.message); assert.equal(q.body.quote.finalTotal, 1180);
+      const orderQuote = await call(orders.getOrderQuote, clients[0], body); assert.equal(orderQuote.body.quote.amount, 1180);
+      // Existing installations had a unique order-only index. Preserve old rows
+      // while replacing it with uniqueness per order and coupon.
+      await CouponUsage.collection.createIndex({ order: 1 }, { unique: true });
+      const created = await call(orders.createOrder, clients[0], { ...body, confirmedAmount: 1180 }); assert.equal(created.statusCode, 201, created.body.message);
+      const saved = await Order.findById(created.body.order._id).lean(); assert.equal(saved.discountTotal, 1500); assert.equal(saved.gstAmount, 180);
+      assert.deepEqual(saved.couponSnapshots.map(c => c.code), body.couponCodes);
+      assert.deepEqual(saved.couponSnapshots.map(c => c.discountTotal), [500, 1000]);
+      assert.equal(await CouponUsage.countDocuments({ order: saved._id }), 2);
+      assert.ok((await CouponUsage.find({ order: saved._id }).lean()).every(usage => usage.finalTotal === 1180 && usage.gstAmount === 180));
+      const indexes = await CouponUsage.collection.indexes(); assert.ok(!indexes.some(i => i.unique && Object.keys(i.key).length === 1 && i.key.order === 1));
+      assert.equal((await Coupon.findById(first._id)).usageCount, 1); assert.equal((await Coupon.findById(second._id)).usageCount, 1);
+      assert.equal((await call(orders.getCouponQuote, clients[0], body)).statusCode, 400);
+      assert.equal((await call(orders.getCouponQuote, clients[1], { ...body, couponCodes: [first.code, first.code.toLowerCase()] })).statusCode, 400);
+      const countBefore = await Order.countDocuments();
+      const originalUpdate = Coupon.findOneAndUpdate;
+      try {
+        // Simulate the second coupon becoming unavailable after its quote.
+        Coupon.findOneAndUpdate = function(filter, ...args) { return String(filter._id) === String(second._id) ? Promise.resolve(null) : originalUpdate.call(this, filter, ...args); };
+        const failed = await call(orders.createOrder, clients[1], { ...body, confirmedAmount: 1180 }); assert.equal(failed.statusCode, 409, failed.body.message);
+      } finally { Coupon.findOneAndUpdate = originalUpdate; }
+      assert.equal(await Order.countDocuments(), countBefore);
+      assert.equal((await Coupon.findById(first._id)).usageCount, 1);
+      assert.equal(await CouponClientUsage.countDocuments({ coupon: first._id, client: clients[1]._id }), 0);
+      assert.equal(await CouponUsage.countDocuments({ coupon: first._id }), 1);
+    });
+    await t.test("admin archive and restore preserve orders, financial references, files and audit history", async () => {
+      const archive = require("../controllers/orderArchiveController");
+      const CouponUsage = require("../models/CouponUsage");
+      const order = await Order.findOne({ "couponSnapshot.code": "OPTION_QA" });
+      order.paymentStatus = "paid"; order.orderStatus = "in_progress";
+      order.invoice = { url: "https://example.com/invoice.pdf", name: "Invoice", type: "link" };
+      order.deliveryLink = "https://example.com/delivery"; await order.save();
+      const before = order.toObject(); const usageBefore = await CouponUsage.findOne({ order: order._id }).lean();
+      const params = { id: String(order._id) }, body = { confirmation: order.orderNumber };
+      for (const role of ["client", "employee"]) assert.equal((await call(archive.archiveOrder, { ...clients[0].toObject(), role }, body, params)).statusCode, 403);
+      assert.equal((await call(archive.archiveOrder, admin, body, { id: "bad" })).statusCode, 400);
+      assert.equal((await call(archive.archiveOrder, admin, {}, params)).statusCode, 400);
+      const warning = await call(archive.archiveOrder, admin, body, params); assert.equal(warning.statusCode, 409); assert.equal(warning.body.requiresAdditionalConfirmation, true);
+      assert.equal((await call(archive.archiveOrder, admin, { ...body, confirmProtected: true }, params)).statusCode, 200);
+      const saved = await Order.findById(order._id).select("+archiveHistory").lean();
+      assert.ok(saved.archivedAt); assert.equal(String(saved.archivedBy), String(admin._id));
+      assert.equal(saved.archiveHistory.length, 1); assert.equal(saved.archiveHistory[0].snapshot.amount, before.amount);
+      for (const field of ["amount", "paymentStatus", "orderStatus", "invoice", "deliveryLink", "couponSnapshot"]) assert.deepEqual(saved[field], before[field]);
+      assert.deepEqual(await CouponUsage.findOne({ order: order._id }).lean(), usageBefore);
+      assert.equal((await Order.findById(order._id).lean()).archiveHistory, undefined);
+      const active = await call(orders.getAdminOrders, admin); assert.ok(!active.body.orders.some(o => String(o._id) === params.id));
+      const archived = response(); await orders.getAdminOrders({ user: admin, query: { archived: "true" } }, archived); assert.ok(archived.body.orders.some(o => String(o._id) === params.id));
+      assert.equal((await call(orders.getOrderById, clients[0], {}, params)).statusCode, 200);
+      assert.equal((await call(archive.archiveOrder, admin, { ...body, confirmProtected: true }, params)).statusCode, 409);
+      assert.equal((await call(archive.restoreOrder, clients[0], {}, params)).statusCode, 403);
+      assert.equal((await call(archive.restoreOrder, admin, {}, params)).statusCode, 200);
+      const restored = await Order.findById(order._id).select("+archiveHistory").lean(); assert.equal(restored.archivedAt, null); assert.equal(restored.archiveHistory.length, 2);
+      assert.equal(restored.archiveHistory[1].action, "restore"); assert.equal(await Order.countDocuments({ _id: order._id }), 1);
+    });
+    await require("./helpers/deliverableWorkflow")({ t, call, orders, Order, Service, admin, clients });
     await t.test("existing active services and existing clients complete package checkout in a local clone", {
       skip: process.env.PACKAGE_QA_READ_EXISTING === "1" ? false : "Opt in with PACKAGE_QA_READ_EXISTING=1 to read the existing catalogue into the isolated database",
     }, async () => { await require("./helpers/existingPackageWorkflow")(); });

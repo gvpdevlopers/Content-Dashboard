@@ -93,11 +93,11 @@ test("ineligible, missing or changed services reject delivery writes", async () 
 
 test("item delivery routes require authentication and existing staff/admin guards", () => {
   const routes = [], router = {};
-  for (const method of ["get", "post", "patch"]) router[method] = (url, ...handlers) => routes.push({ url, handlers });
+  for (const method of ["get", "post", "patch", "delete"]) router[method] = (url, ...handlers) => routes.push({ url, handlers });
   const protect = () => {}, adminOnly = () => {}, orderStaff = () => {};
   load("routes/orderRoutes.js", { express: { Router: () => router }, "../middleware/auth": protect,
     "../middleware/admin": adminOnly, "../middleware/orderStaff": orderStaff });
-  for (const [url, guard] of [["/admin/:id/items/:itemId/delivery", adminOnly], ["/staff/:id/items/:itemId/delivery", orderStaff]]) {
+  for (const [url, guard] of [["/admin/:id/items/:itemId/delivery", adminOnly], ["/staff/:id/items/:itemId/delivery", orderStaff], ["/admin/:id/items/:itemId/deliverables/:deliverableKey", adminOnly], ["/staff/:id/items/:itemId/deliverables/:deliverableKey", orderStaff]]) {
     const route = routes.find((r) => r.url === url);
     assert.equal(route.handlers[0], protect); assert.equal(route.handlers[1], guard);
   }

@@ -1,3 +1,7 @@
+const { outputDefinition, hydrateDeliverables, deliverableSummary, validateDeliverablePatch, deriveOrderStatus, inactiveStatuses } = require("../utils/serviceDeliverables");
+const { reduceCouponComponents } = require("../utils/couponStack");
+const { normalizeCouponCodes } = require("../utils/couponCodes");
+const { collectCouponComponents } = require("../utils/couponTargets");
 const { normalizeServiceId } = require("../utils/serviceIdentity");
 const { canClientOrderService } = require("../utils/serviceAccess");
 const { changeOrderStatus } = require("../utils/adCreditCancellation");
@@ -1894,7 +1898,7 @@ const createServiceSnapshot = ({
     serviceId: service._id,
     name: service.name,
     slug: service.slug || "",
-    supportsDelivery: supportsServiceDelivery({ slug: service.slug }),
+    supportsDelivery: supportsServiceDelivery(service),
     description:
       service.description || "",
     category:
@@ -2025,133 +2029,35 @@ const timeBasedServiceSlugs = new Set([
 
 const getServiceProgressDefinition = (item) => {
   const snapshot = item?.serviceSnapshot || {};
-  const slug = normalizeString(
-    snapshot.slug || item?.service?.slug || "",
-  ).toLowerCase();
-  const name = normalizeString(
-    snapshot.name || item?.service?.name || "",
-  ).toLowerCase();
-  const resolvedSlug =
-    slug ||
-    name
-      .replace(/[â€“â€”]/g, "-")
-      .replace(/\s+/g, "-")
-      .replace(/[^a-z0-9-]/g, "");
-
-  if (timeBasedServiceSlugs.has(resolvedSlug)) {
-    return { type: "time_based", durationDays: 30 };
-  }
-
-  if (
-    resolvedSlug === "social-media-grid-posts" ||
-    name === "social media grid posts"
-  ) {
-    const total = Math.max(1, Number(item?.quantity) || 1);
-    return {
-      type: "quantity_based",
-      deliverables: Array.from({ length: total }, (_, index) => ({
-        key: String(index + 1),
-        name: `Grid ${index + 1}`,
-      })),
-    };
-  }
-
-  if (resolvedSlug === "visual-content-reels" || name === "visual content - reels") {
-    const formData =
-      item?.formData instanceof Map
-        ? Object.fromEntries(item.formData)
-        : item?.formData || {};
-    const reelGroup = Array.isArray(formData.reels) ? formData.reels : [];
-    const snapshotGroup = (snapshot.repeatableGroups || []).find(
-      (group) => group.name === "reels",
-    );
-    const total = Math.max(
-      1,
-      reelGroup.length || snapshotGroup?.items?.length || 0,
-    );
-
-    return {
-      type: "quantity_based",
-      deliverables: Array.from({ length: total }, (_, index) => ({
-        key: String(index + 1),
-        name: `Reel ${index + 1}`,
-      })),
-    };
-  }
-
-  return null;
+  const slug = String(snapshot.slug || "").trim().toLowerCase();
+  const deliverables = outputDefinition(item);
+  if (timeBasedServiceSlugs.has(slug)) return { type: "time_based", durationDays: 30, deliverables };
+  return deliverables.length ? { type: "quantity_based", deliverables } : null;
 };
 
 const createInitialServiceProgress = (item) => {
   const definition = getServiceProgressDefinition(item);
-
-  if (!definition) {
-    return undefined;
-  }
-
-  if (definition.type === "time_based") {
-    return {
-      type: definition.type,
-      status: "pending_start",
-      startAt: null,
-      durationDays: definition.durationDays,
-      deliverables: [],
-    };
-  }
-
+  if (!definition) return undefined;
+  const now = new Date();
   return {
-    type: definition.type,
-    status: "pending_start",
-    startAt: null,
-    durationDays: null,
-    deliverables: definition.deliverables.map((deliverable) => ({
-      ...deliverable,
-      status: "pending",
-      completedAt: null,
+    type: definition.type, status: "pending_start", startAt: null,
+    durationDays: definition.durationDays || null, deliveryVersion: 1,
+    deliverables: definition.deliverables.map(deliverable => ({
+      ...deliverable, id: crypto.randomUUID(), status: "pending", completedAt: null,
+      links: [], notes: "", createdAt: now, updatedAt: now,
     })),
   };
 };
 
 const getOrderItemServiceProgress = (item) => {
-  const initialProgress = createInitialServiceProgress(item);
-
-  if (!initialProgress) {
-    return undefined;
-  }
-
-  const existingProgress =
-    typeof item?.serviceProgress?.toObject === "function"
-      ? item.serviceProgress.toObject()
-      : item?.serviceProgress;
-
-  if (initialProgress.type === "time_based") {
-    return {
-      ...initialProgress,
-      ...existingProgress,
-      type: initialProgress.type,
-      durationDays: initialProgress.durationDays,
-      deliverables: [],
-    };
-  }
-
-  const previousDeliverables = new Map(
-    (existingProgress?.deliverables || []).map((deliverable) => [
-      deliverable.key,
-      deliverable,
-    ]),
-  );
-
-  return {
-    ...initialProgress,
-    ...existingProgress,
-    type: initialProgress.type,
-    deliverables: initialProgress.deliverables.map((deliverable) => ({
-      ...deliverable,
-      ...previousDeliverables.get(deliverable.key),
-      key: deliverable.key,
-      name: deliverable.name,
-    })),
-  };
+  const existing = typeof item?.serviceProgress?.toObject === "function"
+    ? item.serviceProgress.toObject() : item?.serviceProgress;
+  const initial = createInitialServiceProgress(item);
+  if (!initial && !existing?.type) return undefined;
+  const progress = { ...initial, ...existing };
+  progress.deliverables = hydrateDeliverables(item);
+  if (progress.type === "quantity_based") progress.status = deliverableSummary(progress.deliverables).displayStatus;
+  return progress;
 };
 
 const getCalendarDayInKolkata = (date) => {
@@ -2235,6 +2141,7 @@ const toServiceProgressView = (progress, now = new Date()) => {
   }
 
   if (progress.type === "time_based") {
+    progress = { ...progress, deliverySummary: deliverableSummary(progress.deliverables) };
     if (progress.status === "completed") {
       return {
         ...progress,
@@ -2294,27 +2201,7 @@ const toServiceProgressView = (progress, now = new Date()) => {
     };
   }
 
-  const deliverables = progress.deliverables || [];
-  const completedCount = deliverables.filter(
-    (deliverable) => deliverable.status === "completed",
-  ).length;
-  const totalCount = deliverables.length;
-  const allCompleted = totalCount > 0 && completedCount === totalCount;
-  const anyStarted = deliverables.some(
-    (deliverable) => deliverable.status !== "pending",
-  );
-
-  return {
-    ...progress,
-    displayStatus: allCompleted
-      ? "completed"
-      : anyStarted
-        ? "in_progress"
-        : "pending_start",
-    completedCount,
-    totalCount,
-    progressPercent: totalCount ? (completedCount / totalCount) * 100 : 0,
-  };
+  return { ...progress, ...deliverableSummary(progress.deliverables) };
 };
 
 const toOrderWithServiceProgress = (order) => {
@@ -2332,7 +2219,7 @@ const toOrderWithServiceProgress = (order) => {
 
       return {
         ...item,
-        supportsDelivery: supportsServiceDelivery(item.serviceSnapshot),
+        supportsDelivery: supportsServiceDelivery(item.serviceSnapshot) || Boolean(progress?.deliverables?.length),
         ...(progress ? { serviceProgress: toServiceProgressView(progress) } : {}),
       };
     });
@@ -2344,6 +2231,7 @@ const toOrderWithServiceProgress = (order) => {
     if (legacyProgress) {
       visibleOrder.serviceProgress =
         toServiceProgressView(legacyProgress);
+      visibleOrder.supportsDelivery = Boolean(legacyProgress.deliverables?.length);
     }
   }
 
@@ -2602,6 +2490,26 @@ const processOrderServiceItem = async ({
     amount,
   });
 
+  const componentContexts = [{
+    pricing: selectedOptions.map(option => ({ option, quantity: isGroupedPricing ? (groupedQuantities[normalizeString(option.group)] ?? Number(option.minQuantity || 1)) : parsedQuantity })),
+    sources: [{ owner: "service", fields: service.fields }, ...selectedOptions.map(option => ({ owner: `option:${option._id}`, fields: option.fields }))],
+    data: cleanedFormData,
+    applicableFields,
+  }];
+  for (const group of getRepeatableGroups(service)) {
+    for (const repeatedItem of cleanedFormData[group.name] || []) {
+      const { selectedOptions: options } = resolveRepeatablePricingOptions(service, group, repeatedItem);
+      const quantities = resolveRepeatablePricingQuantities(options, repeatedItem);
+      componentContexts.push({
+        pricing: options.map(option => ({ option, quantity: quantities[normalizeString(option.group)] ?? Number(option.minQuantity || 1) })),
+        sources: [{ owner: `group:${group.name}`, fields: group.fields }, ...options.map(option => ({ owner: `option:${option._id}`, fields: option.fields }))],
+        data: repeatedItem.fields || repeatedItem,
+        applicableFields: getRepeatableItemFields(group, options),
+      });
+    }
+  }
+  const couponComponents = collectCouponComponents(service, componentContexts);
+
   const serviceSnapshot =
     createServiceSnapshot({
       service,
@@ -2649,13 +2557,9 @@ const processOrderServiceItem = async ({
     service,
     amount,
     couponEligibleAmount,
+    couponComponents,
   };
 };
-
-const normalizeCouponCode = (value) =>
-  String(value || "")
-    .trim()
-    .toUpperCase();
 
 const couponRequestError = (message, statusCode = 400) => {
   const error = new Error(message);
@@ -2699,6 +2603,7 @@ const validateCouponAvailability = async (coupon, clientId) => {
 };
 
 const calculateCouponQuote = ({
+  minimumSubtotal,
   coupon,
   serviceResults,
   paymentMethod,
@@ -2711,7 +2616,7 @@ const calculateCouponQuote = ({
     ),
   );
 
-  if (originalSubtotal < Number(coupon.minimumOrderAmount || 0)) {
+  if ((minimumSubtotal ?? originalSubtotal) < Number(coupon.minimumOrderAmount || 0)) {
     throw couponRequestError(
       `This coupon requires a minimum order amount of â‚¹${Number(
         coupon.minimumOrderAmount,
@@ -2722,28 +2627,42 @@ const calculateCouponQuote = ({
   const discountByService = new Map(
     (coupon.serviceDiscounts || []).map((discount) => [
       String(discount.serviceId),
-      Number(discount.discountPercent || 0),
+      discount,
     ]),
   );
 
   let discountTotal = 0;
+  let globalFixedRemaining = coupon.scope === "all" && coupon.discountType === "fixed" ? Number(coupon.discountValue || 0) : 0;
   const serviceBreakdown = serviceResults.map((result) => {
     const serviceId = String(result.item.service);
-    const discountPercent = discountByService.get(serviceId) || 0;
+    const rule = coupon.scope === "all" ? coupon : discountByService.get(serviceId);
+    const discountType = rule?.discountType || "percentage";
+    const value = Number(rule?.discountValue ?? rule?.discountPercent ?? 0);
+    const discountPercent = discountType === "percentage" ? value : 0;
     const originalAmount = roundCurrency(result.amount || 0);
-    const eligibleAmount = Math.min(
-      originalAmount,
-      roundCurrency(result.couponEligibleAmount || 0),
-    );
-    const discountAmount = roundCurrency(
-      eligibleAmount * (discountPercent / 100),
-    );
+    const targets = new Set(rule?.targets || []);
+    const optionBreakdown = coupon.scope === "options" ? (result.couponComponents || []).filter(component => targets.has(component.key)).map(component => ({ ...component })) : [];
+    const eligibleAmount = rule ? Math.max(0, Math.min(originalAmount, roundCurrency(result.couponEligibleAmount || 0),
+      coupon.scope === "options" ? roundCurrency(optionBreakdown.reduce((sum, component) => sum + component.amount, 0)) : Infinity)) : 0;
+    const fixedValue = coupon.scope === "all" ? globalFixedRemaining : value;
+    const discountAmount = roundCurrency(Math.min(eligibleAmount, discountType === "fixed" ? fixedValue : eligibleAmount * discountPercent / 100));
+    if (coupon.scope === "all" && discountType === "fixed") globalFixedRemaining = roundCurrency(globalFixedRemaining - discountAmount);
+    let remainingDiscount = discountAmount;
+    const componentTotal = optionBreakdown.reduce((sum, component) => sum + component.amount, 0);
+    optionBreakdown.forEach((component, index) => {
+      component.discountAmount = index === optionBreakdown.length - 1 ? remainingDiscount : Math.min(remainingDiscount, Math.floor(discountAmount * 100 * component.amount / componentTotal) / 100);
+      remainingDiscount = roundCurrency(remainingDiscount - component.discountAmount);
+    });
     const discountedAmount = roundCurrency(originalAmount - discountAmount);
 
     discountTotal += discountAmount;
     return {
       serviceId: result.item.service,
       serviceName: result.service.name,
+      scope: coupon.scope || "service",
+      discountType,
+      discountValue: value,
+      optionBreakdown,
       discountPercent,
       originalAmount,
       eligibleAmount,
@@ -2772,6 +2691,48 @@ const calculateCouponQuote = ({
     gstAmount,
     finalTotal: amount,
   };
+};
+
+// Apply in the submitted order against remaining charges. Each coupon gets its
+// own immutable quote; the aggregate keeps legacy order consumers compatible.
+const calculateCouponStack = ({ coupons, serviceResults, paymentMethod, chequeType }) => {
+  const originalSubtotal = roundCurrency(serviceResults.reduce((sum, result) => sum + result.amount, 0));
+  const remaining = serviceResults.map(result => ({ ...result, couponComponents: (result.couponComponents || []).map(component => ({ ...component })) }));
+  const snapshots = [];
+  for (const coupon of coupons) {
+    let quote;
+    try { quote = calculateCouponQuote({ coupon, serviceResults: remaining, paymentMethod, chequeType, minimumSubtotal: originalSubtotal }); }
+    catch (error) { error.message = `${coupon.code}: ${error.message}`; throw error; }
+    snapshots.push(quote);
+    for (const result of remaining) {
+      const line = quote.serviceBreakdown.find(line => String(line.serviceId) === String(result.item.service));
+      const previousEligible = result.couponEligibleAmount;
+      result.amount = line.discountedAmount;
+      result.couponEligibleAmount = roundCurrency(Math.max(0, previousEligible - line.discountAmount));
+      result.couponComponents = reduceCouponComponents(result.couponComponents, previousEligible, line, coupon.scope);
+    }
+  }
+  if (snapshots.length === 1) return { ...snapshots[0], coupons: snapshots };
+  const serviceBreakdown = serviceResults.map((result, index) => {
+    const lines = snapshots.map(quote => quote.serviceBreakdown[index]);
+    const discountAmount = roundCurrency(lines.reduce((sum, line) => sum + line.discountAmount, 0));
+    return { serviceId: result.item.service, serviceName: result.service.name, scope: "service", discountType: "combined", discountPercent: 0,
+      originalAmount: result.amount, eligibleAmount: result.couponEligibleAmount, discountAmount, discountedAmount: roundCurrency(result.amount - discountAmount), optionBreakdown: [] };
+  });
+  const discountTotal = roundCurrency(snapshots.reduce((sum, quote) => sum + quote.discountTotal, 0));
+  const totals = calculateOrderTotals(originalSubtotal - discountTotal, getGstRate(paymentMethod, chequeType));
+  return { code: coupons.map(coupon => coupon.code).join(" + "), coupons: snapshots, serviceBreakdown, originalSubtotal, discountTotal,
+    taxableSubtotal: totals.subtotal, gstRate: totals.gstRate, gstAmount: totals.gstAmount, finalTotal: totals.amount };
+};
+const quoteCouponCodes = async (codes, clientId, serviceResults, paymentMethod, chequeType) => {
+  const coupons = [];
+  for (const code of codes) {
+    const coupon = await Coupon.findOne({ code });
+    try { await validateCouponAvailability(coupon, clientId); }
+    catch (error) { error.message = `${code}: ${error.message}`; throw error; }
+    coupons.push(coupon);
+  }
+  return { coupons, quote: calculateCouponStack({ coupons, serviceResults, paymentMethod, chequeType }) };
 };
 
 const buildProcessedServiceResults = async (serviceRequests, user) => {
@@ -2869,16 +2830,9 @@ const getCouponQuote = async (req, res) => {
     }
     const serviceResults = await buildProcessedServiceResults(await resolvePackageQuoteRequests(packageId, services, req.user), req.user);
     await applyPackageQuote(packageId, serviceResults, req.user);
-    const normalizedCode = normalizeCouponCode(code);
-    const coupon = await Coupon.findOne({ code: normalizedCode });
-
-    await validateCouponAvailability(coupon, req.user._id);
-    const quote = calculateCouponQuote({
-      coupon,
-      serviceResults,
-      paymentMethod,
-      chequeType,
-    });
+    const codes = normalizeCouponCodes(req.body.couponCodes, code);
+    if (!codes.length) throw couponRequestError("Enter at least one coupon.");
+    const { quote } = await quoteCouponCodes(codes, req.user._id, serviceResults, paymentMethod, chequeType);
 
     return res.status(200).json({
       success: true,
@@ -2937,17 +2891,9 @@ const getOrderQuote = async (req, res) => {
       getGstRate(paymentMethod, chequeType),
     );
 
-    if (String(couponCode || "").trim()) {
-      const coupon = await Coupon.findOne({
-        code: normalizeCouponCode(couponCode),
-      });
-      await validateCouponAvailability(coupon, req.user._id);
-      couponSnapshot = calculateCouponQuote({
-        coupon,
-        serviceResults,
-        paymentMethod,
-        chequeType,
-      });
+    const codes = normalizeCouponCodes(req.body.couponCodes, couponCode);
+    if (codes.length) {
+      couponSnapshot = (await quoteCouponCodes(codes, req.user._id, serviceResults, paymentMethod, chequeType)).quote;
       totals = {
         subtotal: couponSnapshot.taxableSubtotal,
         gstRate: couponSnapshot.gstRate,
@@ -2988,6 +2934,7 @@ const getOrderQuote = async (req, res) => {
         gstAmount: totals.gstAmount,
         amount: totals.amount,
         couponCode: couponSnapshot?.code || "",
+        coupons: couponSnapshot?.coupons || [],
         serviceBreakdown,
       },
     });
@@ -3052,11 +2999,11 @@ const reserveCouponUsage = async ({
     coupon: coupon._id,
     client: clientId,
   };
-  if (coupon.perClientUsageLimit !== null &&
-      coupon.perClientUsageLimit !== undefined) {
-    clientFilter.$expr = {
-      $lt: ["$usageCount", coupon.perClientUsageLimit],
-    };
+  if (reservedCoupon.perClientUsageLimit !== null &&
+      reservedCoupon.perClientUsageLimit !== undefined) {
+    // $expr is forbidden in an upsert. A normal field predicate plus the
+    // unique coupon/client index keeps the increment atomic and capped.
+    clientFilter.usageCount = { $lt: reservedCoupon.perClientUsageLimit };
   }
 
   try {
@@ -3358,31 +3305,22 @@ const createOrder = async (
       0,
     );
 
-    let coupon = null;
+    let coupons = [];
     let couponSnapshot;
     let orderTotals = calculateOrderTotals(
       originalSubtotal,
       getGstRate(paymentMethod, chequeType),
     );
 
-    if (couponCode !== undefined && String(couponCode).trim()) {
-      coupon = await Coupon.findOne({
-        code: normalizeCouponCode(couponCode),
-      });
-
+    const codes = normalizeCouponCodes(req.body.couponCodes, couponCode);
+    if (codes.length) {
       try {
-        await validateCouponAvailability(coupon, req.user._id);
-        couponSnapshot = calculateCouponQuote({
-          coupon,
-          serviceResults,
-          paymentMethod,
-          chequeType,
-        });
+        const stacked = await quoteCouponCodes(codes, req.user._id, serviceResults, paymentMethod, chequeType);
+        coupons = stacked.coupons;
+        couponSnapshot = stacked.quote;
+        if (coupons.length > 1) await CouponUsage.ensureStackedCouponIndex();
       } catch (couponError) {
-        return res.status(400).json({
-          success: false,
-          message: couponError.message,
-        });
+        return res.status(couponError.statusCode || 400).json({ success: false, message: couponError.message });
       }
 
       orderTotals = {
@@ -3506,6 +3444,7 @@ const createOrder = async (
             originalSubtotal: couponSnapshot.originalSubtotal,
             discountTotal: couponSnapshot.discountTotal,
             couponSnapshot,
+            couponSnapshots: couponSnapshot.coupons,
           }
         : {}),
 
@@ -3533,7 +3472,7 @@ const createOrder = async (
     */
 
     let order;
-    if ((coupon && couponSnapshot) || draftId || creditQuote.total > 0) {
+    if ((coupons.length && couponSnapshot) || draftId || creditQuote.total > 0) {
       const session = await mongoose.startSession();
 
       try {
@@ -3553,7 +3492,7 @@ const createOrder = async (
             }
           }
 
-          if (coupon && couponSnapshot) {
+          for (const coupon of coupons) {
             await reserveCouponUsage({
               coupon,
               clientId: req.user._id,
@@ -3569,25 +3508,17 @@ const createOrder = async (
               requested: creditQuote.requested, session, actor: req.user._id });
           }
 
-          if (coupon && couponSnapshot) {
-            await CouponUsage.create(
-              [
-                {
-                  coupon: coupon._id,
-                  couponCode: coupon.code,
-                  client: req.user._id,
-                  order: createdOrder._id,
-                  serviceBreakdown: couponSnapshot.serviceBreakdown,
-                  originalSubtotal: couponSnapshot.originalSubtotal,
-                  discountTotal: couponSnapshot.discountTotal,
-                  taxableSubtotal: couponSnapshot.taxableSubtotal,
-                  gstRate: couponSnapshot.gstRate,
-                  gstAmount: couponSnapshot.gstAmount,
-                  finalTotal: couponSnapshot.finalTotal,
-                },
-              ],
-              { session },
-            );
+          if (coupons.length && couponSnapshot) {
+            await CouponUsage.create(coupons.map((coupon, index) => ({
+              coupon: coupon._id, couponCode: coupon.code, client: req.user._id, order: createdOrder._id,
+              ...couponSnapshot.coupons[index],
+              // Usage tables show the actual order total, not this coupon's
+              // intermediate stacking stage. Stage totals remain in snapshots.
+              finalTotal: createdOrder.amount,
+              taxableSubtotal: createdOrder.subtotal,
+              gstRate: createdOrder.gstRate,
+              gstAmount: createdOrder.gstAmount,
+            })), { session, ordered: true });
           }
 
           if (draftId) {
@@ -3811,7 +3742,7 @@ const getOrderById = async (
 
 const toClientVisibleOrder = (order) => {
   const visibleOrder = toOrderWithServiceProgress(order);
-  for (const field of ["monthEndPaymentHistory", "notes", "codPin", "codPinEmployee", "codPinVerifiedBy", "codPinAttempts", "razorpaySignature",
+  for (const field of ["fulfillmentHistory", "monthEndPaymentHistory", "notes", "codPin", "codPinEmployee", "codPinVerifiedBy", "codPinAttempts", "razorpaySignature",
     "submissionKey", "submissionHash"]) delete visibleOrder[field];
 
   if (visibleOrder.orderStatus !== "completed") {
@@ -3832,7 +3763,7 @@ const getAdminOrders = async (
 ) => {
   try {
     const orders =
-      await Order.find({})
+      await Order.find({ archivedAt: req.query?.archived === "true" ? { $ne: null } : null })
         .select("-codPin")
         .populate(
           "client",
@@ -3992,9 +3923,15 @@ const getStaffOrderById = async (req, res) => {
 };
 
 const updateServiceProgress = async (req, res) => {
+  if (req.body?.action === "set_deliverable_status") {
+    return updateDeliverable({ ...req, params: { ...req.params, deliverableKey: req.body.deliverableKey },
+      body: { status: req.body.status } }, res);
+  }
   try {
+    if (!["admin", "employee"].includes(req.user?.role)) return res.status(403).json({ success: false, message: "Order management access required." });
+    if (!mongoose.isValidObjectId(req.params.id) || (req.params.itemId !== "legacy" && !mongoose.isValidObjectId(req.params.itemId))) return res.status(400).json({ success: false, message: "Invalid order service reference." });
     const { itemId } = req.params;
-    const { action, deliverableKey, status, startDate } = req.body;
+    const { action, startDate } = req.body;
     const order = await Order.findById(req.params.id);
 
     if (!order) {
@@ -4004,9 +3941,10 @@ const updateServiceProgress = async (req, res) => {
       });
     }
 
-    const item = order.items.id(itemId);
+    if (inactiveStatuses.includes(order.orderStatus) || order.adCreditReleased) return res.status(409).json({ success: false, message: "This order is inactive." });
+    const item = itemId === "legacy" ? null : order.items.id(itemId);
     const legacyOrderItem =
-      !item && itemId === "legacy"
+      !item && itemId === "legacy" && !order.items.length
         ? {
             serviceSnapshot: order.serviceSnapshot,
             quantity: order.quantity,
@@ -4075,33 +4013,14 @@ const updateServiceProgress = async (req, res) => {
         });
       }
     } else {
-      const validStatuses = ["pending", "in_progress", "completed"];
-      const deliverable = progress.deliverables.find(
-        (entry) => entry.key === deliverableKey,
-      );
-
-      if (
-        action !== "set_deliverable_status" ||
-        !deliverable ||
-        !validStatuses.includes(status)
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "Select a valid deliverable and status.",
-        });
-      }
-
-      deliverable.status = status;
-      deliverable.completedAt =
-        status === "completed" ? new Date() : null;
+      return res.status(400).json({ success: false, message: "Select a valid deliverable and status." });
     }
 
-    if (item) {
-      item.serviceProgress = progress;
-    } else {
-      order.serviceProgress = progress;
-    }
-    await order.save();
+    const saved = await persistServiceProgress(order, item, progress, req.user._id, {
+      fromStatus: progressItem.serviceProgress?.status, toStatus: progress.status,
+      changedFields: ["serviceProgress"],
+    });
+    if (!saved) return res.status(409).json({ success: false, message: "The order changed. Refresh and try again." });
 
     const updatedOrder = await Order.findById(order._id)
       .select(req.user?.role === "employee" ? "-codPin -notes" : "-codPin")
@@ -4205,7 +4124,7 @@ const updateOrderStatus = async (
       message:
         "Order status updated successfully.",
       order:
-        updatedOrder,
+        toOrderWithServiceProgress(updatedOrder),
     });
   } catch (error) {
     console.error(
@@ -4371,6 +4290,79 @@ const updatePaymentStatus =
     }
   };
 
+// Write progress and its derived order status together, with an optimistic guard
+// covering other staff edits, cancellation, and payment changes.
+const persistServiceProgress = async (order, item, progress, actor, event) => {
+  const itemId = item ? String(item._id) : "legacy";
+  const progresses = order.items?.length
+    ? order.items.map(entry => String(entry._id) === itemId ? progress : getOrderItemServiceProgress(entry))
+    : [progress];
+  const statusChanged = event.fromStatus !== event.toStatus || event.changedFields.includes("serviceProgress");
+  const orderStatus = statusChanged ? deriveOrderStatus(order, progresses) : order.orderStatus;
+  const path = item ? "items.$.serviceProgress" : "serviceProgress";
+  const filter = { _id: order._id, updatedAt: order.updatedAt, orderStatus: order.orderStatus };
+  if (typeof order.__v === "number") filter.__v = order.__v;
+  if (item) filter["items._id"] = item._id;
+  const result = await Order.updateOne(filter, {
+    $set: { [path]: progress, orderStatus },
+    $inc: { __v: 1 },
+    $push: { fulfillmentHistory: { ...event, actor, itemId, at: new Date(),
+      orderStatusBefore: order.orderStatus, orderStatusAfter: orderStatus } },
+  }, { runValidators: true });
+  return result.matchedCount === 1;
+};
+
+const updateDeliverable = async (req, res) => {
+  if (!["admin", "employee"].includes(req.user?.role)) return res.status(403).json({ success: false, message: "Order management access required." });
+  const { id, itemId, deliverableKey } = req.params;
+  if (!mongoose.isValidObjectId(id) || (itemId !== "legacy" && !mongoose.isValidObjectId(itemId)) ||
+      typeof deliverableKey !== "string" || !deliverableKey || deliverableKey.length > 100) {
+    return res.status(400).json({ success: false, message: "Invalid order deliverable reference." });
+  }
+  const error = validateDeliverablePatch(req.body);
+  if (error) return res.status(400).json({ success: false, message: error });
+  try {
+    const order = await Order.findById(id);
+    if (!order) return res.status(404).json({ success: false, message: "Order not found." });
+    if (inactiveStatuses.includes(order.orderStatus) || order.adCreditReleased) return res.status(409).json({ success: false, message: "This order is inactive. Its deliverables cannot be changed." });
+    const item = itemId === "legacy" ? null : order.items.id(itemId);
+    if (!item && (itemId !== "legacy" || order.items.length)) return res.status(404).json({ success: false, message: "Order service was not found." });
+    const progress = getOrderItemServiceProgress(item || order);
+    const deliverable = progress?.deliverables?.find(entry => entry.key === deliverableKey);
+    if (!deliverable) return res.status(404).json({ success: false, message: "Deliverable was not found." });
+    if (Object.hasOwn(req.body, "updatedAt") &&
+        (req.body.updatedAt ? new Date(req.body.updatedAt).getTime() : 0) !== (deliverable.updatedAt ? new Date(deliverable.updatedAt).getTime() : 0)) {
+      return res.status(409).json({ success: false, message: "This deliverable changed. Refresh the order before editing again." });
+    }
+    const fromStatus = deliverable.status;
+    const now = new Date();
+    if (Object.hasOwn(req.body, "status")) {
+      deliverable.status = req.body.status;
+      deliverable.completedAt = req.body.status === "completed" ? deliverable.completedAt || now : null;
+    }
+    if (Object.hasOwn(req.body, "links")) deliverable.links = req.body.links.map(link => ({ label: (link.label || "").trim(), url: link.url.trim() }));
+    if (Object.hasOwn(req.body, "notes")) deliverable.notes = req.body.notes.trim();
+    deliverable.updatedAt = new Date(Math.max(now.getTime(), new Date(deliverable.updatedAt || 0).getTime() + 1));
+    for (const entry of progress.deliverables) {
+      entry.createdAt ||= order.createdAt || now;
+      entry.updatedAt ||= entry.createdAt;
+    }
+    progress.deliveryVersion = 1;
+    if (progress.type === "quantity_based") progress.status = deliverableSummary(progress.deliverables).displayStatus;
+    const saved = await persistServiceProgress(order, item, progress, req.user._id, {
+      deliverableKey, fromStatus, toStatus: deliverable.status,
+      changedFields: Object.keys(req.body).filter(key => key !== "updatedAt"),
+    });
+    if (!saved) return res.status(409).json({ success: false, message: "The order changed. Refresh and try again." });
+    const updated = await Order.findById(id).select(req.user.role === "employee" ? "-codPin -notes" : "-codPin")
+      .populate("client", "name email username").populate("service", "name category").populate("items.service", "name category");
+    return res.json({ success: true, message: "Deliverable saved.", order: toOrderWithServiceProgress(updated) });
+  } catch (error) {
+    console.error("Update deliverable error:", error);
+    return res.status(error.name === "ValidationError" ? 400 : 500).json({ success: false, message: "Unable to save the deliverable." });
+  }
+};
+
 const updateServiceDelivery = async (req, res) => {
   try {
     if (!["admin", "employee"].includes(req.user?.role)) {
@@ -4395,14 +4387,18 @@ const updateServiceDelivery = async (req, res) => {
     }
     const order = await Order.findById(id);
     if (!order) return res.status(404).json({ success: false, message: "Order not found." });
+    if (inactiveStatuses.includes(order.orderStatus) || order.adCreditReleased) return res.status(409).json({ success: false, message: "This order is inactive." });
     const item = order.items?.id(itemId);
     if (!item) return res.status(404).json({ success: false, message: "Order service was not found." });
     if (!supportsServiceDelivery(item.serviceSnapshot)) {
       return res.status(400).json({ success: false, message: "Delivery links are not supported for this service." });
     }
+    if (item.serviceProgress?.deliveryVersion) return res.status(409).json({ success: false, message: "Use Service Deliverables to update this service's links." });
     const delivery = { url, updatedAt: new Date(), updatedBy: req.user._id };
-    const result = await Order.updateOne({ _id: order._id, "items._id": item._id },
-      { $set: { "items.$.delivery": delivery } }, { runValidators: true });
+    const result = await Order.updateOne({ _id: order._id, "items._id": item._id,
+      ...(order.updatedAt ? { updatedAt: order.updatedAt } : {}),
+      ...(typeof order.__v === "number" ? { __v: order.__v } : {}) },
+      { $set: { "items.$.delivery": delivery }, $inc: { __v: 1 } }, { runValidators: true });
     if (result.matchedCount !== 1) {
       return res.status(409).json({ success: false, message: "Order service changed. Refresh and try again." });
     }
@@ -4663,10 +4659,14 @@ const getAdminCodOrders =
 module.exports = {
   validateFieldValue, resolvePricingSelections, getApplicableFields, resolveGroupedPricingQuantities, validateQuantityRules, validateRepeatableGroups, calculateFieldOptionsAmount, calculateRepeatableGroupsAmount, calculateOrderAmount,
   updateServiceDelivery,
+  updateDeliverable,
   getPaymentPricing,
   getCouponQuote,
   getOrderQuote,
   calculateCouponQuote,
+  calculateCouponStack,
+  validateCouponAvailability,
+  processOrderServiceItem,
   calculateCouponEligibleAmount,
   createOrder,
   getMyOrders,

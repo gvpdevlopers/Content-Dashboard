@@ -564,36 +564,26 @@ const serviceSnapshotSchema = new mongoose.Schema(
 |
 */
 
-const serviceDeliverableProgressSchema = new mongoose.Schema(
-  {
-    key: {
-      type: String,
-      required: true,
-    },
-
-    name: {
-      type: String,
-      required: true,
-    },
-
-    status: {
-      type: String,
-      enum: ["pending", "in_progress", "completed"],
-      default: "pending",
-    },
-
-    completedAt: {
-      type: Date,
-      default: null,
-    },
-  },
-  {
-    _id: false,
-  }
-);
+// The stable key identifies an output within its order service. This extends the
+// existing progress snapshot rather than duplicating output/status state.
+const serviceDeliverableProgressSchema = new mongoose.Schema({
+  id: { type: String },
+  key: { type: String, required: true },
+  name: { type: String, required: true, maxlength: 200 },
+  status: { type: String, enum: ["pending", "in_progress", "completed"], default: "pending" },
+  links: { type: [new mongoose.Schema({
+    label: { type: String, trim: true, maxlength: 120, default: "" },
+    url: { type: String, required: true, maxlength: 2048, validate: require("../utils/serviceDeliverables").validDeliveryUrl },
+  }, { _id: false })], default: [], validate: value => value.length <= 20 },
+  notes: { type: String, maxlength: 4000, default: "" },
+  createdAt: { type: Date, default: null },
+  updatedAt: { type: Date, default: null },
+  completedAt: { type: Date, default: null },
+}, { _id: false });
 
 const serviceProgressSchema = new mongoose.Schema(
   {
+    deliveryVersion: { type: Number, default: undefined },
     type: {
       type: String,
       enum: ["time_based", "quantity_based"],
@@ -634,6 +624,15 @@ const serviceProgressSchema = new mongoose.Schema(
 
 const couponDiscountSnapshotSchema = new mongoose.Schema(
   {
+    scope: { type: String, enum: ["all", "service", "options"], default: "service" },
+    discountType: { type: String, enum: ["percentage", "fixed", "combined"], default: "percentage" },
+    discountValue: { type: Number, min: 0 },
+    optionBreakdown: { type: [new mongoose.Schema({
+      key: { type: String, required: true },
+      label: { type: String, required: true },
+      amount: { type: Number, min: 0, required: true },
+      discountAmount: { type: Number, min: 0, required: true },
+    }, { _id: false })], default: [] },
     serviceId: {
       type: mongoose.Schema.Types.ObjectId,
       default: null,
@@ -850,6 +849,15 @@ const orderItemSchema = new mongoose.Schema(
 
 const orderSchema = new mongoose.Schema(
   {
+
+    archivedAt: { type: Date, default: null, index: true },
+    archivedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    archiveHistory: { type: [new mongoose.Schema({
+      action: { type: String, enum: ["archive", "restore"], required: true },
+      actor: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+      at: { type: Date, required: true },
+      snapshot: { type: mongoose.Schema.Types.Mixed, required: true },
+    }, { _id: false })], default: [], select: false },
     orderNumber: {
       type: String,
       required: true,
@@ -973,6 +981,7 @@ const orderSchema = new mongoose.Schema(
       min: 0,
     },
 
+    couponSnapshots: { type: [couponSnapshotSchema], default: [] },
     couponSnapshot: {
       type: couponSnapshotSchema,
       default: undefined,
@@ -1148,6 +1157,17 @@ const orderSchema = new mongoose.Schema(
     | Order workflow status
     |--------------------------------------------------------------------------
     */
+
+    fulfillmentHistory: {
+      type: [new mongoose.Schema({
+        actor: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+        at: { type: Date, required: true },
+        itemId: String, deliverableKey: String,
+        fromStatus: String, toStatus: String,
+        orderStatusBefore: String, orderStatusAfter: String,
+        changedFields: [String],
+      }, { _id: false })], default: [], select: false,
+    },
 
     orderStatus: {
       type: String,

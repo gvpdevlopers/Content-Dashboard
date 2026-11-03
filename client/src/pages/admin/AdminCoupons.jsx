@@ -21,9 +21,12 @@ import {
 import { toast } from "sonner";
 
 import couponService from "../../services/couponService";
-import serviceService from "../../services/serviceService";
+
 
 const emptyForm = {
+  scope: "service",
+  discountType: "percentage",
+  discountValue: "0",
   code: "",
   serviceDiscounts: [],
   expiresAt: "",
@@ -93,13 +96,14 @@ const AdminCoupons = () => {
 
   const readData = useCallback(async () => {
     const [couponResponse, serviceResponse] = await Promise.all([
-      couponService.listCoupons(), serviceService.getAdminServices(),
+      couponService.listCoupons(), couponService.getTargets(),
     ]);
     return { coupons: couponResponse.coupons || [], services: serviceResponse.services || [] };
   }, []);
   const configureDiscounts = useCallback(({ services }) => {
     setForm((current) => ({ ...current, serviceDiscounts: services.map((service) => ({
       serviceId: String(service._id),
+      ...current.serviceDiscounts.find((entry) => String(entry.serviceId) === String(service._id)),
       discountPercent: current.serviceDiscounts.find((entry) => String(entry.serviceId) === String(service._id))?.discountPercent ?? "0",
     })) }));
   }, []);
@@ -140,12 +144,12 @@ const AdminCoupons = () => {
     setEditingId("");
   };
 
-  const changeDiscount = (serviceId, value) => {
+  const changeDiscount = (serviceId, patch) => {
     setForm((current) => ({
       ...current,
       serviceDiscounts: current.serviceDiscounts.map((entry) =>
         entry.serviceId === serviceId
-          ? { ...entry, discountPercent: value }
+          ? { ...entry, ...patch }
           : entry,
       ),
     }));
@@ -156,12 +160,16 @@ const AdminCoupons = () => {
     setFormError("");
     setFormSuccess("");
     setForm({
+      scope: coupon.scope || "service",
+      discountType: coupon.discountType || "percentage",
+      discountValue: coupon.discountValue ?? "0",
       code: coupon.code,
       serviceDiscounts: sortedServices.map((service) => {
         const saved = coupon.serviceDiscounts?.find(
           (entry) => String(entry.serviceId) === String(service._id),
         );
         return {
+          ...saved,
           serviceId: service._id,
           discountPercent: String(saved?.discountPercent ?? 0),
         };
@@ -185,7 +193,8 @@ const AdminCoupons = () => {
       const payload = {
         ...form,
         code: form.code.trim().toUpperCase(),
-        serviceDiscounts: form.serviceDiscounts.map((entry) => ({
+        serviceDiscounts: (form.scope === "all" ? [] : form.serviceDiscounts.filter(entry => Number(entry.discountValue ?? entry.discountPercent) > 0)).map((entry) => ({
+          ...entry,
           serviceId: entry.serviceId,
           discountPercent: Number(entry.discountPercent || 0),
         })),
@@ -218,8 +227,12 @@ const AdminCoupons = () => {
     setTogglingId(coupon._id);
     try {
       const payload = {
+        scope: coupon.scope || "service",
+        discountType: coupon.discountType || "percentage",
+        discountValue: coupon.discountValue ?? "0",
         code: coupon.code,
         serviceDiscounts: (coupon.serviceDiscounts || []).map((entry) => ({
+          ...entry,
           serviceId: entry.serviceId,
           discountPercent: entry.discountPercent,
         })),
@@ -293,7 +306,7 @@ const AdminCoupons = () => {
             Coupons
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">
-            Create service-specific discounts and review successful coupon
+            Create service and option-specific discounts and review successful coupon
             redemptions.
           </p>
         </div>
@@ -320,8 +333,7 @@ const AdminCoupons = () => {
               {editingId ? "Edit coupon" : "Create a coupon"}
             </h2>
             <p className="mt-1 text-xs text-zinc-500">
-              Set a percentage for each eligible service. Leave a service at 0%
-              to exclude it.
+              Choose eligible services or options, then set a percentage or fixed discount. Leave unused service discounts at zero.
             </p>
           </div>
           {editingId && (
@@ -433,7 +445,20 @@ const AdminCoupons = () => {
           </label>
         </div>
 
-        <fieldset className="mt-6">
+        <div className="mt-6 grid gap-4 sm:grid-cols-3">
+          <CustomSelect label="Discount scope" value={form.scope} onChange={scope => setForm(current => ({ ...current, scope }))}
+            options={[{ value: "all", label: "All services" }, { value: "service", label: "Individual service" }, { value: "options", label: "Specific service options / add-ons" }]} />
+          {form.scope === "all" && <>
+            <CustomSelect label="Discount type" value={form.discountType} onChange={discountType => setForm(current => ({ ...current, discountType }))}
+              options={[{ value: "percentage", label: "Percentage" }, { value: "fixed", label: "Fixed amount (INR)" }]} />
+            <label className="text-xs font-medium text-zinc-600">Discount value
+              <input type="number" min="0.01" max={form.discountType === "percentage" ? 100 : undefined} step="0.01" required className={inputClass} value={form.discountValue} onChange={e => setForm(current => ({ ...current, discountValue: e.target.value }))} />
+            </label>
+          </>}
+        </div>
+        <p className="mt-3 text-xs text-zinc-500">Fixed discounts apply once to the eligible charges, capped at their value. Ad spend is excluded. For individual services, leave unused discounts at zero.</p>
+        {form.scope !== "all" && <fieldset className="mt-6">
+
           <legend className="text-sm font-semibold text-zinc-800">
             Service discounts
           </legend>
@@ -463,39 +488,33 @@ const AdminCoupons = () => {
               const discount = form.serviceDiscounts.find(
                 (entry) => String(entry.serviceId) === String(service._id),
               );
+              const targets = service.couponTargets || [];
+              const selectedTargets = discount?.targets || [];
+              const unavailable = selectedTargets.filter(key => !targets.some(t => t.key === key));
               return (
-                <label
-                  key={service._id}
-                  className="flex items-center justify-between gap-4 rounded-xl border border-zinc-200 bg-zinc-50/60 px-3.5 py-3"
-                >
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium text-zinc-800">
-                      {service.name}
-                    </span>
-                    <span className="mt-0.5 block text-[11px] text-zinc-400">
-                      {service.category || "Service"}
-                    </span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-2">
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      required
-                      aria-label={`${service.name} discount percentage`}
-                      value={discount?.discountPercent ?? "0"}
-                      onChange={(event) =>
-                        changeDiscount(
-                          String(service._id),
-                          event.target.value,
-                        )
-                      }
-                      className="w-24 rounded-lg border border-zinc-200 bg-white px-2.5 py-2 text-right text-sm outline-none focus:border-zinc-500"
-                    />
-                    <span className="text-sm text-zinc-400">%</span>
-                  </span>
-                </label>
+                <div key={service._id} className="space-y-3 rounded-xl border border-zinc-200 bg-zinc-50/60 p-3.5">
+                  <p className="text-sm font-medium text-zinc-800">{service.name}{service.isActive === false ? " (inactive)" : ""}</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <CustomSelect aria-label={`${service.name} discount type`} value={discount?.discountType || "percentage"}
+                      onChange={discountType => changeDiscount(String(service._id), { discountType })}
+                      options={[{ value: "percentage", label: "Percentage" }, { value: "fixed", label: "Fixed amount (INR)" }]} />
+                    <input type="number" min="0" max={discount?.discountType === "fixed" ? undefined : 100} step="0.01" required
+                      aria-label={`${service.name} discount value`} value={discount?.discountValue ?? discount?.discountPercent ?? "0"}
+                      onChange={event => changeDiscount(String(service._id), { discountValue: event.target.value, discountPercent: event.target.value })}
+                      className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm" />
+                  </div>
+                  {form.scope === "options" && <>
+                    <CustomSelect label="Eligible options / add-ons" multiple searchable value={selectedTargets}
+                      disabled={targets.length === 0 && unavailable.length === 0}
+                      options={[...targets.map(t => ({ value: t.key, label: t.label })), ...unavailable.map(key => ({ value: key, label: "Unavailable option - remove before saving" }))]}
+                      onChange={targets => changeDiscount(String(service._id), { targets })} />
+                    {targets.length === 0 && <p className="text-xs text-zinc-500">No separately priced options are available.</p>}
+                    {selectedTargets.length > 0 && <ul className="space-y-1 text-xs text-zinc-600">{selectedTargets.map(key => <li key={key} className="flex items-center justify-between gap-2">
+                      <span>{targets.find(t => t.key === key)?.label || "Unavailable option"}</span>
+                      <button type="button" className="dashboard-action dashboard-action--secondary dashboard-action--icon" aria-label="Remove selected coupon option" onClick={() => changeDiscount(String(service._id), { targets: selectedTargets.filter(t => t !== key) })}><X size={14} /></button>
+                    </li>)}</ul>}
+                  </>}
+                </div>
               );
             })}
             {visibleDiscountServices.length === 0 && (
@@ -504,7 +523,7 @@ const AdminCoupons = () => {
               </p>
             )}
           </div>
-        </fieldset>
+        </fieldset>}
 
         <FormFeedback message={formError} />
         <FormFeedback message={formSuccess} tone="success" />
@@ -595,11 +614,11 @@ const AdminCoupons = () => {
                         </span>
                       </div>
                       <p className="mt-1 text-xs text-zinc-500">
-                        {(coupon.serviceDiscounts || [])
-                          .filter((entry) => entry.discountPercent > 0)
+                        {coupon.scope === "all" ? `All services: ${coupon.discountValue}${coupon.discountType === "fixed" ? " INR" : "%"}` : (coupon.serviceDiscounts || [])
+                          .filter((entry) => Number(entry.discountValue ?? entry.discountPercent) > 0)
                           .map(
                             (entry) =>
-                              `${entry.serviceName}: ${entry.discountPercent}%`,
+                              `${entry.serviceName}: ${entry.discountValue ?? entry.discountPercent}${entry.discountType === "fixed" ? " INR" : "%"}${coupon.scope === "options" ? ` (${entry.targets?.length || 0} options)` : ""}`,
                           )
                           .join(" · ") || "No service discounts"}
                       </p>

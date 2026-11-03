@@ -19,6 +19,10 @@ const applyFixedPackagePrice = (results, price) => {
     row.result.amount = (row.reserve + share) / 100;
     row.result.item.amount = row.result.amount;
     row.result.couponEligibleAmount = share / 100;
+    // Apply the bundle allocation to each component, not its full catalogue price.
+    row.result.couponComponents = (row.result.couponComponents || []).map(component => ({
+      ...component, amount: row.weight ? Math.floor(component.amount * 100 * share / row.weight) / 100 : 0,
+    }));
   });
 };
 module.exports = { applyFixedPackagePrice };

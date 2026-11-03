@@ -8,5 +8,6 @@ const deliverableServiceSlugs = new Set([
 const supportsServiceDelivery = (snapshot = {}) =>
   typeof snapshot.supportsDelivery === "boolean"
     ? snapshot.supportsDelivery
-    : deliverableServiceSlugs.has(String(snapshot.slug || "").trim().toLowerCase());
+    : deliverableServiceSlugs.has(String(snapshot.slug || "").trim().toLowerCase()) ||
+      (snapshot.pricingType === "per_unit" && ["video", "design", "image", "post"].includes(String(snapshot.unit || "").trim().toLowerCase()));
 module.exports = { supportsServiceDelivery };

@@ -1,0 +1,12 @@
+{
+  "passed": [
+    "option selection and payload",
+    "editing preserves targets",
+    "fixed option discount",
+    "toggle preserves targeting",
+    "global fixed coupon",
+    "390px no overflow",
+    "no browser errors"
+  ],
+  "writes": 4
+}

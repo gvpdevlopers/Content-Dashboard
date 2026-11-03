@@ -1,0 +1,13 @@
+{
+  "passed": [
+    "draft restores both coupons",
+    "remove keeps remaining coupon",
+    "add second coupon",
+    "duplicate blocked",
+    "invalid coupon removable",
+    "online GST revalidation",
+    "draft saves coupon array",
+    "390px no overflow",
+    "no page errors"
+  ]
+}

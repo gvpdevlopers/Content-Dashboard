@@ -237,11 +237,12 @@ const OrderItemsOverview = ({
             })}
 
             {renderServiceExtras?.(item)}
-            <ServiceDelivery item={item} onSave={onDeliverySave} />
+            <ServiceDelivery item={item} onSave={onDeliverySave} inactive={["cancelled", "rejected", "failed"].includes(order?.orderStatus)} />
 
             <ServiceProgress
               item={item}
               compact={compact}
+              showDeliverables={false}
               inactive={["cancelled", "rejected", "failed"].includes(order?.orderStatus)}
               canManage={canManageProgress}
               updatingKey={updatingProgressKey}

@@ -3,6 +3,7 @@ const protect = require("../middleware/auth");
 const adminOnly = require("../middleware/admin");
 const {
   listCoupons,
+  listCouponTargets,
   createCoupon,
   updateCoupon,
   deleteCoupon,
@@ -16,6 +17,7 @@ router.post("/validate", protect, validateCheckoutCoupon);
 
 router.use("/admin", protect, adminOnly);
 router.get("/admin", listCoupons);
+router.get("/admin/targets", listCouponTargets);
 router.post("/admin", createCoupon);
 router.patch("/admin/:id", updateCoupon);
 router.delete("/admin/:id", deleteCoupon);

@@ -1,3 +1,4 @@
+const { normalizeCouponCodes } = require("../utils/couponCodes");
 const { normalizeServiceId } = require("../utils/serviceIdentity");
 const Service = require("../models/Service");
 const { canClientOrderService } = require("../utils/serviceAccess");
@@ -65,10 +66,8 @@ const normalizeDraftInput = (body = {}) => {
     throw requestError("Additional requirements must be 5000 characters or fewer.");
   }
 
-  const couponCode = String(body.couponCode || "").trim().toUpperCase();
-  if (couponCode && !/^[A-Z0-9_-]{2,40}$/.test(couponCode)) {
-    throw requestError("Coupon code is invalid.");
-  }
+  const couponCodes = normalizeCouponCodes(body.couponCodes, body.couponCode);
+  const couponCode = couponCodes[0] || "";
 
   if (body.packageId !== undefined && body.packageId !== null && !mongoose.Types.ObjectId.isValid(body.packageId)) {
     throw requestError("Package reference is invalid.");
@@ -79,6 +78,7 @@ const normalizeDraftInput = (body = {}) => {
     services,
     additionalRequirements,
     couponCode,
+    couponCodes,
     packageId: body.packageId || null,
   };
 };

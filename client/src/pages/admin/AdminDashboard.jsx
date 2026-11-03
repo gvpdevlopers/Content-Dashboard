@@ -1,7 +1,7 @@
 import useAsyncResource from "../../hooks/useAsyncResource";
 import useCollectionPaymentRefresh from "../../hooks/useCollectionPaymentRefresh";
 import StatusBadge from "../../components/OrderStatusBadge";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 
 import {
   ArrowUpRight,
@@ -33,6 +33,12 @@ const AdminDashboard = () => {
   const { data: { orders, users }, loading, error, reload: loadDashboard } = useAsyncResource(readDashboard,
     { initialData: { orders: [], users: [] }, errorMessage: "Unable to load dashboard data." });
   useCollectionPaymentRefresh(orders, loadDashboard);
+  useEffect(() => {
+    const refresh = () => loadDashboard(true);
+    window.addEventListener("orders:archive-changed", refresh);
+    window.addEventListener("focus", refresh);
+    return () => { window.removeEventListener("orders:archive-changed", refresh); window.removeEventListener("focus", refresh); };
+  }, [loadDashboard]);
 
   /* =========================================================
      NORMALIZED ORDERS

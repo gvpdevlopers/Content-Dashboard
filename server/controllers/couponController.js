@@ -1,3 +1,4 @@
+const { getCouponTargets } = require("../utils/couponTargets");
 const Coupon = require("../models/Coupon");
 const CouponUsage = require("../models/CouponUsage");
 const Service = require("../models/Service");
@@ -22,8 +23,18 @@ const validateCouponInput = async (body) => {
     );
   }
 
-  const rawDiscounts = body.serviceDiscounts;
-  if (!Array.isArray(rawDiscounts) || rawDiscounts.length === 0) {
+  const scope = body.scope || "service";
+  if (!["all", "service", "options"].includes(scope)) throw inputError("Invalid discount scope.");
+  const parseDiscount = (entry) => {
+    const discountType = entry.discountType || "percentage";
+    const discountValue = Number(entry.discountValue ?? entry.discountPercent ?? 0);
+    if (!["percentage", "fixed"].includes(discountType) || !Number.isFinite(discountValue) || discountValue < 0 || (discountType === "percentage" && discountValue > 100)) throw inputError("Enter a valid discount (percentage must be between 0 and 100).");
+    return { discountType, discountValue };
+  };
+  const globalDiscount = parseDiscount(body);
+  if (scope === "all" && globalDiscount.discountValue <= 0) throw inputError("Enter a discount greater than zero.");
+  const rawDiscounts = scope === "all" ? [] : body.serviceDiscounts;
+  if (!Array.isArray(rawDiscounts) || (scope !== "all" && rawDiscounts.length === 0)) {
     throw inputError("Configure at least one service discount.");
   }
 
@@ -31,7 +42,8 @@ const validateCouponInput = async (body) => {
   const serviceDiscounts = [];
   for (const entry of rawDiscounts) {
     const serviceId = String(entry?.serviceId || "");
-    const discountPercent = Number(entry?.discountPercent);
+    const discount = parseDiscount(entry || {});
+    const discountPercent = discount.discountType === "percentage" ? discount.discountValue : 0;
     if (!serviceId || !Number.isFinite(discountPercent) ||
         discountPercent < 0 || discountPercent > 100) {
       throw inputError("Each service discount must be between 0% and 100%.");
@@ -40,17 +52,25 @@ const validateCouponInput = async (body) => {
       throw inputError("A service can only be configured once.");
     }
     seenServiceIds.add(serviceId);
-    serviceDiscounts.push({ serviceId, discountPercent });
+    const targets = scope === "options" ? entry.targets : [];
+    if (!Array.isArray(targets) || (scope === "options" && targets.length === 0) || targets.some(t => typeof t !== "string") || new Set(targets).size !== targets.length) throw inputError("Select unique service options for each configured service.");
+    serviceDiscounts.push({ serviceId, discountPercent, ...discount, targets });
   }
 
   const services = await Service.find({
     _id: { $in: serviceDiscounts.map((entry) => entry.serviceId) },
-  }).select("_id name");
+  }).select("_id name slug fields pricingOptions repeatableGroups isActive");
   const servicesById = new Map(
     services.map((service) => [String(service._id), service]),
   );
   if (servicesById.size !== serviceDiscounts.length) {
     throw inputError("One or more selected services could not be found.");
+  }
+
+  for (const entry of serviceDiscounts) {
+    const service = servicesById.get(entry.serviceId);
+    const valid = new Set(getCouponTargets(service).map(t => t.key));
+    if (entry.targets.some(target => !valid.has(target))) throw inputError("A selected option is inactive, deleted, or does not belong to this service. Review the coupon targets.");
   }
 
   const parseOptionalLimit = (value, label) => {
@@ -79,6 +99,8 @@ const validateCouponInput = async (body) => {
 
   return {
     code,
+    scope,
+    ...globalDiscount,
     serviceDiscounts: serviceDiscounts.map((entry) => ({
       ...entry,
       serviceName: servicesById.get(entry.serviceId).name,
@@ -234,7 +256,16 @@ const getCouponUsages = async (req, res) => {
 
 const validateCheckoutCoupon = (req, res) => getCouponQuote(req, res);
 
+const listCouponTargets = async (_req, res) => {
+  try {
+    const services = await Service.find({}).lean();
+    return res.json({ success: true, services: services.map(service => ({ ...service, couponTargets: getCouponTargets(service) })) });
+  } catch (error) { return handleAdminError(res, error, "Unable to load coupon options."); }
+};
+
 module.exports = {
+  validateCouponInput,
+  listCouponTargets,
   listCoupons,
   createCoupon,
   updateCoupon,

@@ -27,6 +27,7 @@ const getCouponUsages = async (couponId) => {
 
 const couponService = {
   listCoupons,
+  getTargets: async () => (await api.get("/coupons/admin/targets")).data,
   createCoupon,
   updateCoupon,
   deleteCoupon,

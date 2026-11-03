@@ -2261,6 +2261,16 @@ const NewOrder = () => {
   );
   const [couponInput, setCouponInput] = useState("");
   const [appliedCouponCode, setAppliedCouponCode] = useState("");
+  const addCoupon = () => {
+    const code = couponInput.trim().toUpperCase();
+    const codes = appliedCouponCode ? appliedCouponCode.split(",") : [];
+    if (!/^[A-Z0-9_-]{2,40}$/.test(code)) { toast.error("Enter a valid coupon code."); return; }
+    if (codes.includes(code)) { toast.error("This coupon is already added."); return; }
+    if (codes.length >= 5) { toast.error("Apply at most five coupons per order."); return; }
+    setAppliedCouponCode([...codes, code].join(","));
+    setCouponInput("");
+    setCouponError("");
+  };
   const [couponQuote, setCouponQuote] = useState(null);
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponError, setCouponError] = useState("");
@@ -2475,6 +2485,7 @@ const NewOrder = () => {
 
     const requestKey = JSON.stringify({
       code: appliedCouponCode,
+      packageId: selectedPackageId,
       orderItems,
       paymentMethod,
       chequeType,
@@ -2490,7 +2501,7 @@ const NewOrder = () => {
           throw new Error("Select at least one service to use a coupon.");
         }
         const response = await orderService.validateCoupon({
-          code: appliedCouponCode,
+          couponCodes: appliedCouponCode.split(","),
           services: buildServicesPayload(orderItems),
           ...(selectedPackageId ? { packageId: selectedPackageId } : {}),
           paymentMethod,
@@ -2763,8 +2774,8 @@ const NewOrder = () => {
     const restored = restoreOrderItems({ items: draftItems }, services);
     restored.issues.push(...accessIssues.map((issue) => issue.message));
     setAdditionalRequirements(draft.additionalRequirements || "");
-    setCouponInput(draft.couponCode || "");
-    setAppliedCouponCode(draft.couponCode || "");
+    setCouponInput("");
+    setAppliedCouponCode(draft.couponCodes?.length ? draft.couponCodes.join(",") : draft.couponCode || "");
     setPaymentMethod("cod");
     setChequeType("");
     setEditingDraftId(String(draft._id));
@@ -2865,7 +2876,7 @@ const NewOrder = () => {
         services: buildServicesPayload(orderItems),
         ...(selectedPackageId ? { packageId: selectedPackageId } : {}),
         additionalRequirements: additionalRequirements.trim(),
-        couponCode: appliedCouponCode,
+        couponCodes: appliedCouponCode ? appliedCouponCode.split(",") : [],
       };
       const response = editingDraftId
         ? await draftService.updateDraft(editingDraftId, payload)
@@ -3432,6 +3443,7 @@ const NewOrder = () => {
   const currentCouponRequestKey = appliedCouponCode
     ? JSON.stringify({
         code: appliedCouponCode,
+        packageId: selectedPackageId,
         orderItems,
         paymentMethod,
         chequeType,
@@ -3950,7 +3962,7 @@ const NewOrder = () => {
       additionalRequirements: additionalRequirements.trim(),
       paymentMethod,
       chequeType: paymentMethod === "cheque" ? chequeType : "",
-      couponCode: appliedCouponCode,
+      couponCodes: appliedCouponCode ? appliedCouponCode.split(",") : [],
       adCredit: appliedAdCredit,
     });
 
@@ -4066,7 +4078,7 @@ const NewOrder = () => {
           adCredit: appliedAdCredit,
           paymentMethod,
           ...(paymentMethod === "cheque" ? { chequeType } : {}),
-          ...(appliedCouponCode ? { couponCode: appliedCouponCode } : {}),
+          ...(appliedCouponCode ? { couponCodes: appliedCouponCode.split(",") } : {}),
         });
         setDraftQuote({
           ...quoteResponse.quote,
@@ -4099,7 +4111,7 @@ const NewOrder = () => {
         additionalRequirements: additionalRequirements.trim(),
         paymentMethod,
         ...(paymentMethod === "cheque" ? { chequeType } : {}),
-        ...(appliedCouponCode ? { couponCode: appliedCouponCode } : {}),
+        ...(appliedCouponCode ? { couponCodes: appliedCouponCode.split(",") } : {}),
         ...(editingDraftId
           ? {
               draftId: editingDraftId,
@@ -6217,9 +6229,9 @@ const NewOrder = () => {
                                 <div className="flex items-start justify-between gap-3 rounded-lg bg-white/[0.04] px-2.5 py-2">
                                   <div>
                                     <p className="text-xs text-emerald-200/80">
-                                      Coupon discount (
-                                      {serviceCouponLine.discountPercent}%)
+                                      Coupon discount {serviceCouponLine.discountType === "combined" ? "(combined coupons)" : serviceCouponLine.discountType === "fixed" ? "(fixed amount)" : `(${serviceCouponLine.discountPercent}%)`}
                                     </p>
+                                    {serviceCouponLine.optionBreakdown?.map(option => <p key={option.key} className="mt-1 text-xs text-white/70">{option.label}: -{formatCurrency(option.discountAmount)}</p>)}
                                     {serviceCouponLine.eligibleAmount <
                                       serviceCouponLine.originalAmount && (
                                       <p className="mt-0.5 text-[10px] text-white/35">
@@ -6270,61 +6282,42 @@ const NewOrder = () => {
                       <input
                         id="order-coupon-code"
                         value={couponInput}
-                        disabled={Boolean(appliedCouponCode) || submitting}
+                        disabled={submitting || currentCouponLoading}
                         onChange={(event) =>
                           setCouponInput(event.target.value.toUpperCase())
                         }
                         onKeyDown={(event) => {
                           if (event.key === "Enter") {
                             event.preventDefault();
-                            if (couponInput.trim()) {
-                              setCouponError("");
-                              setAppliedCouponCode(
-                                couponInput.trim().toUpperCase(),
-                              );
-                            }
+                            if (couponInput.trim() && !currentCouponLoading && !submitting) addCoupon();
                           }
                         }}
                         placeholder="Enter coupon code"
                         className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm uppercase !text-white caret-white outline-none placeholder:normal-case placeholder:text-white/25 focus:border-white/25 disabled:opacity-60"
                       />
-                      {appliedCouponCode ? (
-                        <button
-                          type="button"
-                          disabled={submitting}
-                          onClick={() => {
-                            setAppliedCouponCode("");
-                            setCouponInput("");
-                            setCouponQuote(null);
-                            setCouponError("");
-                            setCouponErrorRequestKey("");
-                            setCouponLoading(false);
-                          }}
-                          className="dashboard-action dashboard-action--tertiary dashboard-action--inverse shrink-0 rounded-xl border border-white/15 px-3 py-2.5 text-xs font-medium text-white/70 hover:bg-white/10"
-                        >
-                          Remove
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={
-                            !couponInput.trim() ||
-                            !orderItems.length ||
-                            currentCouponLoading ||
-                            submitting
-                          }
-                          onClick={() => {
-                            setCouponError("");
-                            setAppliedCouponCode(
-                              couponInput.trim().toUpperCase(),
-                            );
-                          }}
-                          className="dashboard-action dashboard-action--primary dashboard-action--inverse shrink-0 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-zinc-900 hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          Apply
-                        </button>
-                      )}
+                      <button type="button" disabled={!couponInput.trim() || !orderItems.length || currentCouponLoading || submitting}
+                        onClick={addCoupon} className="dashboard-action dashboard-action--primary dashboard-action--inverse shrink-0">
+                        Add coupon
+                      </button>
                     </div>
+                    <p className="mt-2 text-xs text-white/60">Add up to five coupons. Discounts apply in this order to the remaining eligible charges, before GST.</p>
+                    {appliedCouponCode && <div className="mt-3 space-y-2">
+                      {appliedCouponCode.split(",").map((code, index) => {
+                        const quote = currentCouponQuote?.coupons?.find(entry => entry.code === code);
+                        return <div key={code} className="flex items-center justify-between gap-2 rounded-lg border border-white/15 p-2 text-xs text-white/80">
+                          <span>{index + 1}. {code}{quote ? `: -${formatCurrency(quote.discountTotal)}` : currentCouponError ? " (review coupon error)" : " (checking eligibility)"}</span>
+                          <button type="button" disabled={submitting} aria-label={`Remove coupon ${code}`} className="dashboard-action dashboard-action--tertiary dashboard-action--inverse"
+                            onClick={() => { setAppliedCouponCode(appliedCouponCode.split(",").filter(value => value !== code).join(",")); setCouponQuote(null); setCouponError(""); setCouponLoading(false); }}>Remove</button>
+                        </div>;
+                      })}
+                    </div>}
+
+                    {currentCouponQuote?.coupons?.length > 1 && <div className="mt-3 space-y-2 text-xs text-white/70">
+                      {currentCouponQuote.coupons.map(coupon => <div key={coupon.code}>
+                        <p className="font-medium">{coupon.code}</p>
+                        {coupon.serviceBreakdown.filter(line => line.discountAmount > 0).map(line => <p key={line.serviceId}>{line.serviceName}: -{formatCurrency(line.discountAmount)}{line.optionBreakdown?.length ? ` (${line.optionBreakdown.map(option => option.label).join(", ")})` : ""}</p>)}
+                      </div>)}
+                    </div>}
                     {currentCouponLoading && (
                       <p className="mt-2 flex items-center gap-1.5 text-xs text-white/45">
                         <Loader2 size={13} className="animate-spin" />
@@ -6364,7 +6357,7 @@ const NewOrder = () => {
                               Coupon {currentCouponQuote.code}
                             </p>
                             <p className="mt-0.5 text-[10px] text-white/30">
-                              Service-specific discounts
+                              Eligible service / option discounts
                             </p>
                           </div>
                           <p className="text-sm font-medium text-emerald-200">
@@ -6390,7 +6383,8 @@ const NewOrder = () => {
                                 className="flex justify-between gap-3 text-[10px] text-white/40"
                               >
                                 <span className="truncate">
-                                  {line.serviceName} ({line.discountPercent}%)
+                                  {line.serviceName} ({line.discountType === "combined" ? "combined coupons" : line.discountType === "fixed" ? "fixed amount" : `${line.discountPercent}%`})
+                                  {line.optionBreakdown?.map(option => <span key={option.key} className="block whitespace-normal">{option.label}: -{formatCurrency(option.discountAmount)}</span>)}
                                 </span>
                                 <span className="shrink-0">
                                   −{formatCurrency(line.discountAmount)}

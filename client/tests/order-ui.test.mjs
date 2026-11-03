@@ -101,14 +101,21 @@ test("progress uses actual data and only active services pulse with reduced-moti
   const unknown = render(Progress, { item: { serviceProgress: { type: "quantity_based", displayStatus: "in_progress" } } });
   assert.doesNotMatch(unknown, /role="progressbar"/);
 });
-test("delivery editors appear only for eligible staff-managed items", () => {
-  const item = { _id: "one", supportsDelivery: true, serviceSnapshot: { name: "Reels" } };
-  assert.equal(render(Delivery, { item }), "");
-  assert.match(render(Delivery, { item, onSave() {} }), /Service delivery link/);
-  assert.equal(render(Delivery, { item: { ...item, supportsDelivery: false }, onSave() {} }), "");
-  const html = render(Delivery, { item: { ...item, delivery: { url: "https://example.com/reels" } } });
-  assert.match(html, /Open delivery/); assert.doesNotMatch(html, /Save link/);
+test("deliverable rows expose links and progress to clients, editing only to active staff", () => {
+  const item = { _id: "one", serviceSnapshot: { name: "Reels" }, serviceProgress: { deliverables: [
+    { key: "1", name: "Reel 1", status: "completed", links: [{ label: "Final video", url: "https://example.com/reel" }], notes: "Approved" },
+    { key: "2", name: "Reel 2", status: "pending", links: [] },
+  ] } };
+  const client = render(Delivery, { item });
+  assert.match(client, /Service deliverables/); assert.match(client, /Reel 1/); assert.match(client, /Reel 2/);
+  assert.match(client, /Final video/); assert.match(client, /Approved/); assert.match(client, /No delivery links yet/);
+  assert.doesNotMatch(client, /Edit deliverable|<input|<textarea/);
+  assert.equal((render(Delivery, { item, onSave() {} }).match(/Edit deliverable/g) || []).length, 2);
+  assert.doesNotMatch(render(Delivery, { item, inactive: true, onSave() {} }), /Edit deliverable/);
+  assert.equal(render(Delivery, { item: { _id: "unsupported" }, onSave() {} }), "");
+  assert.match(render(Delivery, { item: { delivery: { url: "https://example.com/old" } } }), /Open delivery/);
 });
+
 test("supported order statuses share compact labels and icons", () => {
   for (const [status, label] of [["pending", "Pending"], ["processing", "Processing"], ["in_progress", "In Progress"], ["completed", "Completed"], ["cancelled", "Cancelled"], ["failed", "Failed"]]) {
     const html = render(Badge, { status }); assert.match(html, /<svg/); assert.ok(html.includes(label));

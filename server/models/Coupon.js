@@ -2,6 +2,9 @@ const mongoose = require("mongoose");
 
 const couponServiceDiscountSchema = new mongoose.Schema(
   {
+    targets: { type: [String], default: [] },
+    discountType: { type: String, enum: ["percentage", "fixed"], default: "percentage" },
+    discountValue: { type: Number, min: 0 },
     serviceId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Service",
@@ -28,6 +31,9 @@ const couponServiceDiscountSchema = new mongoose.Schema(
 
 const couponSchema = new mongoose.Schema(
   {
+    scope: { type: String, enum: ["all", "service", "options"], default: "service" },
+    discountType: { type: String, enum: ["percentage", "fixed"], default: "percentage" },
+    discountValue: { type: Number, min: 0, default: 0 },
     code: {
       type: String,
       required: true,

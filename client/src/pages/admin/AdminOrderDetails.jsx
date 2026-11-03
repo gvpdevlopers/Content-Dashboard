@@ -1,3 +1,4 @@
+import OrderArchiveAction from "../../components/OrderArchiveAction";
 import useAsyncResource from "../../hooks/useAsyncResource";
 import PaymentStatusBadge from "../../components/PaymentStatusBadge";
 import StatusBadge from "../../components/OrderStatusBadge";
@@ -178,10 +179,9 @@ const AdminOrderDetailsContent = ({ id, staffMode, user }) => {
     }
   };
 
-  const handleServiceDeliverySave = async (itemId, url) => {
-    const data = await adminOrderService.updateServiceDelivery(order._id, itemId, url, staffMode);
-    setOrder((current) => ({ ...current, items: current.items.map((item) =>
-      String(item._id) === String(data.itemId) ? { ...item, delivery: data.delivery } : item) }));
+  const handleServiceDeliverySave = async (itemId, deliverableKey, changes) => {
+    const data = await adminOrderService.updateDeliverable(order._id, itemId, deliverableKey, changes, staffMode);
+    setOrder(current => ({ ...current, ...data.order }));
   };
 
   const handleServiceProgressUpdate = async (itemId, progressUpdate) => {
@@ -479,6 +479,11 @@ const AdminOrderDetailsContent = ({ id, staffMode, user }) => {
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-[1500px] overflow-x-clip animate-fade-up">
+      {user?.role === "admin" && <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-zinc-600">{order.archivedAt ? "Archived from the active admin list. Client history and payment records are retained." : "Order management"}</p>
+        <OrderArchiveAction order={order} user={user} onUpdated={() => loadOrder()} />
+      </div>}
+
       {/* =====================================================
           BACK
       ====================================================== */}
@@ -932,12 +937,13 @@ const AdminOrderDetailsContent = ({ id, staffMode, user }) => {
                     label={`Coupon (${order.couponSnapshot.code})`}
                     value={`−${formatCurrency(order?.discountTotal)}`}
                   />
+              {order.couponSnapshots?.length > 1 && order.couponSnapshots.map(coupon => <DetailItem key={coupon.code} label={`${coupon.code}: ${coupon.serviceBreakdown.filter(line => line.discountAmount > 0).map(line => line.optionBreakdown?.length ? `${line.serviceName} (${line.optionBreakdown.map(option => option.label).join(", ")})` : line.serviceName).join("; ")}`} value={`-${formatCurrency(coupon.discountTotal)}`} />)}
                   {order.couponSnapshot.serviceBreakdown
                     ?.filter((entry) => entry.discountAmount > 0)
                     .map((entry) => (
                       <DetailItem
                         key={entry.serviceId}
-                        label={`${entry.serviceName} (${entry.discountPercent}%)`}
+                        label={`${entry.serviceName} (${entry.discountType === "combined" ? "combined coupons" : entry.discountType === "fixed" ? "fixed amount" : `${entry.discountPercent}%`})${entry.optionBreakdown?.length ? ` - ${entry.optionBreakdown.map(option => option.label).join(", ")}` : ""}`}
                         value={`−${formatCurrency(entry.discountAmount)}`}
                       />
                     ))}

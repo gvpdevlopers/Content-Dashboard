@@ -284,7 +284,7 @@ test("settled credit-funded cancellation keeps campaign funds available for staf
 test("ad credit routes require staff permission for issuance and authenticated client access for balances", () => {
   const routes = [];
   const router = {};
-  for (const method of ["get", "post", "patch"]) router[method] = (url, ...handlers) => routes.push({ method, url, handlers });
+  for (const method of ["get", "post", "patch", "delete"]) router[method] = (url, ...handlers) => routes.push({ method, url, handlers });
   const protect = () => {};
   const adminOnly = () => {};
   const orderStaff = () => {};

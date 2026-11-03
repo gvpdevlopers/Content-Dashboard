@@ -14,6 +14,7 @@ const {
   getStaffOrderById,
   updateServiceProgress,
   updateServiceDelivery,
+  updateDeliverable,
   updateOrderStatus,
   updatePaymentStatus,
   updateDeliveryLink,
@@ -27,6 +28,9 @@ const adminOnly = require("../middleware/admin");
 const orderStaff = require("../middleware/orderStaff");
 
 const router = express.Router();
+const { archiveOrder, restoreOrder } = require("../controllers/orderArchiveController");
+router.delete("/admin/:id", protect, adminOnly, archiveOrder);
+router.post("/admin/:id/restore", protect, adminOnly, restoreOrder);
 const adCredit = require("../controllers/adCreditController");
 router.get("/ad-credit", protect, adCredit.getMyAdCredit);
 router.get("/admin/:id/ad-credit", protect, adminOnly, adCredit.getOrderAdCredit);
@@ -180,6 +184,8 @@ router.patch(
   updateInvoice
 );
 
+router.patch("/admin/:id/items/:itemId/deliverables/:deliverableKey", protect, adminOnly, updateDeliverable);
+router.patch("/staff/:id/items/:itemId/deliverables/:deliverableKey", protect, orderStaff, updateDeliverable);
 router.patch("/admin/:id/items/:itemId/delivery", protect, adminOnly, updateServiceDelivery);
 router.patch("/staff/:id/items/:itemId/delivery", protect, orderStaff, updateServiceDelivery);
 

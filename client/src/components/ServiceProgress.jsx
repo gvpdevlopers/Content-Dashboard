@@ -22,6 +22,7 @@ const ServiceProgress = ({
   onUpdate,
   compact = false,
   inactive = false,
+  showDeliverables = true,
 }) => {
   const [startDateOpen, setStartDateOpen] = useState(false);
   const progress = item?.serviceProgress;
@@ -65,6 +66,11 @@ const ServiceProgress = ({
 
       {progress.type === "time_based" ? (
         <>
+          {progress.deliverySummary?.totalCount > 0 && <div className="mt-3 text-xs text-zinc-600">
+            <p>{progress.deliverySummary.completedCount} of {progress.deliverySummary.totalCount} deliverables completed ? {Math.round(progress.deliverySummary.progressPercent)}%</p>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-100"><div className="h-full bg-blue-500" style={{ width: `${progress.deliverySummary.progressPercent}%` }}
+              role="progressbar" aria-label="Deliverable progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress.deliverySummary.progressPercent)} /></div>
+          </div>}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-600">
             <span>
               {progress.startAt
@@ -84,7 +90,7 @@ const ServiceProgress = ({
               <span>Scheduled {formatKolkataDate(progress.scheduledStartAt)} IST</span>
             )}
           </div>
-          {canManage && (
+          {canManage && !inactive && (
             <div className="mt-4 flex justify-end">
               {status === "pending_start" ? (
                 <button
@@ -110,7 +116,7 @@ const ServiceProgress = ({
           <p className="mt-3 text-xs text-zinc-600">
             {progress.completedCount} of {progress.totalCount} completed
           </p>
-          {!compact && <div className="mt-3 divide-y divide-zinc-100">
+          {!compact && showDeliverables && <div className="mt-3 divide-y divide-zinc-100">
             {(progress.deliverables || []).map((deliverable) => (
               <div
                 key={deliverable.key}
@@ -119,7 +125,7 @@ const ServiceProgress = ({
                 <span className="text-sm text-zinc-700">
                   {deliverable.name}
                 </span>
-                {canManage ? (
+                {canManage && !inactive ? (
                   <div className="w-full min-w-0 sm:w-40">
                     <CustomSelect compact
                       aria-label={`${deliverable.name} status`}

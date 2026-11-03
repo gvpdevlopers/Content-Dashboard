@@ -31,6 +31,7 @@ const orderDraftSchema = new mongoose.Schema(
       maxlength: 5000,
     },
 
+    couponCodes: { type: [String], default: [] },
     couponCode: {
       type: String,
       default: "",

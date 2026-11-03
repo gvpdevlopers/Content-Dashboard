@@ -1,3 +1,4 @@
+import OrderArchiveAction from "../../components/OrderArchiveAction";
 import useAsyncResource from "../../hooks/useAsyncResource";
 import ActiveFilters from "../../components/ActiveFilters";
 import PaymentStatusBadge from "../../components/PaymentStatusBadge";
@@ -25,6 +26,7 @@ const AdminOrders = () => {
   const staffMode = user?.role === "employee";
   const orderPath = staffMode ? "/staff/orders" : "/admin/orders";
 
+  const [archived, setArchived] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
@@ -34,10 +36,10 @@ const AdminOrders = () => {
   ====================================================== */
 
   const readOrders = useCallback(async () => {
-    const response = await adminOrderService.getAdminOrders(staffMode);
+    const response = await adminOrderService.getAdminOrders(staffMode, archived);
     return [...(Array.isArray(response?.orders) ? response.orders : [])].sort((a, b) =>
       new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime());
-  }, [staffMode]);
+  }, [staffMode, archived]);
   const { data: orders, setData: setOrders, loading, refreshing, error, reload: loadOrders } = useAsyncResource(readOrders,
     { initialData: [], errorMessage: "Unable to load orders." });
   const hasActivePins = orders.some((order) => order.codPinStatus === "active");
@@ -259,6 +261,9 @@ const AdminOrders = () => {
               </p>
             </div>
 
+            {user?.role === "admin" && <CustomSelect aria-label="Order archive view" value={archived ? "archived" : "active"}
+              options={[{ value: "active", label: "Active admin orders" }, { value: "archived", label: "Archived orders" }]}
+              onChange={value => setArchived(value === "archived")} />}
             <button
               type="button"
               onClick={() => loadOrders(true)}
@@ -660,6 +665,7 @@ const AdminOrders = () => {
                   order={order}
                   orderPath={orderPath}
                   user={user}
+                  onArchiveChanged={() => loadOrders(true)}
                   onUpdated={(update) => setOrders((current) => current.map((item) => item._id === order._id ? { ...item, ...update } : item))}
                 />
               ))}
@@ -677,6 +683,7 @@ const AdminOrders = () => {
                 order={order}
                 orderPath={orderPath}
                 user={user}
+                onArchiveChanged={() => loadOrders(true)}
                 onUpdated={(update) => setOrders((current) => current.map((item) => item._id === order._id ? { ...item, ...update } : item))}
               />
             ))}
@@ -691,7 +698,7 @@ const AdminOrders = () => {
    DESKTOP ORDER ROW
 ========================================================= */
 
-const AdminOrderRow = ({ order, orderPath, user, onUpdated }) => {
+const AdminOrderRow = ({ order, orderPath, user, onUpdated, onArchiveChanged }) => {
   const serviceName =
     order?.serviceSnapshot?.name || order?.service?.name || "Service";
 
@@ -777,6 +784,7 @@ const AdminOrderRow = ({ order, orderPath, user, onUpdated }) => {
 
       <div>
         <StatusBadge status={order?.orderStatus} />
+        <div className="mt-2"><OrderArchiveAction order={order} user={user} onUpdated={onArchiveChanged} /></div>
       </div>
 
       {/* Arrow */}
@@ -821,7 +829,7 @@ const OrderArtifactBadges = ({ order }) => {
    MOBILE ORDER CARD
 ========================================================= */
 
-const AdminOrderMobileCard = ({ order, orderPath, user, onUpdated }) => {
+const AdminOrderMobileCard = ({ order, orderPath, user, onUpdated, onArchiveChanged }) => {
   const serviceName =
     order?.serviceSnapshot?.name || order?.service?.name || "Service";
 
@@ -988,6 +996,7 @@ const AdminOrderMobileCard = ({ order, orderPath, user, onUpdated }) => {
       </div>
 
       <OrderPaymentPinActions order={order} user={user} onUpdated={onUpdated} />
+      <div className="mt-3"><OrderArchiveAction order={order} user={user} onUpdated={onArchiveChanged} /></div>
       {/* View Details */}
 
       <div
