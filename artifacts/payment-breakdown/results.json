@@ -1,0 +1,14 @@
+{
+  "passed": [
+    "admin collapsed/keyboard toggle/details/status update/responsive",
+    "employee collapsed/keyboard toggle/details/status update/responsive"
+  ],
+  "widths": [
+    1440,
+    768,
+    390,
+    360
+  ],
+  "pageErrors": [],
+  "api": "mocked"
+}

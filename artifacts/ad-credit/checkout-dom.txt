@@ -1,0 +1,45 @@
+WORKSPACE
+
+Dashboard
+New Order
+Order History
+Go to Ads Manager
+Q
+
+QA
+
+Client
+
+Logout
+Dashboard
+
+Overview of your orders and activity
+
+Q
+Ordering Again?
+
+Repeat a previous order and review its current pricing.
+
+You haven’t placed any orders yet.
+
+Saved Drafts
+1
+
+Ads wallet draft
+
+1 service · Updated 3 Nov 2026
+
+Resume
+Delete
+
+STEP 1
+
+Build your order
+
+Select one or more services. Each selected service can be configured independently.
+
+0 selected
+Ads
+Your order summary
+
+Select one or more services to see your configuration and pricing summary here.

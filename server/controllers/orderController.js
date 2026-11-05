@@ -1,4 +1,4 @@
-const { outputDefinition, hydrateDeliverables, deliverableSummary, validateDeliverablePatch, deriveOrderStatus, inactiveStatuses } = require("../utils/serviceDeliverables");
+const { outputDefinition, hydrateDeliverables, deliverableSummary, validateDeliverablePatch, deriveOrderStatus, inactiveStatuses, activateScheduledProgress } = require("../utils/serviceDeliverables");
 const { reduceCouponComponents } = require("../utils/couponStack");
 const { normalizeCouponCodes } = require("../utils/couponCodes");
 const { collectCouponComponents } = require("../utils/couponTargets");
@@ -2095,20 +2095,14 @@ const parseKolkataDateOnly = (value) => {
 };
 
 const activateDueScheduledProgress = (order, now = new Date()) => {
+  if (inactiveStatuses.includes(order.orderStatus) || ["on_hold", "completed"].includes(order.orderStatus) || order.adCreditReleased) return false;
   let changed = false;
   const items = Array.isArray(order?.items) ? order.items : [];
   const progressItems = items.length ? items : [order];
 
   for (const item of progressItems) {
     const progress = getOrderItemServiceProgress(item);
-    if (!progress || progress.type !== "time_based" || progress.status === "completed" ||
-        !progress.scheduledStartAt || progress.startAt || new Date(progress.scheduledStartAt) > now) {
-      continue;
-    }
-
-    progress.startAt = new Date(progress.scheduledStartAt);
-    progress.scheduledStartAt = null;
-    progress.status = "in_progress";
+    if (!activateScheduledProgress(progress, now)) continue;
     if (item === order) order.serviceProgress = progress;
     else item.serviceProgress = progress;
     changed = true;
@@ -3742,7 +3736,7 @@ const getOrderById = async (
 
 const toClientVisibleOrder = (order) => {
   const visibleOrder = toOrderWithServiceProgress(order);
-  for (const field of ["fulfillmentHistory", "monthEndPaymentHistory", "notes", "codPin", "codPinEmployee", "codPinVerifiedBy", "codPinAttempts", "razorpaySignature",
+  for (const field of ["statusHistory", "fulfillmentHistory", "monthEndPaymentHistory", "notes", "codPin", "codPinEmployee", "codPinVerifiedBy", "codPinAttempts", "razorpaySignature",
     "submissionKey", "submissionHash"]) delete visibleOrder[field];
 
   if (visibleOrder.orderStatus !== "completed") {
@@ -3931,7 +3925,7 @@ const updateServiceProgress = async (req, res) => {
     if (!["admin", "employee"].includes(req.user?.role)) return res.status(403).json({ success: false, message: "Order management access required." });
     if (!mongoose.isValidObjectId(req.params.id) || (req.params.itemId !== "legacy" && !mongoose.isValidObjectId(req.params.itemId))) return res.status(400).json({ success: false, message: "Invalid order service reference." });
     const { itemId } = req.params;
-    const { action, startDate } = req.body;
+    const { action, startDate } = req.body || {};
     const order = await Order.findById(req.params.id);
 
     if (!order) {
@@ -3970,7 +3964,7 @@ const updateServiceProgress = async (req, res) => {
       });
     }
 
-    activateDueScheduledProgress(order);
+    if (order.orderStatus !== "on_hold") activateScheduledProgress(progress);
 
     if (progress.type === "time_based") {
       if (
@@ -4051,13 +4045,16 @@ const updateOrderStatus = async (
   res,
 ) => {
   try {
+    if (!["admin", "employee"].includes(req.user?.role)) return res.status(403).json({ success: false, message: "Order management access required." });
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ success: false, message: "Invalid order ID." });
     const { status } =
-      req.body;
+      req.body || {};
 
     const allowedStatuses = [
       "pending",
       "processing",
       "in_progress",
+      "on_hold",
       "completed",
       "cancelled",
     ];
@@ -4095,6 +4092,8 @@ const updateOrderStatus = async (
       });
     }
 
+    if (req.body?.expectedStatus && req.body.expectedStatus !== order.orderStatus) return res.status(409).json({ success: false, message: "The status changed. Refresh the order and review it again." });
+    if (order.orderStatus === "completed" && status !== "completed" && req.body.confirmCompleted !== true) return res.status(409).json({ success: false, requiresConfirmation: true, message: "Confirm changing this completed order's status. Payment and deliverables will be retained." });
     await changeOrderStatus(order, status, req.user._id);
 
     const updatedOrder =
@@ -4306,7 +4305,8 @@ const persistServiceProgress = async (order, item, progress, actor, event) => {
   const result = await Order.updateOne(filter, {
     $set: { [path]: progress, orderStatus },
     $inc: { __v: 1 },
-    $push: { fulfillmentHistory: { ...event, actor, itemId, at: new Date(),
+    $push: { ...(orderStatus !== order.orderStatus ? { statusHistory: { previousStatus: order.orderStatus, newStatus: orderStatus,
+      changedBy: actor, changedAt: new Date(), source: "deliverable" } } : {}), fulfillmentHistory: { ...event, actor, itemId, at: new Date(),
       orderStatusBefore: order.orderStatus, orderStatusAfter: orderStatus } },
   }, { runValidators: true });
   return result.matchedCount === 1;

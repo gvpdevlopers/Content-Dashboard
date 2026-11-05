@@ -67,7 +67,7 @@ const ServiceProgress = ({
       {progress.type === "time_based" ? (
         <>
           {progress.deliverySummary?.totalCount > 0 && <div className="mt-3 text-xs text-zinc-600">
-            <p>{progress.deliverySummary.completedCount} of {progress.deliverySummary.totalCount} deliverables completed ? {Math.round(progress.deliverySummary.progressPercent)}%</p>
+            <p>{progress.deliverySummary.completedCount} of {progress.deliverySummary.totalCount} deliverables completed - {Math.round(progress.deliverySummary.progressPercent)}%</p>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-100"><div className="h-full bg-blue-500" style={{ width: `${progress.deliverySummary.progressPercent}%` }}
               role="progressbar" aria-label="Deliverable progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress.deliverySummary.progressPercent)} /></div>
           </div>}

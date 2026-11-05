@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { validResourceUrl } from "../utils/orderResources";
 import CustomSelect from "./CustomSelect";
@@ -10,6 +10,8 @@ const statusOptions = [{ value: "pending", label: "Pending" }, { value: "in_prog
 
 function DeliverableRow({ itemId, deliverable, onSave, inactive }) {
   const id = useId();
+  const nextLinkId = useRef(0);
+  const createLinkId = () => `${id}-link-${nextLinkId.current++}`;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -18,7 +20,7 @@ function DeliverableRow({ itemId, deliverable, onSave, inactive }) {
   const canEdit = Boolean(onSave) && !inactive;
   const startEdit = () => {
     setDraft({ status: deliverable.status, notes: deliverable.notes || "", updatedAt: deliverable.updatedAt || null,
-      links: (deliverable.links || []).map(link => ({ label: link.label || "", url: link.url, localId: crypto.randomUUID() })) });
+      links: (deliverable.links || []).map(link => ({ label: link.label || "", url: link.url, localId: createLinkId() })) });
     setError(""); setMessage(""); setEditing(true);
   };
   const save = async (event) => {
@@ -61,7 +63,7 @@ function DeliverableRow({ itemId, deliverable, onSave, inactive }) {
               onClick={() => setDraft(current => ({ ...current, links: current.links.filter(entry => entry.localId !== link.localId) }))}><Trash2 size={16} aria-hidden="true" /></button>
           </div>)}
           <button type="button" disabled={draft.links.length >= 20} className="dashboard-action dashboard-action--secondary min-h-11"
-            onClick={() => setDraft(current => ({ ...current, links: [...current.links, { label: "", url: "", localId: crypto.randomUUID() }] }))}>
+            onClick={() => setDraft(current => ({ ...current, links: [...current.links, { label: "", url: "", localId: createLinkId() }] }))}>
             <Plus size={15} aria-hidden="true" />Add link</button>
         </div>
         <div><label htmlFor={`${id}-notes`} className="mb-1 block text-xs font-medium text-zinc-700">Notes (visible to the client)</label>
@@ -71,7 +73,7 @@ function DeliverableRow({ itemId, deliverable, onSave, inactive }) {
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       <div className="flex flex-wrap justify-end gap-2">
         <button type="button" disabled={saving} onClick={() => { setEditing(false); setError(""); }} className="dashboard-action dashboard-action--secondary min-h-11">Cancel</button>
-        <button type="submit" disabled={saving} className="dashboard-action dashboard-action--primary min-h-11">{saving ? "Saving?" : "Save deliverable"}</button>
+        <button type="submit" disabled={saving} className="dashboard-action dashboard-action--primary min-h-11">{saving ? "Saving..." : "Save deliverable"}</button>
       </div>
     </form> : <>
       {deliverable.notes && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-zinc-600">{deliverable.notes}</p>}

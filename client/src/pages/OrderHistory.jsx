@@ -1,3 +1,4 @@
+import useOrderStatusRefresh from "../hooks/useOrderStatusRefresh";
 import useAsyncResource from "../hooks/useAsyncResource";
 import useCollectionPaymentRefresh from "../hooks/useCollectionPaymentRefresh";
 import PaymentPinDialog from "../components/PaymentPinDialog";
@@ -31,6 +32,7 @@ const OrderHistory = () => {
   const { data: orders, setData: setOrders, loading, error, reload: loadOrders } = useAsyncResource(readOrders,
     { initialData: [], errorMessage: "Unable to load your orders.", onSuccess: reconcilePinOrder });
   useCollectionPaymentRefresh(orders, loadOrders);
+  useOrderStatusRefresh(loadOrders);
 
   return (
     <div className="mx-auto max-w-[1500px] animate-fade-up">

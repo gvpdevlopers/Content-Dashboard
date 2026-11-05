@@ -131,7 +131,7 @@ test("a failed issuance rolls back the order marker and wallet together", async 
     "../utils/adCredit": f.credit,
   });
   const res = response();
-  await controller.issueAdCredit({ params: { id: orderId }, user: { _id: client },
+  await controller.issueAdCredit({ params: { id: orderId }, user: { _id: client, role: "admin" },
     body: { platform: "metaAds", amount: 100, note: "Unused" } }, res);
   assert.equal(res.statusCode, 409);
   assert.equal(f.state.balances.metaAds, 200000);
@@ -297,6 +297,10 @@ test("ad credit routes require staff permission for issuance and authenticated c
   assert.equal(staff.handlers[1], orderStaff);
   assert.equal(admin.handlers[1], adminOnly);
   assert.equal(mine.handlers[0], protect);
+  for (const [prefix, permission] of [["admin", adminOnly], ["staff", orderStaff]]) {
+    const apply = routes.find(route => route.method === "post" && route.url === `/${prefix}/:id/ad-credit/apply`);
+    assert.equal(apply.handlers[0], protect); assert.equal(apply.handlers[1], permission);
+  }
 });
 
 test("an order fully funded by eligible ad credit has no new payment due", async () => {

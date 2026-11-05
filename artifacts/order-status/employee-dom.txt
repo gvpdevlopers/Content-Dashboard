@@ -1,0 +1,144 @@
+Order Operations
+Q
+
+ORDER OPERATIONS
+
+Dashboard
+Orders
+Q
+
+QA
+
+Administrator
+
+Logout
+Back to Orders
+
+ORDER DETAILS
+
+GV-DELIVERY-QA
+Completed
+Payment Done
+Online Payment
+
+Review the client's submitted information, payment details and order status.
+
+Refresh
+
+CLIENT
+
+Test Client
+
+SERVICE
+
+Service
+
+ORDER AMOUNT
+
+₹9,000
+
+PLACED
+
+03 Nov 2026, 03:30 pm
+
+CLIENT
+
+Client Information
+
+NAME
+
+Test Client
+
+EMAIL
+
+qa@example.com
+
+USERNAME
+
+—
+
+CLIENT ID
+
+client
+
+ORDER OPERATIONS
+
+Order Status
+Change Status
+
+Update the current processing status of this order.
+
+Completed
+
+ORDER OPERATIONS
+
+Payment Status
+
+PAYMENT METHOD
+
+Online Payment
+
+SUBTOTAL
+
+₹9,000
+
+GST (0%)
+
+₹0
+
+FINAL TOTAL
+
+₹9,000
+
+Update the saved payment status here.
+
+Paid
+
+CLIENT HANDOFF
+
+Delivery & Invoice
+Delivery link
+Google Drive or other HTTPS share link
+Save delivery link
+
+Delivery is marked completed, but no link is available yet.
+
+Invoice link
+Invoice name
+Google Drive or other HTTPS invoice link
+Save invoice link
+
+Invoice is not available yet.
+
+SERVICES
+
+Order configuration
+Visual Content ? Reels
+
+Content
+
+₹9,000
+
+Service deliverables
+Reel 1
+Pending
+Edit deliverable
+
+No delivery links yet.
+
+Reel 2
+Pending
+Edit deliverable
+
+No delivery links yet.
+
+Reel 3
+Pending
+Edit deliverable
+
+No delivery links yet.
+
+Service progress
+Pending Start
+
+0 of 3 completed

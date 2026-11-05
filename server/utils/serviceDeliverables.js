@@ -4,6 +4,15 @@ const plain = (value) => typeof value?.toObject === "function" ? value.toObject(
 const statuses = ["pending", "in_progress", "completed"];
 const inactiveStatuses = ["cancelled", "rejected", "failed"];
 
+function activateScheduledProgress(progress, now = new Date()) {
+  if (!progress || progress.type !== "time_based" || progress.status === "completed" ||
+      !progress.scheduledStartAt || progress.startAt || new Date(progress.scheduledStartAt) > now) return false;
+  progress.startAt = new Date(progress.scheduledStartAt);
+  progress.scheduledStartAt = null;
+  progress.status = "in_progress";
+  return true;
+}
+
 // Only saved output-bearing configuration counts. Pricing option quantities are
 // shoot/add-on quantities, not additional finished outputs.
 function outputDefinition(item) {
@@ -92,7 +101,7 @@ function validateDeliverablePatch(body) {
 // Do not complete untracked services, revive cancelled orders, release credit,
 // or change any payment state. Calendar-based services still need staff completion.
 function deriveOrderStatus(order, progresses) {
-  if (inactiveStatuses.includes(order.orderStatus) || order.adCreditReleased) return order.orderStatus;
+  if (inactiveStatuses.includes(order.orderStatus) || order.orderStatus === "on_hold" || order.adCreditReleased) return order.orderStatus;
   const complete = progress => progress &&
     (progress.type === "time_based" ? progress.status === "completed" : deliverableSummary(progress.deliverables).displayStatus === "completed") &&
     (!progress.deliverables?.length || deliverableSummary(progress.deliverables).displayStatus === "completed");
@@ -102,4 +111,4 @@ function deriveOrderStatus(order, progresses) {
   return order.orderStatus;
 }
 
-module.exports = { outputDefinition, hydrateDeliverables, deliverableSummary, validDeliveryUrl, validateDeliverablePatch, deriveOrderStatus, inactiveStatuses };
+module.exports = { outputDefinition, hydrateDeliverables, deliverableSummary, validDeliveryUrl, validateDeliverablePatch, deriveOrderStatus, inactiveStatuses, activateScheduledProgress };

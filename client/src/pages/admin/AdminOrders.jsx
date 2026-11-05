@@ -1,3 +1,4 @@
+import useOrderStatusRefresh from "../../hooks/useOrderStatusRefresh";
 import OrderArchiveAction from "../../components/OrderArchiveAction";
 import useAsyncResource from "../../hooks/useAsyncResource";
 import ActiveFilters from "../../components/ActiveFilters";
@@ -42,6 +43,7 @@ const AdminOrders = () => {
   }, [staffMode, archived]);
   const { data: orders, setData: setOrders, loading, refreshing, error, reload: loadOrders } = useAsyncResource(readOrders,
     { initialData: [], errorMessage: "Unable to load orders." });
+  useOrderStatusRefresh(loadOrders);
   const hasActivePins = orders.some((order) => order.codPinStatus === "active");
   useEffect(() => {
     if (!hasActivePins) return;
@@ -118,7 +120,7 @@ const AdminOrders = () => {
   };
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-[1500px] animate-fade-up">
+    <div style={{ "--orders-actions-width": user?.role === "admin" ? "104px" : "56px" }} className="mx-auto w-full min-w-0 max-w-[1500px] animate-fade-up">
       {/* =====================================================
           PAGE HEADER
       ====================================================== */}
@@ -261,9 +263,17 @@ const AdminOrders = () => {
               </p>
             </div>
 
-            {user?.role === "admin" && <CustomSelect aria-label="Order archive view" value={archived ? "archived" : "active"}
-              options={[{ value: "active", label: "Active admin orders" }, { value: "archived", label: "Archived orders" }]}
-              onChange={value => setArchived(value === "archived")} />}
+            <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
+              {user?.role === "admin" && (
+                <div role="group" aria-label="Order archive view" className="inline-flex rounded-xl border border-zinc-200 bg-zinc-100/70 p-1">
+                  {[{ value: false, label: "Active Orders" }, { value: true, label: "Archived Orders" }].map(option => (
+                    <button key={option.label} type="button" aria-pressed={archived === option.value} onClick={() => setArchived(option.value)}
+                      className={`min-h-9 rounded-lg px-3 py-2 text-xs font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 sm:text-sm ${archived === option.value ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-600 hover:bg-white/60 hover:text-zinc-950"}`}>
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             <button
               type="button"
               onClick={() => loadOrders(true)}
@@ -309,6 +319,7 @@ const AdminOrders = () => {
 
               {refreshing ? "Refreshing..." : "Refresh"}
             </button>
+            </div>
           </div>
         </div>
       </section>
@@ -451,6 +462,10 @@ const AdminOrders = () => {
                 {
                   value: "in_progress",
                   label: "In Progress",
+                },
+                {
+                  value: "on_hold",
+                  label: "On Hold",
                 },
                 {
                   value: "completed",
@@ -636,7 +651,7 @@ const AdminOrders = () => {
             <div
               className="
                 grid
-                grid-cols-[minmax(0,1.25fr)_minmax(0,1.25fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_56px]
+                grid-cols-[minmax(0,1.25fr)_minmax(0,1.25fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_var(--orders-actions-width,56px)]
                 border-b
                 border-zinc-200
                 bg-zinc-50
@@ -717,7 +732,7 @@ const AdminOrderRow = ({ order, orderPath, user, onUpdated, onArchiveChanged }) 
       className="relative isolate
         group
         grid
-        grid-cols-[minmax(0,1.25fr)_minmax(0,1.25fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_56px]
+        grid-cols-[minmax(0,1.25fr)_minmax(0,1.25fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_var(--orders-actions-width,56px)]
         items-center
         border-b
         border-zinc-100
@@ -784,12 +799,13 @@ const AdminOrderRow = ({ order, orderPath, user, onUpdated, onArchiveChanged }) 
 
       <div>
         <StatusBadge status={order?.orderStatus} />
-        <div className="mt-2"><OrderArchiveAction order={order} user={user} onUpdated={onArchiveChanged} /></div>
+
       </div>
 
       {/* Arrow */}
 
-      <div className="flex justify-end">
+      <div className="table-actions flex-nowrap">
+        <OrderArchiveAction iconOnly order={order} user={user} onUpdated={onArchiveChanged} />
         <span
           title="View order details" aria-hidden="true"
           className="table-action-indicator transition-colors group-hover:bg-zinc-50"
@@ -996,7 +1012,7 @@ const AdminOrderMobileCard = ({ order, orderPath, user, onUpdated, onArchiveChan
       </div>
 
       <OrderPaymentPinActions order={order} user={user} onUpdated={onUpdated} />
-      <div className="mt-3"><OrderArchiveAction order={order} user={user} onUpdated={onArchiveChanged} /></div>
+
       {/* View Details */}
 
       <div
@@ -1021,6 +1037,8 @@ const AdminOrderMobileCard = ({ order, orderPath, user, onUpdated, onArchiveChan
           View order details
         </span>
 
+        <div className="table-actions">
+          <OrderArchiveAction iconOnly order={order} user={user} onUpdated={onArchiveChanged} />
         <span
           className="
             table-action-indicator
@@ -1047,6 +1065,7 @@ const AdminOrderMobileCard = ({ order, orderPath, user, onUpdated, onArchiveChan
             "
           />
         </span>
+        </div>
       </div>
     </div>
   );

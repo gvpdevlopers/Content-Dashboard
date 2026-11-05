@@ -1,0 +1,14 @@
+{
+  "passed": [
+    "admin In Progress issuance",
+    "employee In Progress issuance",
+    "admin application confirmation/cancel",
+    "employee application confirmation/cancel",
+    "updated order breakdown",
+    "client dashboard balances/history/source link",
+    "partial checkout amount/remainder",
+    "390px no overflow",
+    "no page errors"
+  ],
+  "api": "mocked"
+}

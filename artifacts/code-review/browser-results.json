@@ -1,0 +1,16 @@
+{
+  "passed": [
+    "three output rows",
+    "admin creates two labeled links",
+    "one output update leaves siblings unchanged",
+    "cancel discards removal",
+    "replace and remove link",
+    "conflict preserves unsaved draft",
+    "employee uses staff endpoint",
+    "weighted progress shown",
+    "client read-only links",
+    "1440/768/390/360 no overflow",
+    "no page errors",
+    "editing works without crypto.randomUUID"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "passed": [
+    "collapsed default",
+    "keyboard enter/space",
+    "history and source link",
+    "pagination retains expanded state",
+    "empty history",
+    "no overflow at four widths",
+    "no page errors"
+  ],
+  "widths": [
+    1440,
+    768,
+    390,
+    360
+  ],
+  "api": "mocked"
+}

@@ -272,6 +272,8 @@ test("real package API persists all groups, validates assignments, quotes and su
       assert.equal(restored.archiveHistory[1].action, "restore"); assert.equal(await Order.countDocuments({ _id: order._id }), 1);
     });
     await require("./helpers/deliverableWorkflow")({ t, call, orders, Order, Service, admin, clients });
+    await require("./helpers/adCreditWorkflow")({ t, call, orders, Order, Service, admin, clients });
+    await require("./helpers/orderStatusWorkflow")({ t, call, orders, Order, Service, admin, clients });
     await t.test("existing active services and existing clients complete package checkout in a local clone", {
       skip: process.env.PACKAGE_QA_READ_EXISTING === "1" ? false : "Opt in with PACKAGE_QA_READ_EXISTING=1 to read the existing catalogue into the isolated database",
     }, async () => { await require("./helpers/existingPackageWorkflow")(); });

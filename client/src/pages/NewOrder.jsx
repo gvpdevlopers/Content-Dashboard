@@ -3409,6 +3409,7 @@ const NewOrder = () => {
         ? Math.min(
             adSpendBudgets[platform],
             Number(adCreditData?.available?.[platform] || 0),
+            selectedAdCredit[platform] === true ? Infinity : Math.max(0, Number(selectedAdCredit[platform]) || 0),
           )
         : 0,
     ]),

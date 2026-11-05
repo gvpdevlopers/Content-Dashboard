@@ -3,6 +3,11 @@ const Order = require("../models/Order");
 const Wallet = require("../models/AdCreditWallet");
 const Entry = require("../models/AdCreditEntry");
 const { PLATFORMS, toPaise, plain, adBudgets, getBalances, creditError } = require("../utils/adCredit");
+const { quoteCredit, spendCredit } = require("../utils/adCredit");
+const { acquireLock } = require("../utils/requestLock");
+const requireStaff = req => {
+  if (!["admin", "employee"].includes(req.user?.role)) throw creditError("Order management access required.", 403);
+};
 
 const handleError = (res, error) => {
   const duplicate = error.code === 11000;
@@ -13,18 +18,21 @@ const handleError = (res, error) => {
 };
 const getMyAdCredit = async (req, res) => {
   try {
+    const page = Number(req.query?.page || 1);
+    if (!Number.isSafeInteger(page) || page < 1 || page > 100000) throw creditError("Invalid history page.");
     const available = await getBalances(req.user._id);
-    const entries = await Entry.find({ client: req.user._id }).sort({ createdAt: -1 }).limit(50)
-      .populate("order", "orderNumber");
-    return res.json({ success: true,
+    const entries = await Entry.find({ client: req.user._id }).sort({ createdAt: -1, _id: -1 }).skip((page - 1) * 50).limit(51)
+      .populate("order", "orderNumber").populate("actor", "name role");
+    return res.json({ success: true, page, hasMore: entries.length > 50,
       available: Object.fromEntries(PLATFORMS.map((platform) => [platform, available[platform] / 100])),
-      entries: entries.map((entry) => ({ id: entry._id, platform: entry.platform, kind: entry.kind,
-        amount: entry.amountPaise / 100, order: entry.order, createdAt: entry.createdAt })),
+      entries: entries.slice(0, 50).map((entry) => ({ id: entry._id, platform: entry.platform, kind: entry.kind,
+        amount: entry.amountPaise / 100, order: entry.order, note: entry.note, actor: entry.actor, createdAt: entry.createdAt })),
     });
   } catch (error) { return handleError(res, error); }
 };
 const getOrderAdCredit = async (req, res) => {
   try {
+    requireStaff(req);
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) throw creditError("Invalid order ID.");
     const order = await Order.findById(req.params.id);
     if (!order) throw creditError("Order not found.", 404);
@@ -44,6 +52,7 @@ const getOrderAdCredit = async (req, res) => {
 const issueAdCredit = async (req, res) => {
   let session;
   try {
+    requireStaff(req);
     const { platform, amount, note } = req.body || {};
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) throw creditError("Invalid order ID.");
     if (!PLATFORMS.includes(platform)) throw creditError("Select Meta or Google Ads.");
@@ -72,4 +81,40 @@ const issueAdCredit = async (req, res) => {
   } catch (error) { return handleError(res, error); }
   finally { if (session) await session.endSession(); }
 };
-module.exports = { getMyAdCredit, getOrderAdCredit, issueAdCredit };
+// A management adjustment is only possible before collection/payment begins.
+// Reuse checkout's budget validation, GST calculation and atomic debit logic.
+const applyOrderCredit = async (req, res) => {
+  let session, release;
+  try {
+    requireStaff(req);
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) throw creditError("Invalid order ID.");
+    if (req.body?.confirmed !== true) throw creditError("Confirm applying the client's credit.");
+    release = await acquireLock(`payment:${req.params.id}`);
+    session = await mongoose.startSession();
+    await session.withTransaction(async () => {
+      const order = await Order.findById(req.params.id).session(session);
+      if (!order) throw creditError("Order not found.", 404);
+      if (order.paymentStatus !== "pending" || order.razorpayOrderId || order.razorpayPaymentId ||
+          order.codPinStatus === "active" || order.adCreditReleased || order.adCreditTotal > 0 ||
+          ["completed", "cancelled"].includes(order.orderStatus) || order.invoice?.url || order.monthEndPaymentHistory?.length) {
+        throw creditError("Credit can only be applied once to an unpaid order before payment, invoice or PIN collection begins.", 409);
+      }
+      const quote = await quoteCredit({ client: order.client, items: order.items?.length ? order.items : [order],
+        input: req.body.adCredit, subtotal: order.subtotal, gstRate: order.gstRate });
+      if (!quote.total) throw creditError("Enter an amount of credit to apply.");
+      await spendCredit({ client: order.client, order: order._id, requested: quote.requested, session, actor: req.user._id });
+      order.subtotalBeforeAdCredit = order.subtotal;
+      order.adCreditApplied = Object.fromEntries(PLATFORMS.map(platform => [platform, quote.requested[platform] / 100]));
+      order.adCreditTotal = quote.total;
+      Object.assign(order, quote.totals);
+      if (order.amount === 0 && order.paymentMethod !== "month_end") order.paymentStatus = "paid";
+      await order.save({ session });
+    });
+    return res.json({ success: true, message: "Ad credit applied. The remaining payable amount has been updated." });
+  } catch (error) { return handleError(res, error); }
+  finally {
+    if (session) await session.endSession();
+    if (release) { try { await release(); } catch (error) { console.error("Ad credit lock release failed:", error.message); } }
+  }
+};
+module.exports = { getMyAdCredit, getOrderAdCredit, issueAdCredit, applyOrderCredit };

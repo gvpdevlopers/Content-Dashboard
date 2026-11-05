@@ -1,3 +1,5 @@
+import AdCreditWallet from "../components/AdCreditWallet";
+import useOrderStatusRefresh from "../hooks/useOrderStatusRefresh";
 import useAsyncResource from "../hooks/useAsyncResource";
 import useCollectionPaymentRefresh from "../hooks/useCollectionPaymentRefresh";
 import SharedOrderStatusBadge from "../components/OrderStatusBadge";
@@ -39,6 +41,7 @@ const Dashboard = () => {
   const { data: orders, loading, error, reload: loadOrders } = useAsyncResource(readOrders,
     { initialData: [], errorMessage: "Unable to load dashboard data." });
   useCollectionPaymentRefresh(orders, loadOrders);
+  useOrderStatusRefresh(loadOrders);
 
   /* =========================================================
      ORDER STATISTICS
@@ -92,10 +95,11 @@ const Dashboard = () => {
   }, [orders]);
 
   const firstName = user?.name?.split(" ")[0] || "there";
-  const supportPhone = "+919876543210";
+  const supportPhone = "+91 76499 95444";
 
   return (
     <div className="relative mx-auto max-w-[1500px]">
+      <AdCreditWallet />
       {/* =====================================================
           BACKGROUND EFFECTS
       ====================================================== */}
@@ -1129,6 +1133,7 @@ const formatStatus = (status) => {
   const labels = {
     pending: "Pending",
     confirmed: "Confirmed",
+    on_hold: "On Hold",
     in_progress: "In Progress",
     processing: "Processing",
     completed: "Completed",

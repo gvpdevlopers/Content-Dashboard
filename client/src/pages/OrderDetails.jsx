@@ -1,3 +1,4 @@
+import useOrderStatusRefresh from "../hooks/useOrderStatusRefresh";
 import PaymentStatusBadge from "../components/PaymentStatusBadge";
 import ClientPaymentPinSection from "../components/ClientPaymentPinSection";
 import { useAuth } from "../context/authSessionContext";
@@ -40,6 +41,7 @@ const OrderDetailsContent = ({ id }) => {
   const readOrder = useCallback(async () => (await orderService.getOrderById(id)).order || null, [id]);
   const { data: order, setData: setOrder, loading, error, reload } = useAsyncResource(readOrder, { errorMessage: "Unable to load order details." });
   useCollectionPaymentRefresh(order ? [order] : [], reload);
+  useOrderStatusRefresh(reload);
 
   // ---------------------------------------------------------
   // Loading

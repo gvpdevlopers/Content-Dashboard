@@ -12,11 +12,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { validResourceUrl, hasProjectDetails } from "../src/utils/orderResources.js";
 import { getSelectPlacement, findEnabledOption, findTypeaheadOption } from "../src/utils/selectNavigation.js";
 import { getDraftLabel, formatDraftDate } from "../src/utils/draftLabels.js";
-let PackageForm, PackageConfig;
+let PackageForm, PackageConfig, AdCreditCheckout;
 let server, cacheDirectory, Progress, Delivery, Resource, Badge, PaymentBadge, Select, Filters, Feedback, Modal, Confirm, PinEmployee, AccessEditor, Role, PinActions, ClientPin;
 before(async () => {
   cacheDirectory = await mkdtemp(join(tmpdir(), "glow-ui-vite-"));
   server = await createServer({ configFile: false, cacheDir: cacheDirectory, plugins: [react()], optimizeDeps: { noDiscovery: true, entries: [] }, resolve: { preserveSymlinks: true }, server: { middlewareMode: true }, appType: "custom" });
+  AdCreditCheckout = (await server.ssrLoadModule("/src/components/AdCreditCheckout.jsx")).default;
   PackageForm = (await server.ssrLoadModule("/src/pages/admin/AdminPackages.jsx")).default;
   PackageConfig = (await server.ssrLoadModule("/src/components/PackageServiceConfiguration.jsx")).default;
   Filters = (await server.ssrLoadModule("/src/components/ActiveFilters.jsx")).default;
@@ -340,4 +341,16 @@ test("package configuration derives pricing, dynamic and repeated fields from se
   assert.doesNotMatch(html, /<select/);
   const ids = [...html.matchAll(/ id="([^"]+)"/g)].map((match) => match[1]);
   assert.equal(new Set(ids).size, ids.length, "Repeated schema fields must have unique labels and control IDs");
+});
+
+
+test("ad credit checkout shows partial amount, remaining wallet and platform-specific limits", () => {
+  const props = { platform: "metaAds", data: { available: { metaAds: 2000 } }, budgets: { metaAds: 1000 }, selected: { metaAds: "300" }, onSelect() {}, onRefresh() {} };
+  const html = render(AdCreditCheckout, props);
+  assert.match(html, /value="300"/); assert.match(html, /max="1000"/);
+  assert.match(html, /Remaining wallet balance:.*1,700/); assert.match(html, /Ad credit applied:.*300/);
+  const unchecked = render(AdCreditCheckout, { ...props, selected: { metaAds: false } });
+  assert.doesNotMatch(unchecked, /type="number"/);
+  const failed = render(AdCreditCheckout, { ...props, error: "Unavailable" });
+  assert.match(failed, /role="alert"/); assert.doesNotMatch(failed, /type="number"/);
 });

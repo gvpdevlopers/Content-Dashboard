@@ -1,3 +1,4 @@
+import useOrderStatusRefresh from "../hooks/useOrderStatusRefresh";
 import { useCallback, useMemo } from "react";
 
 import { ArrowRight, ClipboardList, Loader2, Package } from "lucide-react";
@@ -17,11 +18,12 @@ const EmployeeDashboard = () => {
   }, []);
   const { data: orders, loading, error, reload } = useAsyncResource(readOrders, { initialData: [], errorMessage: "Unable to load order dashboard." });
   useCollectionPaymentRefresh(orders, reload);
+  useOrderStatusRefresh(reload);
 
   const counts = useMemo(
     () => ({
       active: orders.filter((order) =>
-        ["pending", "processing", "in_progress"].includes(order.orderStatus),
+        ["pending", "processing", "in_progress", "on_hold"].includes(order.orderStatus),
       ).length,
 
       awaitingDelivery: orders.filter(

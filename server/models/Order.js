@@ -1169,12 +1169,21 @@ const orderSchema = new mongoose.Schema(
       }, { _id: false })], default: [], select: false,
     },
 
+    statusHistory: { type: [new mongoose.Schema({
+      previousStatus: { type: String, required: true },
+      newStatus: { type: String, required: true },
+      changedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+      changedAt: { type: Date, required: true },
+      source: { type: String, enum: ["manual", "deliverable"], default: "manual" },
+    }, { _id: false })], default: [] },
+
     orderStatus: {
       type: String,
       enum: [
         "pending",
         "processing",
         "in_progress",
+        "on_hold",
         "completed",
         "cancelled",
       ],

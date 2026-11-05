@@ -1,3 +1,4 @@
+import useOrderStatusRefresh from "../../hooks/useOrderStatusRefresh";
 import useAsyncResource from "../../hooks/useAsyncResource";
 import useCollectionPaymentRefresh from "../../hooks/useCollectionPaymentRefresh";
 import StatusBadge from "../../components/OrderStatusBadge";
@@ -33,11 +34,11 @@ const AdminDashboard = () => {
   const { data: { orders, users }, loading, error, reload: loadDashboard } = useAsyncResource(readDashboard,
     { initialData: { orders: [], users: [] }, errorMessage: "Unable to load dashboard data." });
   useCollectionPaymentRefresh(orders, loadDashboard);
+  useOrderStatusRefresh(loadDashboard);
   useEffect(() => {
     const refresh = () => loadDashboard(true);
     window.addEventListener("orders:archive-changed", refresh);
-    window.addEventListener("focus", refresh);
-    return () => { window.removeEventListener("orders:archive-changed", refresh); window.removeEventListener("focus", refresh); };
+    return () => { window.removeEventListener("orders:archive-changed", refresh); };
   }, [loadDashboard]);
 
   /* =========================================================

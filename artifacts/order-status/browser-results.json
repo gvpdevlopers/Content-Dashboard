@@ -1,0 +1,13 @@
+{
+  "passed": [
+    "admin confirmation and cancel",
+    "employee confirmation and cancel",
+    "admin complete to pending/in progress/on hold",
+    "employee complete to pending/in progress/on hold",
+    "payment unchanged",
+    "client read-only status",
+    "client refresh event",
+    "390px no overflow",
+    "no page errors"
+  ]
+}

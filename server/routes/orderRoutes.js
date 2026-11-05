@@ -37,6 +37,8 @@ router.get("/admin/:id/ad-credit", protect, adminOnly, adCredit.getOrderAdCredit
 router.post("/admin/:id/ad-credit", protect, adminOnly, adCredit.issueAdCredit);
 router.get("/staff/:id/ad-credit", protect, orderStaff, adCredit.getOrderAdCredit);
 router.post("/staff/:id/ad-credit", protect, orderStaff, adCredit.issueAdCredit);
+router.post("/admin/:id/ad-credit/apply", protect, adminOnly, adCredit.applyOrderCredit);
+router.post("/staff/:id/ad-credit/apply", protect, orderStaff, adCredit.applyOrderCredit);
 
 router.get(
   "/payment-pricing",

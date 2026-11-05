@@ -16,11 +16,12 @@ const getAdminOrderById = async (orderId, staffMode = false) => {
   return response.data;
 };
 
-const updateOrderStatus = async (orderId, status, staffMode = false) => {
+const updateOrderStatus = async (orderId, status, staffMode = false, confirmation = {}) => {
   const response = await api.patch(
     `${getOrderRoot(staffMode)}/${orderId}/status`,
     {
       status,
+      ...confirmation,
     }
   );
 

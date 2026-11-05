@@ -614,3 +614,36 @@
     transform: none;
   }
 }
+/* Compact archive controls are opt-in for the admin order list. */
+.dashboard-ui .dashboard-action.order-archive-icon {
+  background: #fff;
+  border-color: #e2e8f0;
+  color: #64748b;
+}
+.dashboard-ui .dashboard-action.order-archive-icon:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+.dashboard-ui .dashboard-action.order-archive-icon--delete:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+/* Opt-in all-screen accordion, reusing the client order-action presentation. */
+.dashboard-ui .order-action-section--collapsible { padding: 0.5rem 1rem; }
+.dashboard-ui .order-action-section--collapsible .order-action-desktop-title { display: none; }
+.dashboard-ui .order-action-section--collapsible .order-action-mobile-title { display: block; }
+.dashboard-ui .order-action-section--collapsible .order-action-body { margin-top: 0; }
+.dashboard-ui .order-action-section--collapsible[data-expanded="false"] .order-action-body {
+  grid-template-rows: 0fr;
+  visibility: hidden;
+}
+.dashboard-ui .order-action-section--collapsible button:focus-visible {
+  outline: 2px solid #64748b;
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-ui .order-action-section--collapsible :is(.order-action-body, .order-action-chevron) { transition: none; }
+}

@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import ConfirmDialog from "./ConfirmDialog";
 import adminOrderService from "../services/adminOrderService";
 
-export default function OrderArchiveAction({ order, user, onUpdated }) {
+export default function OrderArchiveAction({ order, user, onUpdated, iconOnly = false }) {
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -31,9 +31,9 @@ export default function OrderArchiveAction({ order, user, onUpdated }) {
     } finally { setBusy(false); }
   };
   return <div className="relative z-[2]">
-    <button type="button" className={`dashboard-action ${archived ? "dashboard-action--secondary" : "dashboard-action--destructive"}`} onClick={() => { setError(""); setStep(1); }} aria-label={`${archived ? "Restore" : "Delete"} order ${reference}`}>
+    <button type="button" title={archived ? "Restore order" : "Delete order"} className={`dashboard-action ${iconOnly ? `dashboard-action--icon order-archive-icon ${!archived ? "order-archive-icon--delete" : ""}` : archived ? "dashboard-action--secondary" : "dashboard-action--destructive"}`} onClick={() => { setError(""); setStep(1); }} aria-label={`${archived ? "Restore" : "Delete"} order ${reference}`}>
       {archived ? <ArchiveRestore size={15} aria-hidden="true" /> : <Trash2 size={15} aria-hidden="true" />}
-      {archived ? "Restore" : "Delete"}
+      {!iconOnly && (archived ? "Restore" : "Delete")}
     </button>
     <ConfirmDialog open={step > 0} title={archived ? "Restore this order?" : step === 2 ? "Confirm paid or active order archive" : "Delete order from the active admin list?"}
       description={`Order ${reference} (ID: ${order._id}). ${archived ? "Restore this order to the active admin list." : step === 2 ? "Warning: this order has payment, fulfilment, or completed work to retain. Archiving does not cancel work, payments, or collection requests, and does not issue a refund. Explicitly confirm that you want to archive it." : "This moves the order to the recoverable archive. It does not permanently delete the order. Invoices, delivery links, financial records and client history are preserved."}`}

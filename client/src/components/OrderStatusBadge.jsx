@@ -7,6 +7,7 @@ const statuses = {
   confirmed: ["Confirmed", CheckCircle2, "border-blue-200 bg-blue-50 text-blue-700"],
   processing: ["Processing", Settings2, "border-blue-200 bg-blue-50 text-blue-700"],
   in_progress: ["In Progress", Activity, "border-blue-200 bg-blue-50 text-blue-700"],
+  on_hold: ["On Hold", Clock3, "border-amber-200 bg-amber-50 text-amber-700"],
   completed: ["Completed", CheckCircle2, "border-emerald-200 bg-emerald-50 text-emerald-700"],
   delivered: ["Delivered", CheckCircle2, "border-emerald-200 bg-emerald-50 text-emerald-700"],
   cancelled: ["Cancelled", XCircle, "border-red-200 bg-red-50 text-red-700"],

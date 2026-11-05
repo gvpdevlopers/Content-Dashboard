@@ -1,3 +1,6 @@
+import OrderPaymentBreakdown from "../../components/OrderPaymentBreakdown";
+import { notifyOrderStatusChange } from "../../hooks/useOrderStatusRefresh";
+import ConfirmDialog from "../../components/ConfirmDialog";
 import OrderArchiveAction from "../../components/OrderArchiveAction";
 import useAsyncResource from "../../hooks/useAsyncResource";
 import PaymentStatusBadge from "../../components/PaymentStatusBadge";
@@ -47,6 +50,8 @@ const AdminOrderDetailsContent = ({ id, staffMode, user }) => {
 
 
 
+  const [proposedStatus, setProposedStatus] = useState("");
+  const [statusError, setStatusError] = useState("");
   const [statusLoading, setStatusLoading] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [notesLoading, setNotesLoading] = useState(false);
@@ -147,12 +152,16 @@ const AdminOrderDetailsContent = ({ id, staffMode, user }) => {
   |----------------------------------------------------------------------
   */
 
-  const handleStatusChange = async (value) => {
+  const handleStatusChange = async (value, confirmed = false) => {
     if (!order || value === order.orderStatus) {
       return;
     }
 
+    if (order.orderStatus === "completed" && !confirmed) {
+      setProposedStatus(value); setStatusError(""); return;
+    }
     try {
+      setStatusError("");
       setStatusLoading(true);
       setError("");
 
@@ -160,6 +169,7 @@ const AdminOrderDetailsContent = ({ id, staffMode, user }) => {
         order._id,
         value,
         staffMode,
+        { expectedStatus: order.orderStatus, confirmCompleted: confirmed },
       );
 
       setOrder((currentOrder) => ({
@@ -167,8 +177,11 @@ const AdminOrderDetailsContent = ({ id, staffMode, user }) => {
         ...data.order,
       }));
 
+      setProposedStatus("");
+      notifyOrderStatusChange();
       toast.success("Order status updated successfully.");
     } catch (error) {
+      setStatusError(error.response?.data?.message || "Unable to update order status.");
       console.error("Update order status error:", error);
 
       toast.error(
@@ -479,6 +492,11 @@ const AdminOrderDetailsContent = ({ id, staffMode, user }) => {
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-[1500px] overflow-x-clip animate-fade-up">
+      <ConfirmDialog open={Boolean(proposedStatus)} title="Change completed order status?"
+        description={`Order ${order.orderNumber || order._id}: Completed to ${proposedStatus.replace(/_/g, " ")}. Payment status, existing deliveries and order information will be retained.`}
+        confirmLabel="Change Status" loading={statusLoading} error={statusError}
+        onCancel={() => { setProposedStatus(""); setStatusError(""); }}
+        onConfirm={() => handleStatusChange(proposedStatus, true)} />
       {user?.role === "admin" && <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-zinc-600">{order.archivedAt ? "Archived from the active admin list. Client history and payment records are retained." : "Order management"}</p>
         <OrderArchiveAction order={order} user={user} onUpdated={() => loadOrder()} />
@@ -854,10 +872,10 @@ const AdminOrderDetailsContent = ({ id, staffMode, user }) => {
           >
             <div className="min-w-0">
               <h3 className="mb-2 text-sm font-medium text-zinc-800">
-                Current status
+                Change Status
               </h3>
 
-              <p className="mb-4 text-xs leading-5 text-zinc-400">
+              <p className="mb-4 text-xs leading-5 text-zinc-600">
                 Update the current processing status of this order.
               </p>
 
@@ -877,6 +895,10 @@ const AdminOrderDetailsContent = ({ id, staffMode, user }) => {
                     {
                       value: "in_progress",
                       label: "In Progress",
+                    },
+                    {
+                      value: "on_hold",
+                      label: "On Hold",
                     },
                     {
                       value: "completed",
@@ -917,52 +939,9 @@ const AdminOrderDetailsContent = ({ id, staffMode, user }) => {
                 />
               </div>
 
-              {order?.paymentMethod === "cheque" && (
-                <DetailItem
-                  label="Cheque Type"
-                  value={
-                    order?.chequeType === "with_gst"
-                      ? "With GST"
-                      : "Direct Collection"
-                  }
-                />
-              )}
-              {order?.couponSnapshot && (
-                <>
-                  <DetailItem
-                    label="Original subtotal"
-                    value={formatCurrency(order?.originalSubtotal)}
-                  />
-                  <DetailItem
-                    label={`Coupon (${order.couponSnapshot.code})`}
-                    value={`−${formatCurrency(order?.discountTotal)}`}
-                  />
-              {order.couponSnapshots?.length > 1 && order.couponSnapshots.map(coupon => <DetailItem key={coupon.code} label={`${coupon.code}: ${coupon.serviceBreakdown.filter(line => line.discountAmount > 0).map(line => line.optionBreakdown?.length ? `${line.serviceName} (${line.optionBreakdown.map(option => option.label).join(", ")})` : line.serviceName).join("; ")}`} value={`-${formatCurrency(coupon.discountTotal)}`} />)}
-                  {order.couponSnapshot.serviceBreakdown
-                    ?.filter((entry) => entry.discountAmount > 0)
-                    .map((entry) => (
-                      <DetailItem
-                        key={entry.serviceId}
-                        label={`${entry.serviceName} (${entry.discountType === "combined" ? "combined coupons" : entry.discountType === "fixed" ? "fixed amount" : `${entry.discountPercent}%`})${entry.optionBreakdown?.length ? ` - ${entry.optionBreakdown.map(option => option.label).join(", ")}` : ""}`}
-                        value={`−${formatCurrency(entry.discountAmount)}`}
-                      />
-                    ))}
-                </>
-              )}
-              <DetailItem
-                label={order?.couponSnapshot ? "Taxable subtotal" : "Subtotal"}
-                value={formatCurrency(order?.subtotal)}
-              />
-              <DetailItem
-                label={`GST (${Number(order?.gstRate || 0)}%)`}
-                value={formatCurrency(order?.gstAmount)}
-              />
-              <DetailItem
-                label="Final Total"
-                value={formatCurrency(order?.amount)}
-              />
+              <OrderPaymentBreakdown order={order} formatCurrency={formatCurrency} />
 
-              <p className="mb-4 text-xs leading-5 text-zinc-400">
+              <p className="mb-4 text-xs leading-5 text-zinc-600">
                 {order?.paymentMethod === "month_end"
                   ? "Payment is due at the end of the month. Select Paid only after payment has been received and verified. Status changes record your account and the time."
                   : ["cod", "cheque"].includes(order?.paymentMethod) ? "Only the owning client can verify the PIN. Successful verification marks the payment as Paid." : "Update the saved payment status here."}
@@ -1644,7 +1623,7 @@ const AdminOrderDetailsContent = ({ id, staffMode, user }) => {
                 )}
               </div>
             )}
-            <OrderAdCredit order={order} staffMode={staffMode} />
+            <OrderAdCredit order={order} staffMode={staffMode} onUpdated={() => loadOrder(true)} />
           </InfoCard>
         )}
 
@@ -1660,7 +1639,7 @@ const AdminOrderDetailsContent = ({ id, staffMode, user }) => {
             updatingProgressKey={progressUpdatingKey}
             onProgressUpdate={handleServiceProgressUpdate}
             renderServiceExtras={(item) => order.items?.length > 0 && item.serviceSnapshot?.slug === "ads"
-              ? <OrderAdCredit order={order} staffMode={staffMode} /> : null}
+              ? <OrderAdCredit order={order} staffMode={staffMode} onUpdated={() => loadOrder(true)} /> : null}
           />
         )}
 
