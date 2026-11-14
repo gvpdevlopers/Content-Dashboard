@@ -59,11 +59,12 @@ const PublicFooter = () => {
       <div className="absolute -right-48 -top-56 h-[36rem] w-[36rem] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.48),transparent_68%)]" />
     </div>
 
+    {/* Resize with h-full / w-1/2; translate-x-1/2 clips half the centered logo at the footer edge. */}
     <motion.img
       src="/small_logo.png"
       alt=""
       aria-hidden="true"
-      className="pointer-events-none absolute right-0 top-[calc(50%-2.5rem)] z-0 hidden h-auto w-96 translate-x-[45%] -translate-y-1/2 object-contain opacity-[0.045] min-[480px]:block sm:w-[min(48rem,80vw)] lg:w-[min(56rem,80vw)]"
+      className="pointer-events-none absolute right-0 top-0 z-0 h-full w-1/2 translate-x-[40%] object-contain object-center opacity-[0.045]"
       initial={reduceMotion ? false : { opacity: 0, y: 10 }}
       whileInView={{ opacity: 0.045, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
