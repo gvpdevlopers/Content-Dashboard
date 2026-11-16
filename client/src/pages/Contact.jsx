@@ -13,7 +13,7 @@ const Contact = () => {
 
         if (element) {
           element.scrollIntoView({
-            behavior: "smooth",
+            behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
             block: "start",
           });
         }
@@ -33,7 +33,7 @@ const Contact = () => {
       {/* =====================================================
           CONTACT CONTENT
       ====================================================== */}
-      <Section className="bg-white !py-16 sm:!py-24 lg:!py-32">
+      <Section className="glow-contact-content bg-white !py-16 sm:!py-24 lg:!py-32">
         <div className="mx-auto max-w-4xl">
           <ContactInfo />
 

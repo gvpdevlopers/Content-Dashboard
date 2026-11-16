@@ -1,4 +1,5 @@
 import "../styles/dashboard.css";
+import "../styles/dashboard-theme.css";
 import { NavLink, Outlet } from "react-router-dom";
 import { useState } from "react";
 import {
@@ -39,7 +40,7 @@ const DashboardLayout = () => {
   const userInitial = user?.name?.charAt(0)?.toUpperCase() || "G";
 
   return (
-    <div className="dashboard-ui min-h-screen bg-[#f7f7f8] text-zinc-900">
+    <div data-dashboard-role="client" className="dashboard-ui dashboard-shell min-h-screen bg-[#f7f7f8] text-zinc-900">
       {/* =====================================================
           MOBILE HEADER
       ====================================================== */}
@@ -179,7 +180,7 @@ const DashboardLayout = () => {
             NAVIGATION
         ================================================== */}
 
-        <nav className="flex-1 px-4 py-6">
+        <nav aria-label="Workspace navigation" className="flex-1 px-4 py-6">
           <p
             className="
               mb-3 px-3

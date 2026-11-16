@@ -26,8 +26,8 @@ const AboutStory = () => (
           around a clear business direction.
         </p>
         <p className="mt-5 text-sm leading-7 text-zinc-600 sm:text-base sm:leading-8">
-          Since 2017, our methods have been tested across hundreds of
-          businesses. We connect strategy, stories, and execution so the work
+          Since 2017, we have brought marketing and public relations together.
+          We connect strategy, stories, and execution so the work
           can move together—not as disconnected pieces.
         </p>
         <p className="mt-5 border-l-2 border-zinc-300 pl-4 text-sm leading-6 text-zinc-500">

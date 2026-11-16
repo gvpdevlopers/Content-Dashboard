@@ -721,7 +721,7 @@ const RecentOrderCard = ({ order }) => {
   return (
     <Link
       to={`/admin/orders/${order._id || order.id}`}
-      className="dashboard-action dashboard-action--secondary
+      className="dashboard-order-card dashboard-action dashboard-action--secondary
         group
         block
         rounded-[22px]

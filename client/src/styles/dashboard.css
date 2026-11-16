@@ -49,10 +49,10 @@
   height: 2.75rem;
   align-items: center;
   justify-content: center;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--dash-border, #d9ded2);
   border-radius: 0.75rem;
   background: #fff;
-  color: #475569;
+  color: var(--dash-text-secondary, #52604f);
 }
 
 @media (max-width: 639px) {
@@ -81,37 +81,37 @@
 }
 
 .dashboard-ui .dashboard-action--primary {
-  background: #334155;
-  border-color: #334155;
+  background: var(--dash-primary, #193a2b);
+  border-color: var(--dash-primary, #193a2b);
   color: #fff;
   box-shadow: 0 2px 4px rgb(15 23 42 / 0.05);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .dashboard-ui .dashboard-action--primary:hover:not(:disabled):not([aria-disabled="true"]) {
-    background: #1e293b;
-    border-color: #1e293b;
+    background: var(--dash-primary-hover, #294e3a);
+    border-color: var(--dash-primary-hover, #294e3a);
     color: #fff;
   }
 }
 
 .dashboard-ui .dashboard-action--secondary {
   background: #fff;
-  border-color: #e2e8f0;
-  color: #475569;
+  border-color: var(--dash-border, #d9ded2);
+  color: var(--dash-text-secondary, #52604f);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .dashboard-ui .dashboard-action--secondary:hover:not(:disabled):not([aria-disabled="true"]) {
-    background: #f8fafc;
-    border-color: #cbd5e1;
-    color: #1e293b;
+    background: var(--dash-ivory, #f3f2ec);
+    border-color: var(--dash-border-strong, #a5b99a);
+    color: var(--dash-primary-hover, #294e3a);
   }
 }
 
 .dashboard-ui .dashboard-action--tertiary {
   background: transparent;
-  color: #64748b;
+  color: var(--dash-text-muted, #64715f);
   --action-lift: 0px;
   --action-hover-shadow: none;
   --action-pressed-shadow: none;
@@ -119,8 +119,8 @@
 
 @media (hover: hover) and (pointer: fine) {
   .dashboard-ui .dashboard-action--tertiary:hover:not(:disabled):not([aria-disabled="true"]) {
-    background: #f1f5f9;
-    color: #334155;
+    background: var(--dash-mist, #e7e9df);
+    color: var(--dash-primary, #193a2b);
   }
 }
 
@@ -141,16 +141,16 @@
 
 .dashboard-ui .dashboard-action:disabled,
 .dashboard-ui .dashboard-action[aria-disabled="true"] {
-  background: #f1f5f9;
-  border-color: #e2e8f0;
-  color: #94a3b8;
+  background: var(--dash-mist, #e7e9df);
+  border-color: var(--dash-border, #d9ded2);
+  color: var(--dash-disabled-text, #7c8875);
   cursor: not-allowed;
   box-shadow: none;
   opacity: 0.75;
 }
 
 .dashboard-ui :where(button, a, input, textarea):focus-visible {
-  outline: 2px solid #64748b;
+  outline: 2px solid var(--dash-text-muted, #64715f);
   outline-offset: 3px;
 }
 
@@ -164,7 +164,7 @@
 
 /* Semantic accents are opt-in on informational icons, never inherited by action buttons. */
 .dashboard-ui .icon-accent-blue {
-  color: #64748b;
+  color: var(--dash-text-muted, #64715f);
 }
 
 .dashboard-ui .icon-accent-green {
@@ -180,7 +180,7 @@
 }
 
 .dashboard-ui .icon-accent-slate {
-  color: #64748b;
+  color: var(--dash-text-muted, #64715f);
 }
 
 .dashboard-ui .draft-row {
@@ -188,8 +188,8 @@
 }
 
 .dashboard-ui .draft-row:hover {
-  background-color: #f8fafc;
-  border-color: #cbd5e1;
+  background-color: var(--dash-ivory, #f3f2ec);
+  border-color: var(--dash-border-strong, #a5b99a);
 }
 
 .dashboard-ui .mobile-order-review {
@@ -213,7 +213,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    border-top: 1px solid #e4e4e7;
+    border-top: 1px solid var(--dash-border, #d9ded2);
     background: #fff;
     padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
     box-shadow: 0 -2px 8px rgb(15 23 42 / 0.04);
@@ -224,7 +224,7 @@
 .dashboard-ui .order-actions-panel {
   display: grid;
   min-width: 0;
-  border: 1px solid #e4e4e7;
+  border: 1px solid var(--dash-border, #d9ded2);
   border-radius: 1rem;
   background: #fff;
   box-shadow: 0 2px 6px rgb(15 23 42 / 0.025);
@@ -236,7 +236,7 @@
 }
 
 .dashboard-ui .order-action-section+.order-action-section {
-  border-top: 1px solid #e4e4e7;
+  border-top: 1px solid var(--dash-border, #d9ded2);
 }
 
 .dashboard-ui .order-action-heading {
@@ -263,14 +263,14 @@
   text-align: left;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #18181b;
+  color: var(--dash-text, #252927);
   border-radius: 0.5rem;
 }
 
 .dashboard-ui .order-action-icon {
   display: inline-flex;
   flex-shrink: 0;
-  color: #64748b;
+  color: var(--dash-text-muted, #64715f);
 }
 
 .dashboard-ui .order-action-chevron {
@@ -322,7 +322,7 @@
 
   .dashboard-ui .order-action-section+.order-action-section {
     border-top: 0;
-    border-left: 1px solid #e4e4e7;
+    border-left: 1px solid var(--dash-border, #d9ded2);
   }
 
   .dashboard-ui .order-action-mobile-title {
@@ -336,7 +336,7 @@
     flex: 1;
     font-size: 0.875rem;
     font-weight: 600;
-    color: #18181b;
+    color: var(--dash-text, #252927);
   }
 
   .dashboard-ui .order-action-body {
@@ -403,29 +403,29 @@
 
 /* The existing dark summary uses the same hierarchy with inverted surfaces. */
 .dashboard-ui .dashboard-action--primary.dashboard-action--inverse {
-  background: #f8fafc;
-  border-color: #f8fafc;
-  color: #1e293b;
+  background: var(--dash-ivory, #f3f2ec);
+  border-color: var(--dash-ivory, #f3f2ec);
+  color: var(--dash-primary-hover, #294e3a);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .dashboard-ui .dashboard-action--primary.dashboard-action--inverse:hover:not(:disabled):not([aria-disabled="true"]) {
-    background: #e2e8f0;
-    border-color: #e2e8f0;
-    color: #0f172a;
+    background: var(--dash-border, #d9ded2);
+    border-color: var(--dash-border, #d9ded2);
+    color: var(--dash-text, #252927);
   }
 }
 
 .dashboard-ui .dashboard-action--secondary.dashboard-action--inverse {
   background: rgb(255 255 255 / 0.04);
   border-color: rgb(255 255 255 / 0.16);
-  color: #e2e8f0;
+  color: var(--dash-border, #d9ded2);
 }
 
 .dashboard-ui .dashboard-action--tertiary.dashboard-action--inverse {
   background: transparent;
   border-color: transparent;
-  color: #cbd5e1;
+  color: var(--dash-border-strong, #a5b99a);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -439,13 +439,13 @@
 }
 
 .dashboard-ui .dashboard-action--inverse:focus-visible {
-  outline-color: #94a3b8;
+  outline-color: var(--dash-disabled-text, #7c8875);
 }
 
 .dashboard-ui .dashboard-action--inverse:disabled {
   background: rgb(255 255 255 / 0.04);
   border-color: rgb(255 255 255 / 0.08);
-  color: #64748b;
+  color: var(--dash-text-muted, #64715f);
   box-shadow: none;
   opacity: 0.75;
 }
@@ -456,9 +456,9 @@
   isolation: isolate;
   overflow: hidden;
   padding: clamp(1.8rem, 4.8vw, 3.8rem) clamp(0.8rem, 3.8vw, 2.8rem);
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--dash-border, #d9ded2);
   border-radius: 2rem;
-  background: linear-gradient(135deg, #f8faff 0%, #fff 48%, #f7f7ff 100%);
+  background: var(--dash-ivory, #f3f2ec);
   box-shadow: 0 18px 55px rgb(51 65 85 / .06);
 }
 
@@ -468,7 +468,7 @@
   width: 15rem;
   height: 15rem;
   border-radius: 999px;
-  background: rgb(129 140 248 / .11);
+  background: rgb(165 185 154 / .11);
   pointer-events: none;
 }
 
@@ -480,7 +480,7 @@
 .dashboard-ui .new-order-entry-orb--bottom {
   bottom: -11rem;
   left: -6rem;
-  background: rgb(96 165 250 / .09);
+  background: rgb(165 185 154 / .09);
 }
 
 .dashboard-ui .new-order-entry-shell>h1 {
@@ -504,7 +504,7 @@
   flex-direction: column;
   align-items: stretch;
   padding: 1.25rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--dash-border, #d9ded2);
   border-radius: 1.25rem;
   background: #fff;
   text-align: left;
@@ -512,8 +512,8 @@
 }
 
 .dashboard-ui .new-order-entry-card--package {
-  border-color: #c4b5fd;
-  background: linear-gradient(145deg, #fbfaff, #f5f3ff);
+  border-color: #c5d1bb;
+  background: var(--dash-mist, #e7e9df);
 }
 
 .dashboard-ui .new-order-entry-art {
@@ -528,15 +528,15 @@
 }
 
 .dashboard-ui .new-order-entry-art--custom {
-  color: #3b82f6;
+  color: #193a2b;
 }
 
 .dashboard-ui .new-order-entry-art--package {
-  color: #7c3aed;
+  color: #4d703b;
 }
 
 .dashboard-ui .new-order-entry-card-title {
-  color: #18181b;
+  color: var(--dash-text, #252927);
   font-size: 1rem;
   font-weight: 600;
   line-height: 1.5rem;
@@ -545,7 +545,7 @@
 .dashboard-ui .new-order-entry-card-description {
   margin-top: .375rem;
   margin-bottom: 1.5rem;
-  color: #64748b;
+  color: var(--dash-text-muted, #64715f);
   font-size: .8125rem;
   line-height: 1.5;
 }
@@ -560,30 +560,30 @@
 }
 
 .dashboard-ui .new-order-entry-card:focus-visible {
-  outline: 2px solid #64748b;
+  outline: 2px solid var(--dash-text-muted, #64715f);
   outline-offset: 4px;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .dashboard-ui .new-order-entry-card:hover {
     transform: translateY(-3px);
-    border-color: #94a3b8;
+    border-color: var(--dash-disabled-text, #7c8875);
     box-shadow: 0 12px 28px rgb(51 65 85 / .09);
   }
 
   .dashboard-ui .new-order-entry-card--package:hover {
-    border-color: #a78bfa;
+    border-color: #a5b99a;
   }
 
   .dashboard-ui .new-order-entry-card:hover .dashboard-action--secondary {
-    border-color: #cbd5e1;
-    background: #f8fafc;
-    color: #1e293b;
+    border-color: var(--dash-border-strong, #a5b99a);
+    background: var(--dash-ivory, #f3f2ec);
+    color: var(--dash-primary-hover, #294e3a);
   }
 
   .dashboard-ui .new-order-entry-card:hover .dashboard-action--primary {
-    border-color: #1e293b;
-    background: #1e293b;
+    border-color: var(--dash-primary-hover, #294e3a);
+    background: var(--dash-primary-hover, #294e3a);
   }
 
   .dashboard-ui .new-order-entry-card:hover .new-order-entry-button {
@@ -617,13 +617,13 @@
 /* Compact archive controls are opt-in for the admin order list. */
 .dashboard-ui .dashboard-action.order-archive-icon {
   background: #fff;
-  border-color: #e2e8f0;
-  color: #64748b;
+  border-color: var(--dash-border, #d9ded2);
+  color: var(--dash-text-muted, #64715f);
 }
 .dashboard-ui .dashboard-action.order-archive-icon:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-  color: #334155;
+  background: var(--dash-ivory, #f3f2ec);
+  border-color: var(--dash-border-strong, #a5b99a);
+  color: var(--dash-primary, #193a2b);
 }
 .dashboard-ui .dashboard-action.order-archive-icon--delete:hover {
   background: #fef2f2;
@@ -641,7 +641,7 @@
   visibility: hidden;
 }
 .dashboard-ui .order-action-section--collapsible button:focus-visible {
-  outline: 2px solid #64748b;
+  outline: 2px solid var(--dash-text-muted, #64715f);
   outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {

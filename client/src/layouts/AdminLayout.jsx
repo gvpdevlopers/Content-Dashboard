@@ -1,4 +1,5 @@
 import "../styles/dashboard.css";
+import "../styles/dashboard-theme.css";
 import { NavLink, Outlet } from "react-router-dom";
 import { useState } from "react";
 import {
@@ -45,7 +46,7 @@ const AdminLayout = () => {
   const ordersPath = isEmployee ? "/staff/orders" : "/admin/orders";
 
   return (
-    <div className="dashboard-ui min-h-screen bg-[#f7f7f8] text-zinc-900">
+    <div data-dashboard-role={isEmployee ? "employee" : "admin"} className="dashboard-ui dashboard-shell min-h-screen bg-[#f7f7f8] text-zinc-900">
       {/* =====================================================
           MOBILE HEADER
       ====================================================== */}
@@ -186,7 +187,7 @@ const AdminLayout = () => {
             NAVIGATION
         ================================================== */}
 
-        <nav className="flex-1 px-4 py-6">
+        <nav aria-label="Workspace navigation" className="flex-1 px-4 py-6">
           <p
             className="
               mb-3 px-3

@@ -108,6 +108,9 @@ const Services = () => {
     };
   }, [reloadKey]);
 
+  const [category, setCategory] = useState("All services");
+  const categories = ["All services", ...new Set(services.map(service => service.category).filter(Boolean))];
+  const filteredServices = category === "All services" ? services : services.filter(service => service.category === category);
   const visibleServices = services.slice(0, 6);
 
   return (
@@ -175,6 +178,7 @@ const Services = () => {
                 <a
                   key={getServiceId(service, index)}
                   href={`#${getServiceId(service, index)}`}
+                  onClick={() => setCategory("All services")}
                   className="public-service-nav-link inline-flex min-h-8 shrink-0 items-baseline gap-2 text-xs font-medium text-zinc-500 transition-colors duration-300 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500"
                 >
                   <span className="text-[10px] font-semibold tracking-[0.12em] text-zinc-400">
@@ -185,8 +189,13 @@ const Services = () => {
               ))}
             </nav>
 
-            <Stagger className="mt-16">
-              {services.map((service, index) => {
+            <div className="glow-category-filters" role="group" aria-label="Filter by category">
+              {categories.map(item => <button type="button" key={item} aria-pressed={category === item} onClick={() => setCategory(item)}>{item}</button>)}
+            </div>
+            <p className="sr-only" role="status">{filteredServices.length} services shown</p>
+            <Stagger key={category} className="mt-10">
+              {filteredServices.map((service) => {
+                const index = services.indexOf(service);
                 const serviceId = getServiceId(service, index);
                 const startingPrice = getServiceStartingPrice(service);
                 const options = getActiveOptions(service);
@@ -205,6 +214,7 @@ const Services = () => {
                           <h3 className="public-service-row__title break-words text-2xl font-medium leading-tight tracking-[-0.05em] text-zinc-950 sm:text-3xl lg:text-4xl">
                             {service.name}
                           </h3>
+                          {service.description && <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-600">{service.description}</p>}
                           {service.category && (
                             <p className="mt-2 text-xs font-medium text-zinc-500 sm:text-sm">
                               {service.category}

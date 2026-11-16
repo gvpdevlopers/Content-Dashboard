@@ -1,3 +1,4 @@
+import { Megaphone, Layers, Clapperboard } from "lucide-react";
 import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
@@ -66,7 +67,7 @@ const IntroSection = () => {
               }`}
             >
               <span className="flex items-center justify-between text-[10px] font-semibold tracking-[0.18em] text-zinc-400">
-                {discipline.number}
+                {[<Megaphone key="marketing" size={25} />, <Layers key="pr" size={25} />, <Clapperboard key="content" size={25} />][index]}
                 <span className={`h-px w-8 transition-colors ${activeIndex === index ? "bg-zinc-900" : "bg-zinc-200"}`} />
               </span>
               <span className="mt-5 block text-xl font-semibold tracking-[-0.045em] sm:text-2xl">
@@ -77,7 +78,7 @@ const IntroSection = () => {
           ))}
         </div>
 
-        <div className="relative min-h-52 overflow-hidden bg-zinc-950 px-6 py-8 text-white sm:min-h-60 sm:px-10 sm:py-10 lg:px-14">
+        <div className="glow-discipline-detail relative min-h-52 overflow-hidden bg-zinc-950 px-6 py-8 text-white sm:min-h-60 sm:px-10 sm:py-10 lg:px-14">
           <div className="pointer-events-none absolute inset-y-0 right-0 w-2/3 opacity-40" aria-hidden="true">
             <svg viewBox="0 0 500 260" className="h-full w-full" fill="none">
               <path d="M80 220C120 80 280 40 470 55" stroke="white" strokeOpacity=".35" />

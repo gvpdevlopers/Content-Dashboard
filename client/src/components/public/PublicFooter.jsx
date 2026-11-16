@@ -64,7 +64,7 @@ const PublicFooter = () => {
       src="/small_logo.png"
       alt=""
       aria-hidden="true"
-      className="pointer-events-none absolute right-0 top-0 z-0 h-full w-1/2 translate-x-[40%] object-contain object-center opacity-[0.045]"
+      className="glow-footer-watermark pointer-events-none absolute right-0 top-0 z-0 h-full w-1/2 translate-x-[40%] object-contain object-center opacity-[0.045]"
       initial={reduceMotion ? false : { opacity: 0, y: 10 }}
       whileInView={{ opacity: 0.045, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
@@ -76,7 +76,7 @@ const PublicFooter = () => {
 
     <div className="relative z-10 mx-auto w-full max-w-[1400px] px-5 sm:px-8 lg:px-10">
       {/* Main Footer */}
-      <div className="grid gap-10 py-14 sm:py-16 lg:grid-cols-[1.35fr_repeat(4,minmax(0,1fr))] lg:gap-8 lg:py-20">
+      <div className="grid gap-10 py-14 sm:grid-cols-2 sm:py-16 lg:grid-cols-[1.35fr_repeat(4,minmax(0,1fr))] lg:gap-8 lg:py-20">
         {/* Brand */}
         <div className="max-w-xs">
           <Link
