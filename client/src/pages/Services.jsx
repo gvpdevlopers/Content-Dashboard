@@ -172,9 +172,9 @@ const Services = () => {
           <div className="mx-auto mt-14 max-w-6xl sm:mt-20">
             <nav
               aria-label="Browse services"
-              className="-mx-4 flex gap-x-5 gap-y-3 overflow-x-auto border-y border-zinc-200 px-4 py-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
+              className="-mx-4 flex gap-x-5 gap-y-3 overflow-x-auto border-y border-zinc-200 px-4 py-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 border-b-0"
             >
-              {visibleServices.map((service, index) => (
+              {/* {visibleServices.map((service, index) => (
                 <a
                   key={getServiceId(service, index)}
                   href={`#${getServiceId(service, index)}`}
@@ -186,7 +186,7 @@ const Services = () => {
                   </span>
                   <span>{service.name}</span>
                 </a>
-              ))}
+              ))} */}
             </nav>
 
             <div className="glow-category-filters" role="group" aria-label="Filter by category">

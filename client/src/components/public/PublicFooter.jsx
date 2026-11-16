@@ -64,7 +64,7 @@ const PublicFooter = () => {
       src="/small_logo.png"
       alt=""
       aria-hidden="true"
-      className="glow-footer-watermark pointer-events-none absolute right-0 top-0 z-0 h-full w-1/2 translate-x-[40%] object-contain object-center opacity-[0.045]"
+      className="glow-footer-watermark pointer-events-none absolute right-0 top-0 z-0 h-full w-1/2 translate-x-[48%] object-contain object-center opacity-[0.045]"
       initial={reduceMotion ? false : { opacity: 0, y: 10 }}
       whileInView={{ opacity: 0.045, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
