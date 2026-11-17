@@ -3,7 +3,6 @@ import { motion, useReducedMotion } from "framer-motion";
 
 import PublicButton from "../PublicButton";
 import HeadingCursor from "../HeadingCursor";
-import OrbitalArtwork from "../OrbitalArtwork";
 import usePointerParallax from "../usePointerParallax";
 
 const HeroSection = () => {
@@ -11,8 +10,22 @@ const HeroSection = () => {
   const parallaxRef = usePointerParallax();
 
   return (
-    <section ref={parallaxRef} className="glow-hero glow-home-hero relative isolate flex min-h-[calc(100svh-72px)] items-center justify-center overflow-hidden bg-[#f7f7f5] px-5 py-20 text-center sm:px-8 lg:py-24">
-      <OrbitalArtwork />
+    <section ref={parallaxRef} className="relative isolate flex min-h-[calc(100svh-72px)] items-center justify-center overflow-hidden bg-[#f7f7f5] px-5 py-20 text-center sm:px-8 lg:py-24">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="public-parallax-layer public-parallax-strong absolute left-1/2 top-[44%] h-[30rem] w-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(24,24,27,0.075),rgba(24,24,27,0.018)_48%,transparent_72%)] sm:h-[42rem] sm:w-[42rem]" />
+        <svg
+          className="public-parallax-layer public-parallax-subtle absolute left-1/2 top-[44%] h-[min(94vw,780px)] w-[min(94vw,780px)] -translate-x-1/2 -translate-y-1/2 text-zinc-900/[0.075]"
+          viewBox="0 0 800 800"
+          fill="none"
+        >
+          <circle cx="400" cy="400" r="230" stroke="currentColor" />
+          <circle cx="400" cy="400" r="300" stroke="currentColor" strokeDasharray="2 10" />
+          <path d="M100 400h600M400 100v600" stroke="currentColor" strokeDasharray="1 9" />
+          <circle cx="400" cy="170" r="3" fill="currentColor" />
+          <circle cx="610" cy="520" r="3" fill="currentColor" />
+        </svg>
+        <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-[#f7f7f5] to-transparent" />
+      </div>
 
       <div className="relative mx-auto flex w-full max-w-5xl flex-col items-center">
         <motion.p
@@ -46,7 +59,7 @@ const HeroSection = () => {
           transition={{ duration: reduceMotion ? 0 : 0.65, delay: reduceMotion ? 0 : 0.16 }}
           className="mx-auto mt-7 max-w-xl text-base leading-7 text-zinc-600 sm:mt-9 sm:text-lg sm:leading-8"
         >
-          Marketing, public relations, and content—connected around what your
+          Marketing, public relations, and content-connected around what your
           business wants to do next.
         </motion.p>
 

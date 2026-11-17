@@ -1,4 +1,3 @@
-import OrbitalArtwork from "./OrbitalArtwork";
 import { Children } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import HeadingCursor from "./HeadingCursor";
@@ -11,9 +10,15 @@ const PublicDarkCTA = ({ eyebrow, title, highlight, description, children }) => 
   return (
     <section
       ref={parallaxRef}
-      className="glow-dark-cta relative isolate overflow-hidden bg-zinc-950 px-4 py-20 text-center text-white sm:px-6 sm:py-28 lg:py-36"
+      className="relative isolate overflow-hidden bg-zinc-950 px-4 py-20 text-center text-white sm:px-6 sm:py-28 lg:py-36"
     >
-      <OrbitalArtwork variant="cta" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="public-parallax-layer public-parallax-strong absolute left-1/2 top-1/2 h-[36rem] w-[36rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.11),transparent_68%)]" />
+        <svg className="public-parallax-layer public-parallax-subtle absolute left-1/2 top-1/2 h-[min(110vw,860px)] w-[min(110vw,860px)] -translate-x-1/2 -translate-y-1/2 text-white/[0.12]" viewBox="0 0 800 800" fill="none">
+          <circle cx="400" cy="400" r="240" stroke="currentColor" />
+          <circle cx="400" cy="400" r="320" stroke="currentColor" strokeDasharray="2 10" />
+        </svg>
+      </div>
       <motion.div
         initial={reduceMotion ? false : { opacity: 0, y: 18, filter: "blur(2px)" }}
         whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}

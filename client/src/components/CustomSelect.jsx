@@ -24,14 +24,12 @@ const CustomSelect = ({
   const [activeIndex, setActiveIndex] = useState(-1);
   const [placement, setPlacement] = useState(null);
   const [portalTarget, setPortalTarget] = useState(null);
-  const [dashboardTheme, setDashboardTheme] = useState(false);
   const selectedIndex = options.findIndex((option) => isSelected(option));
   const selectedOption = allOptions.find(isSelected);
 
   const measure = () => getSelectPlacement(triggerRef.current.getBoundingClientRect(), window.innerWidth, window.innerHeight);
   const show = (direction = 1) => {
     if (disabled) return;
-    setDashboardTheme(Boolean(triggerRef.current?.closest(".dashboard-ui")));
     setPlacement(measure());
     setPortalTarget(getSelectPortalTarget(triggerRef.current, document.body));
     const initialSelectedIndex = allOptions.findIndex(isSelected);
@@ -142,7 +140,6 @@ const CustomSelect = ({
       </button>
       {open && !disabled && placement && portalTarget && createPortal(
         <div ref={menuRef} aria-label={ariaLabel || label || placeholder} aria-labelledby={labelledBy}
-          data-dashboard-theme={dashboardTheme ? "true" : undefined}
           className="custom-select-menu fixed z-[10000] overflow-y-auto overscroll-contain rounded-xl border border-zinc-200 bg-white p-1.5 text-sm shadow-[0_12px_32px_rgba(15,23,42,0.12)]"
           onClick={(event) => event.stopPropagation()}
           style={{ left: placement.left, top: placement.top, bottom: placement.bottom, width: placement.width, maxHeight: placement.maxHeight }}>

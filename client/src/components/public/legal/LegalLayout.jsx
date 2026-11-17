@@ -7,7 +7,7 @@ import {
 
 const LegalLayout = ({ children }) => {
   return (
-    <div className="glow-legal bg-white">
+    <div className="bg-white">
       <div
         className="
           mx-auto

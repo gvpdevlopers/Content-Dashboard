@@ -410,11 +410,11 @@ const ContactForm = () => {
           shadow-none
         "
       >
-        <div className="glow-enquiry-layout relative">
+        <div className="relative">
           {/* ==================================================
               HEADER
           =================================================== */}
-          <div className="glow-enquiry-intro">
+          <div id="contact-form">
             <div className="inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500 sm:text-xs">
               <Send
                 size={13}
@@ -425,7 +425,7 @@ const ContactForm = () => {
               <span>Send an enquiry</span>
             </div>
 
-            <h2
+            <h3
               className="
                 mt-5
                 text-3xl
@@ -436,7 +436,7 @@ const ContactForm = () => {
               "
             >
               Tell us what you're building.
-            </h2>
+            </h3>
 
             <p
               className="
