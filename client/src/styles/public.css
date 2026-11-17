@@ -80,7 +80,7 @@
   padding-inline:clamp(24px,4.5vw,72px);
 }
 .public-page header img {
-  height:46px;
+  height:40px;
 }
 .public-page header nav a {
   font-size:15px;
@@ -611,7 +611,7 @@
 }
 @media(max-width:639px) {
   .public-page header img {
-    height:36px;
+    height:32px;
   }
   .public-page .glow-hero {
     min-height:585px;
